@@ -1,0 +1,27 @@
+[package]
+name = "evolution"
+version = "0.1.0"
+edition = "2021"
+description = "🦖 Evolve your fixed length data files into Apache Arrow tables, fully parallelized!"
+authors = [
+    "Wilhelm Ågren <wilhelmagren98@gmail.com>",
+]
+
+readme = "README.md"
+license-file = "LICENSE"
+homepage = "https://github.com/firelink-data/evolution"
+repository = "https://github.com/firelink-data/evolution"
+
+keywords = [ "rust", "cli", "arrow", "data-engineering", 
+"apache-parquet", "apache-arrow" ]
+include = [ "**/*.rs", "Cargo.toml", "LICENSE", "README.md" ]
+default-run = "evolution"
+
+[dependencies]
+arrow2 = "0.18.0"
+chrono = "0.4.31"
+clap = "4.4.8"
+colored = "2.0.4"
+env_logger = "0.10.1"
+log = "0.4.20"
+
