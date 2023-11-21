@@ -12,7 +12,7 @@ license-file = "LICENSE"
 homepage = "https://github.com/firelink-data/evolution"
 repository = "https://github.com/firelink-data/evolution"
 
-keywords = [ "rust", "cli", "arrow", "data-engineering", 
+keywords = [ "cli", "arrow", "data-engineering", 
 "apache-parquet", "apache-arrow" ]
 include = [ "**/*.rs", "Cargo.toml", "LICENSE", "README.md" ]
 default-run = "evolution"
