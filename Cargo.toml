@@ -18,9 +18,9 @@ include = [ "**/*.rs", "Cargo.toml", "LICENSE", "README.md" ]
 default-run = "evolution"
 
 [dependencies]
-arrow2 = "0.18.0"
+arrow2 = { version = "0.18.0", features = ["io_ipc"] }
 chrono = "0.4.31"
-clap = "4.4.8"
+clap = { version = "4.4.8", features = ["derive"] }
 colored = "2.0.4"
 env_logger = "0.10.1"
 log = "0.4.20"
