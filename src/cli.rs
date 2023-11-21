@@ -26,29 +26,30 @@
 */
 
 use clap::Parser;
-use log::{debug, error, info, warn, SetLoggerError};
-
-mod builder;
-mod cli;
-mod logging;
-
-use cli::CLIArgs;
 
 ///
-fn main() -> Result<(), SetLoggerError> {
-    let _args = CLIArgs::parse();
-    let _ = match logging::init_logging() {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            error!("Could not initialize boxed logger, exiting!");
-            Err(e)
-        }
-    };
+#[derive(Parser, Debug)]
+pub struct CLIArgs {
+    /// The fixed length file to parse.
+    /// TODO: support multiple files at once.
+    #[arg(short = 'f', long = "file", required = true)]
+    pub file: String,
 
-    debug!("abcdefgh ijklm nopqr stuvw xyzåäö");
-    info!("abcdefgh ijklm nopqr stuvw xyzåäö");
-    warn!("abcdefgh ijklm nopqr stuvw xyzåäö");
-    error!("abcdefgh ijklm nopqr stuvw xyzåäö");
+    /// The schema file to use for parsing the fixed length file.
+    #[arg(short = 's', long = "schema", required = true)]
+    pub schema: String,
+}
 
-    Ok(())
+///
+impl CLIArgs {}
+
+#[cfg(test)]
+mod tests_cli {
+    use super::*;
+
+    #[test]
+    #[should_panic]
+    fn try_parse_panic() {
+        CLIArgs::try_parse().unwrap();
+    }
 }

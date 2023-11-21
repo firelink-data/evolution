@@ -27,7 +27,7 @@
 
 use chrono::Local;
 use colored::Colorize;
-use log::{Record, Level, Log, Metadata, SetLoggerError};
+use log::{Level, Log, Metadata, Record, SetLoggerError};
 
 use std::env;
 
@@ -50,7 +50,6 @@ fn get_log_level_from_env() -> Level {
     }
 }
 
-
 ///
 pub struct Logger {
     log_level: Level,
@@ -58,7 +57,6 @@ pub struct Logger {
 
 ///
 impl Logger {
-
     ///
     pub fn new(log_level: Level) -> Self {
         Self { log_level }
@@ -108,17 +106,19 @@ impl Logger {
     fn error(&self, record: &Record) {
         println!(
             "{} [ {} ]\t {}",
-            Local::now().format("%Y-%m-%d %H:%M:%S").to_string().red().bold(),
+            Local::now()
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string()
+                .red()
+                .bold(),
             record.level().as_str().red().bold(),
             record.args().as_str().unwrap().red().bold(),
         );
     }
-
 }
 
 ///
 impl Log for Logger {
-
     ///
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= self.log_level
@@ -140,11 +140,11 @@ impl Log for Logger {
     ///
     fn flush(&self) {}
 }
-                
+
 ///
 pub fn init_logging() -> Result<(), SetLoggerError> {
     let log_level = get_log_level_from_env();
-    let logger = Logger::new(log_level.clone());
+    let logger = Logger::new(log_level);
     log::set_boxed_logger(Box::new(logger))
         .map(|()| log::set_max_level(log_level.to_level_filter()))
 }
