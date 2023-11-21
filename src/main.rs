@@ -26,10 +26,10 @@
 */
 
 use clap::Parser;
-use log::{info, debug, warn, error, SetLoggerError};
+use log::{debug, error, info, warn, SetLoggerError};
 
-mod cli;
 mod builder;
+mod cli;
 mod logging;
 
 use cli::CLIArgs;
@@ -38,11 +38,11 @@ use cli::CLIArgs;
 fn main() -> Result<(), SetLoggerError> {
     let _args = CLIArgs::parse();
     let _ = match logging::init_logging() {
-        Ok(()) => { Ok(()) },
+        Ok(()) => Ok(()),
         Err(e) => {
             error!("Could not initialize boxed logger, exiting!");
             Err(e)
-        },
+        }
     };
 
     debug!("abcdefgh ijklm nopqr stuvw xyzåäö");

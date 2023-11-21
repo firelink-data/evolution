@@ -30,7 +30,6 @@ use clap::Parser;
 ///
 #[derive(Parser, Debug)]
 pub struct CLIArgs {
-
     /// The fixed length file to parse.
     /// TODO: support multiple files at once.
     #[arg(short = 'f', long = "file", required = true)]

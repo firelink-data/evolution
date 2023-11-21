@@ -25,14 +25,12 @@
 * Last updated: 2023-11-21
 */
 
-
 use arrow2::datatypes::{DataType, Field, Schema};
 use arrow2::io::ipc::write::Record;
 
 ///
 #[allow(dead_code)]
 struct FixedField {
-
     /// The destination field.
     field: Field,
 
@@ -48,27 +46,24 @@ struct FixedField {
 
 ///
 #[allow(dead_code)]
-struct FixedRow {
-
+struct FixedRow<'a> {
     ///
-    fixed_fields: Vec<Box<FixedField>>,
+    fixed_fields: Vec<&'a FixedField>,
 }
 
 ///
 #[allow(dead_code)]
 struct FixedTableChunk<'a> {
-
     ///
     chunk_idx: u32,
 
     ///
-    fixed_table: Box<FixedTable<'a>>,
+    fixed_table: &'a FixedTable<'a>,
 
     column_builders: Vec<Box<dyn ColumnBuilder>>,
 
     // record_builder: Vec<Box< ??? >>
-    
-    records: Vec<Box<Record<'a>>>,
+    records: Vec<&'a Record<'a>>,
 
     bytes: Vec<u8>,
 }
@@ -76,18 +71,17 @@ struct FixedTableChunk<'a> {
 ///
 #[allow(dead_code)]
 struct FixedTable<'a> {
-
     ///
     bytes: Vec<u8>,
 
     ///
-    fixed_table_chunks: Vec<Box<FixedTableChunk<'a>>>,
+    fixed_table_chunks: Vec<&'a FixedTableChunk<'a>>,
 
     ///
-    row: FixedRow,
+    row: FixedRow<'a>,
 
     ///
-    schemas: Vec<Box<Schema>>,
+    schemas: Vec<&'a Schema>,
 
     ///
     table_n_cols: Vec<u32>,
@@ -104,7 +98,6 @@ struct FixedTable<'a> {
 
 ///
 pub trait ColumnBuilder {
-    
     ///
     fn parse_value(&self, name: String) -> bool;
 
