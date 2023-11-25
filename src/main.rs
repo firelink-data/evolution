@@ -31,6 +31,7 @@ use log::{debug, error, info, warn, SetLoggerError};
 mod builder;
 mod cli;
 mod logging;
+mod schema;
 
 use cli::CLIArgs;
 
