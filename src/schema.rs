@@ -22,10 +22,12 @@
 * SOFTWARE.
 *
 * File created: 2023-11-25
-* Last updated: 2023-11-25
+* Last updated: 2023-11-26
 */
 
 use arrow2::datatypes::{DataType, Field, Metadata, Schema};
+use arrow2::error::Error;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 ///
@@ -75,9 +77,83 @@ pub fn schema_from_str(json: &str, metadata: Metadata) -> Schema {
     Schema { fields, metadata }
 }
 
+///
+#[derive(Deserialize, Serialize)]
+pub struct Column {
+    name: String,
+    length: usize,
+    dtype: String,
+    is_nullable: bool,
+}
+
+///
+impl Column {
+    ///
+    pub fn arrow_dtype(&self) -> Result<DataType, Error> {
+        match self.dtype.as_str() {
+            "bool" => Ok(DataType::Boolean),
+            "boolean" => Ok(DataType::Boolean),
+            "i16" => Ok(DataType::Int16),
+            "i32" => Ok(DataType::Int32),
+            "i64" => Ok(DataType::Int64),
+            "f16" => Ok(DataType::Float16),
+            "f32" => Ok(DataType::Float32),
+            "f64" => Ok(DataType::Float64),
+            "utf8" => Ok(DataType::Utf8),
+            "string" => Ok(DataType::Utf8),
+            "lutf8" => Ok(DataType::LargeUtf8),
+            "lstring" => Ok(DataType::LargeUtf8),
+            _ => Err(Error::ExternalFormat(format!(
+                "Could not parse json schema dtype to arrow datatype, dtype: {:?}",
+                self.dtype,
+            ))),
+        }
+    }
+}
+
+///
+#[derive(Deserialize, Serialize)]
+pub struct FixedSchema {
+    name: String,
+    version: i32,
+    columns: Vec<Column>,
+}
+
+///
+#[allow(dead_code)]
+impl FixedSchema {
+    ///
+    pub fn num_columns(&self) -> usize {
+        self.columns.len()
+    }
+
+    ///
+    pub fn row_len(&self) -> usize {
+        self.columns.iter().map(|c| c.length).sum()
+    }
+
+    ///
+    pub fn has_nullable_cols(&self) -> bool {
+        self.columns.iter().any(|c| c.is_nullable)
+    }
+
+    ///
+    pub fn into_arrow_schema(self) -> Schema {
+        let fields: Vec<Field> = self
+            .columns
+            .iter()
+            .map(|c| Field::new(c.name.to_owned(), c.arrow_dtype().unwrap(), c.is_nullable))
+            .collect();
+
+        Schema::from(fields)
+    }
+}
+
 #[cfg(test)]
 mod tests_schema {
     use super::*;
+    use std::path::PathBuf;
+    use std::{fs, io};
 
     #[test]
     fn test_from_custom_string() {
@@ -88,5 +164,46 @@ mod tests_schema {
         }"#;
         let schema = schema_from_str(data, Metadata::default());
         println!("schema: {:?}", schema);
+    }
+
+    #[test]
+    fn test_fixed_to_arrow_schema_ok() {
+        let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("resources/schema/test_schema.json");
+
+        let json = fs::File::open(path).unwrap();
+        let reader = io::BufReader::new(json);
+
+        let fixed_schema: FixedSchema = serde_json::from_reader(reader).unwrap();
+
+        let arrow_schema: Schema = fixed_schema.into_arrow_schema();
+
+        assert_eq!(4, arrow_schema.fields.len());
+    }
+
+    #[test]
+    fn test_derive_from_file_ok() {
+        let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("resources/schema/test_schema.json");
+
+        let json = fs::File::open(path).unwrap();
+        let reader = io::BufReader::new(json);
+
+        let schema: FixedSchema = serde_json::from_reader(reader).unwrap();
+
+        assert_eq!(4, schema.num_columns());
+        assert_eq!(74, schema.row_len());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_derive_from_file_trailing_commas() {
+        let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("resources/schema/test_schema_trailing_commas.json");
+
+        let json = fs::File::open(path).unwrap();
+        let reader = io::BufReader::new(json);
+
+        let _schema: FixedSchema = serde_json::from_reader(reader).unwrap();
     }
 }
