@@ -1,0 +1,30 @@
+{
+    "name": "EvolutionTestSchema",
+    "version": 418901,
+    "columns": [
+        {
+            "name": "id",
+            "length": 9,
+            "dtype": "i32",
+            "is_nullable": false
+        },
+        {
+            "name": "name",
+            "length": 32,
+            "dtype": "utf8",
+            "is_nullable": false
+        },
+        {
+            "name": "city",
+            "length": 32,
+            "dtype": "utf8",
+            "is_nullable": true
+        },
+        {
+            "name": "employed",
+            "length": 1,
+            "dtype": "boolean",
+            "is_nullable": true 
+        }
+    ]
+}
