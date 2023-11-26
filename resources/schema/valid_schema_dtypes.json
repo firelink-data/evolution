@@ -1,0 +1,52 @@
+{
+    [
+        {
+            "evolution": "bool",
+            "arrow2": "Boolean"
+        },
+        {
+            "evolution": "boolean",
+            "arrow2": "Boolean"
+        },
+        {
+            "evolution": "i16",
+            "arrow2": "Int16"
+        },
+        {
+            "evolution": "i32",
+            "arrow2": "Int32"
+        },
+        {
+            "evolution": "i64",
+            "arrow2": "Int64"
+        },
+        {
+            "evolution": "f16",
+            "arrow2": "Float16"
+        },
+        {
+            "evolution": "f32",
+            "arrow2": "Float32"
+        },
+        {
+            "evolution": "f64",
+            "arrow2": "Float64"
+        },
+        {
+            "evolution": "utf8",
+            "arrow2": "Utf8"
+        },
+        {
+            "evolution": "string",
+            "arrow2": "Utf8"
+        },
+        {
+            "evolution": "l-utf8",
+            "arrow2": "LargeUtf8"
+        },
+        {
+            "evolution": "l-string",
+            "arrow2": "LargeUtf8"
+        }
+    ]
+}
