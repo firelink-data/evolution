@@ -21,36 +21,30 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 * SOFTWARE.
 *
-* File created: 2023-11-21
-* Last updated: 2023-11-21
+* File created: 2023-11-28
+* Last updated: 2023-11-28
 */
 
-use clap::Parser;
-use log::{debug, error, info, warn, SetLoggerError};
+use arrow2::datatypes::Schema;
 
-mod builder;
-mod cli;
-mod logging;
-mod mock;
-mod schema;
 
-use cli::CLIArgs;
+pub struct FixedMock {
+    schema: Schema,
+}
 
-///
-fn main() -> Result<(), SetLoggerError> {
-    let _args = CLIArgs::parse();
-    let _ = match logging::init_logging() {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            error!("Could not initialize boxed logger, exiting!");
-            Err(e)
-        }
-    };
+impl FixedMock {
+    pub fn generate(&self, n_rows: usize) {
+        todo!();
+    }
+}
 
-    debug!("abcdefgh ijklm nopqr stuvw xyzåäö");
-    info!("abcdefgh ijklm nopqr stuvw xyzåäö");
-    warn!("abcdefgh ijklm nopqr stuvw xyzåäö");
-    error!("abcdefgh ijklm nopqr stuvw xyzåäö");
 
-    Ok(())
+#[cfg(test)]
+mod tests_mock {
+    use super::*;
+
+    #[test]
+    fn test_mock_from_arrow2_schema() {
+        todo!();
+    }
 }
