@@ -151,8 +151,20 @@ impl FixedSchema {
     }
 
     ///
-    pub fn offsets(&self) -> Vec<usize> {
+    pub fn column_names(&self) -> Vec<&String> {
+        self.columns.iter().map(|c| &c.name)
+            .collect::<Vec<&String>>()
+    }
+
+    ///
+    pub fn column_offsets(&self) -> Vec<usize> {
         self.columns.iter().map(|c| c.offset)
+            .collect::<Vec<usize>>()
+    }
+
+    ///
+    pub fn column_lengths(&self) -> Vec<usize> {
+        self.columns.iter().map(|c| c.length)
             .collect::<Vec<usize>>()
     }
 
@@ -181,7 +193,7 @@ impl FixedSchema {
     }
 }
 
-/// Intermediate struct which holds state necessary for
+/// Intermediary struct which holds state necessary for
 /// iterating a [`FixedSchema`], borrows the [`FixedColumn`]s. 
 pub struct FixedSchemaIterator<'a> {
     columns: &'a Vec<FixedColumn>,
@@ -235,10 +247,11 @@ mod tests_schema {
 
         let schema: FixedSchema = FixedSchema::from_path(path);
         let offsets: Vec<usize> = vec![0, 9, 41, 73];
+        let lengths: Vec<usize> = vec![9, 32, 32, 1];
 
         assert_eq!(4, schema.num_columns());
         assert_eq!(74, schema.row_len());
-        assert_eq!(offsets, schema.offsets());
+        assert_eq!(offsets, schema.column_offsets());
     }
 
     #[test]
