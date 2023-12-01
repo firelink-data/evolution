@@ -4,24 +4,28 @@
     "columns": [
         {
             "name": "id",
+            "offset": 0,
             "length": 9,
             "dtype": "i32",
             "is_nullable": false
         },
         {
             "name": "name",
+            "offset": 9,
             "length": 32,
             "dtype": "utf8",
             "is_nullable": false
         },
         {
             "name": "city",
+            "offset": 41,
             "length": 32,
             "dtype": "utf8",
             "is_nullable": false,
         },
         {
             "name": "employed",
+            "offset": 73,
             "length": 1,
             "dtype": "boolean",
             "is_nullable": false,
