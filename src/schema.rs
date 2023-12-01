@@ -22,73 +22,53 @@
 * SOFTWARE.
 *
 * File created: 2023-11-25
-* Last updated: 2023-11-26
+* Last updated: 2023-12-01
 */
 
 use arrow2::datatypes::{DataType, Field, Metadata, Schema};
 use arrow2::error::Error;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 ///
-#[allow(dead_code)]
-pub fn value_as_datatype(value: &Value) -> DataType {
-    if value.is_string() {
-        DataType::Utf8
-    } else if value.is_u64() {
-        DataType::UInt64
-    } else if value.is_i64() {
-        DataType::Int64
-    } else if value.is_f64() {
-        DataType::Float64
-    } else if value.is_boolean() {
-        DataType::Boolean
-    } else {
-        panic!(
-            "Could not find matching arrow2::DataType from value: {:?}",
-            value
-        );
-    }
-}
-
-/// Look into
-/// https://docs.rs/arrow2/latest/src/arrow2/io/json_integration/read/schema.rs.html#442-480
-/// this might solve what we are trying to do.
-#[allow(dead_code)]
-pub fn schema_from_str(json: &str, metadata: Metadata) -> Schema {
-    let values: Value = match serde_json::from_str(json) {
-        Ok(v) => v,
-        Err(e) => panic!(
-            "Could not deserialize string to JSON values, error: {:?}",
-            e
-        ),
-    };
-
-    let mut fields: Vec<Field> = Vec::new();
-
-    if let Value::Object(hash_map) = values {
-        fields.extend(
-            hash_map
-                .iter()
-                .map(|(key, value)| Field::new(key, value_as_datatype(value), false)),
-        );
-    }
-
-    Schema { fields, metadata }
-}
-
-///
-#[derive(Deserialize, Serialize)]
-pub struct Column {
+#[derive(Default, Debug, Deserialize, Serialize)]
+pub struct FixedColumn {
+    /// The symbolic name of the column. 
     name: String,
+    /// The starting offset index for the column.
+    offset: usize,
+    /// The length of the column value.
     length: usize,
+    /// The datatype of the column.
     dtype: String,
+    // Whether or not the column can contain [`None`] values.
     is_nullable: bool,
 }
 
 ///
-impl Column {
-    ///
+impl FixedColumn {
+
+    /// Create a new [`FixedColumn`] from its required attributes.
+    pub fn new(
+        name: String, 
+        offset: usize,
+        length: usize, 
+        dtype: String, 
+        is_nullable: bool,
+    ) -> Self {
+        Self {
+            name,
+            offset,
+            length,
+            dtype,
+            is_nullable,
+        }
+    }
+
+    /// Find the matching [`arrow2::datatypes::DataType`] corresponding
+    /// to the schema defined datatype. Returns an [`Error`] if 
+    /// the [`FixedSchema`] datatype is not known.
+    /// For a full list of defined datatype mappings, see the file
+    /// "resources/schema/valid_schema_dtypes.json".
     pub fn arrow_dtype(&self) -> Result<DataType, Error> {
         match self.dtype.as_str() {
             "bool" => Ok(DataType::Boolean),
@@ -116,12 +96,13 @@ impl Column {
 pub struct FixedSchema {
     name: String,
     version: i32,
-    columns: Vec<Column>,
+    columns: Vec<FixedColumn>,
 }
 
 ///
 #[allow(dead_code)]
 impl FixedSchema {
+
     ///
     pub fn num_columns(&self) -> usize {
         self.columns.len()
@@ -130,6 +111,12 @@ impl FixedSchema {
     ///
     pub fn row_len(&self) -> usize {
         self.columns.iter().map(|c| c.length).sum()
+    }
+
+    ///
+    pub fn offsets(&self) -> Vec<usize> {
+        self.columns.iter().map(|c| c.offset)
+            .collect::<Vec<usize>>()
     }
 
     ///
@@ -156,17 +143,6 @@ mod tests_schema {
     use std::{fs, io};
 
     #[test]
-    fn test_from_custom_string() {
-        let data = r#"
-        {
-            "name": "John Cena",
-            "age": "1498"
-        }"#;
-        let schema = schema_from_str(data, Metadata::default());
-        println!("schema: {:?}", schema);
-    }
-
-    #[test]
     fn test_fixed_to_arrow_schema_ok() {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/schema/test_schema.json");
@@ -191,8 +167,11 @@ mod tests_schema {
 
         let schema: FixedSchema = serde_json::from_reader(reader).unwrap();
 
+        let offsets: Vec<usize> = vec![0, 9, 41, 73];
+
         assert_eq!(4, schema.num_columns());
         assert_eq!(74, schema.row_len());
+        assert_eq!(offsets, schema.offsets());
     }
 
     #[test]
