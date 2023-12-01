@@ -29,6 +29,9 @@ use arrow2::datatypes::{DataType, Field, Metadata, Schema};
 use arrow2::error::Error;
 use serde::{Deserialize, Serialize};
 
+use std::path::PathBuf;
+use std::{fs, io};
+
 ///
 #[derive(Default, Debug, Deserialize, Serialize)]
 pub struct FixedColumn {
@@ -48,6 +51,9 @@ pub struct FixedColumn {
 impl FixedColumn {
 
     /// Create a new [`FixedColumn`] from its required attributes.
+    /// No input sanitation is done in this stage. The user can provide
+    /// an arbitrary datatype but will then later crash when trying to 
+    /// call [`FixedColumn::arrow_dtype()`] if it is not known.
     pub fn new(
         name: String, 
         offset: usize,
@@ -62,6 +68,31 @@ impl FixedColumn {
             dtype,
             is_nullable,
         }
+    }
+
+    ///
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+
+    ///
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+
+    ///
+    pub fn length(&self) -> usize {
+        self.length
+    }
+
+    ///
+    pub fn dtype(&self) -> &String {
+        &self.dtype
+    }
+
+    ///
+    pub fn is_nullable(&self) -> bool {
+        self.is_nullable
     }
 
     /// Find the matching [`arrow2::datatypes::DataType`] corresponding
@@ -100,8 +131,14 @@ pub struct FixedSchema {
 }
 
 ///
-#[allow(dead_code)]
 impl FixedSchema {
+    ///
+    pub fn from_path(path: PathBuf) -> Self {
+        let json = fs::File::open(path).unwrap();
+        let reader = io::BufReader::new(json);
+
+        serde_json::from_reader(reader).unwrap()
+    }
 
     ///
     pub fn num_columns(&self) -> usize {
@@ -134,24 +171,58 @@ impl FixedSchema {
 
         Schema::from(fields)
     }
+
+    ///
+    pub fn iter(&self) -> FixedSchemaIterator {
+        FixedSchemaIterator {
+            columns: &self.columns,
+            index: 0,
+        }
+    }
+}
+
+/// Intermediate struct which holds state necessary for
+/// iterating a [`FixedSchema`], borrows the [`FixedColumn`]s. 
+pub struct FixedSchemaIterator<'a> {
+    columns: &'a Vec<FixedColumn>,
+    index: usize,
+}
+
+/// Iterate the [`FixedColumn`]s of a [`FixedSchema`].
+/// Only borrows the values, nothing is moved.
+impl<'a> Iterator for FixedSchemaIterator<'a> {
+    type Item = &'a FixedColumn;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.columns.len() {
+            Some(&self.columns[{self.index += 1; self.index - 1}])
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests_schema {
     use super::*;
-    use std::path::PathBuf;
-    use std::{fs, io};
+
+    #[test]
+    fn test_new_fixed_column_ok() {
+        let schema = FixedColumn::new(
+            "coolSchema2000Elin".to_string(),
+            5,
+            20,
+            "utf8".to_string(),
+            false,
+        );
+        assert_eq!(DataType::Utf8, schema.arrow_dtype().unwrap());
+    }
 
     #[test]
     fn test_fixed_to_arrow_schema_ok() {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/schema/test_schema.json");
 
-        let json = fs::File::open(path).unwrap();
-        let reader = io::BufReader::new(json);
-
-        let fixed_schema: FixedSchema = serde_json::from_reader(reader).unwrap();
-
+        let fixed_schema: FixedSchema = FixedSchema::from_path(path);
         let arrow_schema: Schema = fixed_schema.into_arrow_schema();
 
         assert_eq!(4, arrow_schema.fields.len());
@@ -162,11 +233,7 @@ mod tests_schema {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/schema/test_schema.json");
 
-        let json = fs::File::open(path).unwrap();
-        let reader = io::BufReader::new(json);
-
-        let schema: FixedSchema = serde_json::from_reader(reader).unwrap();
-
+        let schema: FixedSchema = FixedSchema::from_path(path);
         let offsets: Vec<usize> = vec![0, 9, 41, 73];
 
         assert_eq!(4, schema.num_columns());
@@ -180,9 +247,6 @@ mod tests_schema {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/schema/test_schema_trailing_commas.json");
 
-        let json = fs::File::open(path).unwrap();
-        let reader = io::BufReader::new(json);
-
-        let _schema: FixedSchema = serde_json::from_reader(reader).unwrap();
+        let _schema: FixedSchema = FixedSchema::from_path(path);
     }
 }

@@ -22,35 +22,62 @@
 * SOFTWARE.
 *
 * File created: 2023-11-21
-* Last updated: 2023-11-21
+* Last updated: 2023-12-01
 */
 
-use clap::Parser;
+use clap::{Arg, ArgAction, Command, Parser, value_parser};
 use log::{debug, error, info, warn, SetLoggerError};
 
 mod builder;
-mod cli;
 mod logging;
 mod mock;
 mod schema;
 
-use cli::CLIArgs;
-
 ///
 fn main() -> Result<(), SetLoggerError> {
-    let _args = CLIArgs::parse();
-    let _ = match logging::init_logging() {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            error!("Could not initialize boxed logger, exiting!");
-            Err(e)
-        }
-    };
+    logging::setup_log()?;
 
-    debug!("abcdefgh ijklm nopqr stuvw xyzåäö");
-    info!("abcdefgh ijklm nopqr stuvw xyzåäö");
-    warn!("abcdefgh ijklm nopqr stuvw xyzåäö");
-    error!("abcdefgh ijklm nopqr stuvw xyzåäö");
+    let mut matches = Command::new("evolution")
+        .author("Wilhelm Ågren <wilhelmagren98@gmail.com>")
+        .version("0.2.0")
+        .about("🦖 Evolve your fixed length data files into Apache Arrow tables, fully parallelized!")
+        .arg(
+            Arg::new("schema")
+                .short('s')
+                .long("schema")
+                .action(ArgAction::Set)
+        )
+        .arg(
+            Arg::new("file")
+                .short('f')
+                .long("file")
+                .requires("schema")
+                .action(ArgAction::Set)
+        )
+        .arg(
+            Arg::new("mock")
+                .short('m')
+                .long("mock")
+                .requires("schema")
+                .action(ArgAction::SetTrue)
+        )
+        .arg(
+            Arg::new("n-rows")
+                .short('n')
+                .long("n-rows")
+                .requires("mock")
+                .action(ArgAction::Set)
+                .default_value("1000")
+                .value_parser(value_parser!(usize))
+        )
+        .get_matches();
+
+    if matches.get_flag("mock") {
+        mock::mock_from_schema(
+            matches.remove_one::<String>("schema").unwrap(),
+            matches.remove_one::<usize>("n-rows").unwrap(),
+        );
+    }
 
     Ok(())
 }

@@ -22,29 +22,83 @@
 * SOFTWARE.
 *
 * File created: 2023-11-28
-* Last updated: 2023-11-28
+* Last updated: 2023-12-01
 */
 
-use arrow2::datatypes::Schema;
+use crate::schema;
+use log::info;
+use rand::distributions::{Alphanumeric, DistString};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
+pub(crate) static MOCKED_FILENAME_LEN: usize = 16;
 
-pub struct FixedMock {
-    schema: Schema,
+///
+pub struct FixedMocker {
+    schema: schema::FixedSchema,
 }
 
-impl FixedMock {
+///
+impl FixedMocker {
+    ///
+    pub fn new(schema: schema::FixedSchema) -> Self {
+        Self { schema }
+    }
+
+    /// TODO: randomize data based on dtype
     pub fn generate(&self, n_rows: usize) {
-        todo!();
+        
+        let now = SystemTime::now();
+
+        let mut rows: Vec<u8> = Vec::new();
+        for _row in 0..n_rows {
+            let mut row_builder: Vec<u8> = Vec::new();
+            for col in self.schema.iter() {
+                let col_len = col.length();
+                let mocked_values: Vec<u8> = (0..col_len)
+                    .map(|_| "a")
+                    .collect::<String>()
+                    .into_bytes();
+                row_builder.extend_from_slice(mocked_values.as_slice());
+            }
+            row_builder.extend_from_slice("\rn\n".as_bytes());
+            rows.extend_from_slice(row_builder.as_slice());
+        }
+
+        info!(
+            "Produced {} rows in {}ms",
+            n_rows,
+            now.elapsed().unwrap().as_millis(),
+        );
+
+        let mut path = PathBuf::from(Alphanumeric.sample_string(
+            &mut rand::thread_rng(),
+            MOCKED_FILENAME_LEN,
+        ));
+
+        path.set_extension("flf");
+        fs::write(path, rows).unwrap();
     }
 }
 
+///
+pub(crate) fn mock_from_schema(
+    schema_path: String,
+    n_rows: usize,
+) {
+    let schema = schema::FixedSchema::from_path(schema_path.into());
+    let mocker = FixedMocker::new(schema);
+    mocker.generate(n_rows);
+}
 
 #[cfg(test)]
 mod tests_mock {
     use super::*;
 
     #[test]
-    fn test_mock_from_arrow2_schema() {
+    #[should_panic]
+    fn test_mock_from_fixed_schema() {
         todo!();
     }
 }
