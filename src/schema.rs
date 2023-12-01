@@ -49,11 +49,10 @@ pub struct FixedColumn {
 
 ///
 impl FixedColumn {
-
-    /// Create a new [`FixedColumn`] from its required attributes.
+    /// Create a new [`FixedColumn`] providing all its required attributes.
     /// No input sanitation is done in this stage. The user can provide
-    /// an arbitrary datatype but will then later crash when trying to 
-    /// call [`FixedColumn::arrow_dtype()`] if it is not known.
+    /// an arbitrary datatype but the problem will then later crash when
+    /// trying to call [`FixedColumn::arrow_dtype()`] if it is not known.
     pub fn new(
         name: String, 
         offset: usize,
@@ -70,36 +69,39 @@ impl FixedColumn {
         }
     }
 
-    ///
+    /// Get the name of the column.
     pub fn name(&self) -> &String {
         &self.name
     }
 
-    ///
+    /// Get the index offset for where the column starts in each row.
     pub fn offset(&self) -> usize {
         self.offset
     }
 
-    ///
+    /// Get the length of the column.
     pub fn length(&self) -> usize {
         self.length
     }
 
-    ///
+    /// Get the datatype of the column.
+    /// NOTE: not as a [`arrow2::datatypes::DataType`].
     pub fn dtype(&self) -> &String {
         &self.dtype
     }
 
-    ///
+    /// Check whether or not the column can contain null values.
     pub fn is_nullable(&self) -> bool {
         self.is_nullable
     }
 
-    /// Find the matching [`arrow2::datatypes::DataType`] corresponding
-    /// to the schema defined datatype. Returns an [`Error`] if 
-    /// the [`FixedSchema`] datatype is not known.
-    /// For a full list of defined datatype mappings, see the file
-    /// "resources/schema/valid_schema_dtypes.json".
+    /// Find the matching [`arrow2::datatypes::DataType`]s corresponding
+    /// to the [`FixedColumn`]s defined datatypes. 
+    /// # Error
+    /// Iff the [`FixedColumn`] datatype is not known.
+    ///
+    /// For a full list of defined datatype mappings, see the documentation
+    /// or the file "resources/schema/valid_schema_dtypes.json".
     pub fn arrow_dtype(&self) -> Result<DataType, Error> {
         match self.dtype.as_str() {
             "bool" => Ok(DataType::Boolean),
@@ -132,7 +134,10 @@ pub struct FixedSchema {
 
 ///
 impl FixedSchema {
-    ///
+    /// Create a new [`FixedSchema`] by reading deserializing
+    /// the schema from a local json file.
+    /// # Error
+    /// Iff the file does not exist or it is malformed.
     pub fn from_path(path: PathBuf) -> Self {
         let json = fs::File::open(path).unwrap();
         let reader = io::BufReader::new(json);
@@ -140,40 +145,45 @@ impl FixedSchema {
         serde_json::from_reader(reader).unwrap()
     }
 
-    ///
+    /// Get the number of columns in the schema.
     pub fn num_columns(&self) -> usize {
         self.columns.len()
     }
 
-    ///
+    /// Get the total length of the fixed-length row.
     pub fn row_len(&self) -> usize {
         self.columns.iter().map(|c| c.length).sum()
     }
 
-    ///
+    /// Get the names of the columns.
     pub fn column_names(&self) -> Vec<&String> {
         self.columns.iter().map(|c| &c.name)
             .collect::<Vec<&String>>()
     }
 
-    ///
+    /// Get the index offsets for each column.
     pub fn column_offsets(&self) -> Vec<usize> {
         self.columns.iter().map(|c| c.offset)
             .collect::<Vec<usize>>()
     }
 
-    ///
+    /// Get the column lengths.
     pub fn column_lengths(&self) -> Vec<usize> {
         self.columns.iter().map(|c| c.length)
             .collect::<Vec<usize>>()
     }
 
-    ///
+    /// Check whether any column can contain null values.
     pub fn has_nullable_cols(&self) -> bool {
         self.columns.iter().any(|c| c.is_nullable)
     }
 
-    ///
+    /// Consume the [`FixedSchema`] and produce a new [`arrow2::datatypes::Schema`].
+    /// All of the [`FixedColumn`]s will tried to be parsed as their
+    /// corresponding [`arrow2::datatypes::DataType`]s, but may fail. 
+    /// # Error
+    /// Iff any of the column datatypes can not be parsed to its
+    /// corresponding [`arrow2::datatypes::DataType`].
     pub fn into_arrow_schema(self) -> Schema {
         let fields: Vec<Field> = self
             .columns
@@ -184,7 +194,7 @@ impl FixedSchema {
         Schema::from(fields)
     }
 
-    ///
+    /// Borrow the stored [`FixedColumn`]s and iterate over them.
     pub fn iter(&self) -> FixedSchemaIterator {
         FixedSchemaIterator {
             columns: &self.columns,
