@@ -22,10 +22,10 @@
 * SOFTWARE.
 *
 * File created: 2023-11-25
-* Last updated: 2023-12-01
+* Last updated: 2023-12-04
 */
 
-use arrow2::datatypes::{DataType, Field, Metadata, Schema};
+use arrow2::datatypes::{DataType, Field, Schema};
 use arrow2::error::Error;
 use serde::{Deserialize, Serialize};
 
@@ -35,7 +35,7 @@ use std::{fs, io};
 ///
 #[derive(Default, Debug, Deserialize, Serialize)]
 pub struct FixedColumn {
-    /// The symbolic name of the column. 
+    /// The symbolic name of the column.
     name: String,
     /// The starting offset index for the column.
     offset: usize,
@@ -48,16 +48,17 @@ pub struct FixedColumn {
 }
 
 ///
+#[allow(dead_code)]
 impl FixedColumn {
     /// Create a new [`FixedColumn`] providing all its required attributes.
     /// No input sanitation is done in this stage. The user can provide
     /// an arbitrary datatype but the problem will then later crash when
     /// trying to call [`FixedColumn::arrow_dtype()`] if it is not known.
     pub fn new(
-        name: String, 
+        name: String,
         offset: usize,
-        length: usize, 
-        dtype: String, 
+        length: usize,
+        dtype: String,
         is_nullable: bool,
     ) -> Self {
         Self {
@@ -96,7 +97,7 @@ impl FixedColumn {
     }
 
     /// Find the matching [`arrow2::datatypes::DataType`]s corresponding
-    /// to the [`FixedColumn`]s defined datatypes. 
+    /// to the [`FixedColumn`]s defined datatypes.
     /// # Error
     /// Iff the [`FixedColumn`] datatype is not known.
     ///
@@ -133,11 +134,22 @@ pub struct FixedSchema {
 }
 
 ///
+#[allow(dead_code)]
 impl FixedSchema {
-    /// Create a new [`FixedSchema`] by reading deserializing
-    /// the schema from a local json file.
+    /// Explicitly create a new [`FixedSchema`] by providing all its requried attributes.
+    pub fn new(name: String, version: i32, columns: Vec<FixedColumn>) -> Self {
+        Self {
+            name,
+            version,
+            columns,
+        }
+    }
+
+    /// Implicitly create a new [`FixedSchema`] by reading a json path
+    /// and deserializing the schema into the epxected struct fields.
     /// # Error
-    /// Iff the file does not exist or it is malformed.
+    /// If the file does not exist or if the schema in the file
+    /// does not adhere to the above struct definition.
     pub fn from_path(path: PathBuf) -> Self {
         let json = fs::File::open(path).unwrap();
         let reader = io::BufReader::new(json);
@@ -157,19 +169,25 @@ impl FixedSchema {
 
     /// Get the names of the columns.
     pub fn column_names(&self) -> Vec<&String> {
-        self.columns.iter().map(|c| &c.name)
+        self.columns
+            .iter()
+            .map(|c| &c.name)
             .collect::<Vec<&String>>()
     }
 
     /// Get the index offsets for each column.
     pub fn column_offsets(&self) -> Vec<usize> {
-        self.columns.iter().map(|c| c.offset)
+        self.columns
+            .iter()
+            .map(|c| c.offset)
             .collect::<Vec<usize>>()
     }
 
     /// Get the column lengths.
     pub fn column_lengths(&self) -> Vec<usize> {
-        self.columns.iter().map(|c| c.length)
+        self.columns
+            .iter()
+            .map(|c| c.length)
             .collect::<Vec<usize>>()
     }
 
@@ -180,7 +198,7 @@ impl FixedSchema {
 
     /// Consume the [`FixedSchema`] and produce a new [`arrow2::datatypes::Schema`].
     /// All of the [`FixedColumn`]s will tried to be parsed as their
-    /// corresponding [`arrow2::datatypes::DataType`]s, but may fail. 
+    /// corresponding [`arrow2::datatypes::DataType`]s, but may fail.
     /// # Error
     /// Iff any of the column datatypes can not be parsed to its
     /// corresponding [`arrow2::datatypes::DataType`].
@@ -204,7 +222,7 @@ impl FixedSchema {
 }
 
 /// Intermediary struct which holds state necessary for
-/// iterating a [`FixedSchema`], borrows the [`FixedColumn`]s. 
+/// iterating a [`FixedSchema`], borrows the [`FixedColumn`]s.
 pub struct FixedSchemaIterator<'a> {
     columns: &'a Vec<FixedColumn>,
     index: usize,
@@ -216,7 +234,12 @@ impl<'a> Iterator for FixedSchemaIterator<'a> {
     type Item = &'a FixedColumn;
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.columns.len() {
-            Some(&self.columns[{self.index += 1; self.index - 1}])
+            Some(
+                &self.columns[{
+                    self.index += 1;
+                    self.index - 1
+                }],
+            )
         } else {
             None
         }
@@ -262,6 +285,7 @@ mod tests_schema {
         assert_eq!(4, schema.num_columns());
         assert_eq!(74, schema.row_len());
         assert_eq!(offsets, schema.column_offsets());
+        assert_eq!(lengths, schema.column_lengths());
     }
 
     #[test]

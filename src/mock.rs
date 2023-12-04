@@ -22,14 +22,14 @@
 * SOFTWARE.
 *
 * File created: 2023-11-28
-* Last updated: 2023-12-01
+* Last updated: 2023-12-04
 */
 
 use crate::schema;
 use log::info;
 use rand::distributions::{Alphanumeric, DistString};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::SystemTime;
 
 pub(crate) static MOCKED_FILENAME_LEN: usize = 16;
@@ -48,7 +48,6 @@ impl FixedMocker {
 
     /// TODO: randomize data based on dtype
     pub fn generate(&self, n_rows: usize) {
-        
         let now = SystemTime::now();
 
         let mut rows: Vec<u8> = Vec::new();
@@ -56,10 +55,8 @@ impl FixedMocker {
             let mut row_builder: Vec<u8> = Vec::new();
             for col in self.schema.iter() {
                 let col_len = col.length();
-                let mocked_values: Vec<u8> = (0..col_len)
-                    .map(|_| "a")
-                    .collect::<String>()
-                    .into_bytes();
+                let mocked_values: Vec<u8> =
+                    (0..col_len).map(|_| "a").collect::<String>().into_bytes();
                 row_builder.extend_from_slice(mocked_values.as_slice());
             }
             row_builder.extend_from_slice("\rn\n".as_bytes());
@@ -72,10 +69,8 @@ impl FixedMocker {
             now.elapsed().unwrap().as_millis(),
         );
 
-        let mut path = PathBuf::from(Alphanumeric.sample_string(
-            &mut rand::thread_rng(),
-            MOCKED_FILENAME_LEN,
-        ));
+        let mut path =
+            PathBuf::from(Alphanumeric.sample_string(&mut rand::thread_rng(), MOCKED_FILENAME_LEN));
 
         path.set_extension("flf");
         fs::write(path, rows).unwrap();
@@ -83,10 +78,7 @@ impl FixedMocker {
 }
 
 ///
-pub(crate) fn mock_from_schema(
-    schema_path: String,
-    n_rows: usize,
-) {
+pub(crate) fn mock_from_schema(schema_path: String, n_rows: usize) {
     let schema = schema::FixedSchema::from_path(schema_path.into());
     let mocker = FixedMocker::new(schema);
     mocker.generate(n_rows);
@@ -95,10 +87,40 @@ pub(crate) fn mock_from_schema(
 #[cfg(test)]
 mod tests_mock {
     use super::*;
+    use crate::schema::{FixedColumn, FixedSchema};
+    use glob::glob;
+    use std::fs;
 
     #[test]
-    #[should_panic]
     fn test_mock_from_fixed_schema() {
-        todo!();
+        let name = String::from("cool Schema");
+        let version: i32 = 4198;
+        let columns: Vec<FixedColumn> = vec![];
+
+        let schema = FixedSchema::new(name, version, columns);
+        let mock = FixedMocker::new(schema);
+        mock.generate(10);
+
+        for entry in glob("*.flf*").unwrap() {
+            if let Ok(p) = entry {
+                let _ = fs::remove_file(p);
+            }
+        }
+    }
+
+    #[test]
+    fn test_mock_generate_1000000() {
+        let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("resources/schema/test_schema.json");
+
+        let schema: FixedSchema = FixedSchema::from_path(path);
+        let mock = FixedMocker::new(schema);
+        mock.generate(1000000);
+
+        for entry in glob("*.flf*").unwrap() {
+            if let Ok(p) = entry {
+                let _ = fs::remove_file(p);
+            }
+        }
     }
 }

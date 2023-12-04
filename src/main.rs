@@ -22,11 +22,11 @@
 * SOFTWARE.
 *
 * File created: 2023-11-21
-* Last updated: 2023-12-01
+* Last updated: 2023-12-04
 */
 
-use clap::{Arg, ArgAction, Command, Parser, value_parser};
-use log::{debug, error, info, warn, SetLoggerError};
+use clap::{value_parser, Arg, ArgAction, Command};
+use log::SetLoggerError;
 
 mod builder;
 mod logging;
@@ -40,26 +40,28 @@ fn main() -> Result<(), SetLoggerError> {
     let mut matches = Command::new("evolution")
         .author("Wilhelm Ågren <wilhelmagren98@gmail.com>")
         .version("0.2.0")
-        .about("🦖 Evolve your fixed length data files into Apache Arrow tables, fully parallelized!")
+        .about(
+            "🦖 Evolve your fixed length data files into Apache Arrow tables, fully parallelized!",
+        )
         .arg(
             Arg::new("schema")
                 .short('s')
                 .long("schema")
-                .action(ArgAction::Set)
+                .action(ArgAction::Set),
         )
         .arg(
             Arg::new("file")
                 .short('f')
                 .long("file")
                 .requires("schema")
-                .action(ArgAction::Set)
+                .action(ArgAction::Set),
         )
         .arg(
             Arg::new("mock")
                 .short('m')
                 .long("mock")
                 .requires("schema")
-                .action(ArgAction::SetTrue)
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("n-rows")
@@ -68,7 +70,7 @@ fn main() -> Result<(), SetLoggerError> {
                 .requires("mock")
                 .action(ArgAction::Set)
                 .default_value("1000")
-                .value_parser(value_parser!(usize))
+                .value_parser(value_parser!(usize)),
         )
         .get_matches();
 
