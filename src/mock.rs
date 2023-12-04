@@ -26,11 +26,12 @@
 */
 
 use crate::schema;
-use log::info;
+use log::{debug, info};
 use rand::distributions::{Alphanumeric, DistString};
 use std::fs;
 use std::path::PathBuf;
 use std::time::SystemTime;
+use std::thread;
 
 pub(crate) static MOCKED_FILENAME_LEN: usize = 16;
 
@@ -44,6 +45,24 @@ impl FixedMocker {
     ///
     pub fn new(schema: schema::FixedSchema) -> Self {
         Self { schema }
+    }
+
+    pub fn generate_threaded(&self, n_rows: usize, n_threads: usize) {
+        let threads: Vec<_> = (0..n_threads)
+            .map(|t| {
+                thread::spawn(move || {
+                    info!("Thread #{} starts working...", t);
+                    for _ in 0..n_rows {
+                        debug!("hello from #{}", t);
+                    }
+                    info!("Thread #{} done!", t);
+                })
+            })
+            .collect();
+
+        for handle in threads {
+            handle.join().unwrap();
+        }
     }
 
     /// TODO: randomize data based on dtype
@@ -81,7 +100,8 @@ impl FixedMocker {
 pub(crate) fn mock_from_schema(schema_path: String, n_rows: usize) {
     let schema = schema::FixedSchema::from_path(schema_path.into());
     let mocker = FixedMocker::new(schema);
-    mocker.generate(n_rows);
+    //mocker.generate(n_rows);
+    mocker.generate_threaded(n_rows, 5);
 }
 
 #[cfg(test)]
