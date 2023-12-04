@@ -22,73 +22,87 @@
 * SOFTWARE.
 *
 * File created: 2023-11-25
-* Last updated: 2023-11-26
+* Last updated: 2023-12-04
 */
 
-use arrow2::datatypes::{DataType, Field, Metadata, Schema};
+use arrow2::datatypes::{DataType, Field, Schema};
 use arrow2::error::Error;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+
+use std::path::PathBuf;
+use std::{fs, io};
 
 ///
-#[allow(dead_code)]
-pub fn value_as_datatype(value: &Value) -> DataType {
-    if value.is_string() {
-        DataType::Utf8
-    } else if value.is_u64() {
-        DataType::UInt64
-    } else if value.is_i64() {
-        DataType::Int64
-    } else if value.is_f64() {
-        DataType::Float64
-    } else if value.is_boolean() {
-        DataType::Boolean
-    } else {
-        panic!(
-            "Could not find matching arrow2::DataType from value: {:?}",
-            value
-        );
-    }
-}
-
-/// Look into
-/// https://docs.rs/arrow2/latest/src/arrow2/io/json_integration/read/schema.rs.html#442-480
-/// this might solve what we are trying to do.
-#[allow(dead_code)]
-pub fn schema_from_str(json: &str, metadata: Metadata) -> Schema {
-    let values: Value = match serde_json::from_str(json) {
-        Ok(v) => v,
-        Err(e) => panic!(
-            "Could not deserialize string to JSON values, error: {:?}",
-            e
-        ),
-    };
-
-    let mut fields: Vec<Field> = Vec::new();
-
-    if let Value::Object(hash_map) = values {
-        fields.extend(
-            hash_map
-                .iter()
-                .map(|(key, value)| Field::new(key, value_as_datatype(value), false)),
-        );
-    }
-
-    Schema { fields, metadata }
-}
-
-///
-#[derive(Deserialize, Serialize)]
-pub struct Column {
+#[derive(Default, Debug, Deserialize, Serialize)]
+pub struct FixedColumn {
+    /// The symbolic name of the column.
     name: String,
+    /// The starting offset index for the column.
+    offset: usize,
+    /// The length of the column value.
     length: usize,
+    /// The datatype of the column.
     dtype: String,
+    // Whether or not the column can contain [`None`] values.
     is_nullable: bool,
 }
 
 ///
-impl Column {
+#[allow(dead_code)]
+impl FixedColumn {
+    /// Create a new [`FixedColumn`] providing all its required attributes.
+    /// No input sanitation is done in this stage. The user can provide
+    /// an arbitrary datatype but the problem will then later crash when
+    /// trying to call [`FixedColumn::arrow_dtype()`] if it is not known.
+    pub fn new(
+        name: String,
+        offset: usize,
+        length: usize,
+        dtype: String,
+        is_nullable: bool,
+    ) -> Self {
+        Self {
+            name,
+            offset,
+            length,
+            dtype,
+            is_nullable,
+        }
+    }
+
+    /// Get the name of the column.
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+
+    /// Get the index offset for where the column starts in each row.
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+
+    /// Get the length of the column.
+    pub fn length(&self) -> usize {
+        self.length
+    }
+
+    /// Get the datatype of the column.
+    /// NOTE: not as a [`arrow2::datatypes::DataType`].
+    pub fn dtype(&self) -> &String {
+        &self.dtype
+    }
+
+    /// Check whether or not the column can contain null values.
+    pub fn is_nullable(&self) -> bool {
+        self.is_nullable
+    }
+
+    /// Find the matching [`arrow2::datatypes::DataType`]s corresponding
+    /// to the [`FixedColumn`]s defined datatypes.
+    /// # Error
+    /// Iff the [`FixedColumn`] datatype is not known.
     ///
+    /// For a full list of defined datatype mappings, see the documentation
+    /// or the file "resources/schema/valid_schema_dtypes.json".
     pub fn arrow_dtype(&self) -> Result<DataType, Error> {
         match self.dtype.as_str() {
             "bool" => Ok(DataType::Boolean),
@@ -116,28 +130,78 @@ impl Column {
 pub struct FixedSchema {
     name: String,
     version: i32,
-    columns: Vec<Column>,
+    columns: Vec<FixedColumn>,
 }
 
 ///
 #[allow(dead_code)]
 impl FixedSchema {
-    ///
+    /// Explicitly create a new [`FixedSchema`] by providing all its requried attributes.
+    pub fn new(name: String, version: i32, columns: Vec<FixedColumn>) -> Self {
+        Self {
+            name,
+            version,
+            columns,
+        }
+    }
+
+    /// Implicitly create a new [`FixedSchema`] by reading a json path
+    /// and deserializing the schema into the epxected struct fields.
+    /// # Error
+    /// If the file does not exist or if the schema in the file
+    /// does not adhere to the above struct definition.
+    pub fn from_path(path: PathBuf) -> Self {
+        let json = fs::File::open(path).unwrap();
+        let reader = io::BufReader::new(json);
+
+        serde_json::from_reader(reader).unwrap()
+    }
+
+    /// Get the number of columns in the schema.
     pub fn num_columns(&self) -> usize {
         self.columns.len()
     }
 
-    ///
+    /// Get the total length of the fixed-length row.
     pub fn row_len(&self) -> usize {
         self.columns.iter().map(|c| c.length).sum()
     }
 
-    ///
+    /// Get the names of the columns.
+    pub fn column_names(&self) -> Vec<&String> {
+        self.columns
+            .iter()
+            .map(|c| &c.name)
+            .collect::<Vec<&String>>()
+    }
+
+    /// Get the index offsets for each column.
+    pub fn column_offsets(&self) -> Vec<usize> {
+        self.columns
+            .iter()
+            .map(|c| c.offset)
+            .collect::<Vec<usize>>()
+    }
+
+    /// Get the column lengths.
+    pub fn column_lengths(&self) -> Vec<usize> {
+        self.columns
+            .iter()
+            .map(|c| c.length)
+            .collect::<Vec<usize>>()
+    }
+
+    /// Check whether any column can contain null values.
     pub fn has_nullable_cols(&self) -> bool {
         self.columns.iter().any(|c| c.is_nullable)
     }
 
-    ///
+    /// Consume the [`FixedSchema`] and produce a new [`arrow2::datatypes::Schema`].
+    /// All of the [`FixedColumn`]s will tried to be parsed as their
+    /// corresponding [`arrow2::datatypes::DataType`]s, but may fail.
+    /// # Error
+    /// Iff any of the column datatypes can not be parsed to its
+    /// corresponding [`arrow2::datatypes::DataType`].
     pub fn into_arrow_schema(self) -> Schema {
         let fields: Vec<Field> = self
             .columns
@@ -147,23 +211,55 @@ impl FixedSchema {
 
         Schema::from(fields)
     }
+
+    /// Borrow the stored [`FixedColumn`]s and iterate over them.
+    pub fn iter(&self) -> FixedSchemaIterator {
+        FixedSchemaIterator {
+            columns: &self.columns,
+            index: 0,
+        }
+    }
+}
+
+/// Intermediary struct which holds state necessary for
+/// iterating a [`FixedSchema`], borrows the [`FixedColumn`]s.
+pub struct FixedSchemaIterator<'a> {
+    columns: &'a Vec<FixedColumn>,
+    index: usize,
+}
+
+/// Iterate the [`FixedColumn`]s of a [`FixedSchema`].
+/// Only borrows the values, nothing is moved.
+impl<'a> Iterator for FixedSchemaIterator<'a> {
+    type Item = &'a FixedColumn;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.columns.len() {
+            Some(
+                &self.columns[{
+                    self.index += 1;
+                    self.index - 1
+                }],
+            )
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests_schema {
     use super::*;
-    use std::path::PathBuf;
-    use std::{fs, io};
 
     #[test]
-    fn test_from_custom_string() {
-        let data = r#"
-        {
-            "name": "John Cena",
-            "age": "1498"
-        }"#;
-        let schema = schema_from_str(data, Metadata::default());
-        println!("schema: {:?}", schema);
+    fn test_new_fixed_column_ok() {
+        let schema = FixedColumn::new(
+            "coolSchema2000Elin".to_string(),
+            5,
+            20,
+            "utf8".to_string(),
+            false,
+        );
+        assert_eq!(DataType::Utf8, schema.arrow_dtype().unwrap());
     }
 
     #[test]
@@ -171,11 +267,7 @@ mod tests_schema {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/schema/test_schema.json");
 
-        let json = fs::File::open(path).unwrap();
-        let reader = io::BufReader::new(json);
-
-        let fixed_schema: FixedSchema = serde_json::from_reader(reader).unwrap();
-
+        let fixed_schema: FixedSchema = FixedSchema::from_path(path);
         let arrow_schema: Schema = fixed_schema.into_arrow_schema();
 
         assert_eq!(4, arrow_schema.fields.len());
@@ -186,13 +278,14 @@ mod tests_schema {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/schema/test_schema.json");
 
-        let json = fs::File::open(path).unwrap();
-        let reader = io::BufReader::new(json);
-
-        let schema: FixedSchema = serde_json::from_reader(reader).unwrap();
+        let schema: FixedSchema = FixedSchema::from_path(path);
+        let offsets: Vec<usize> = vec![0, 9, 41, 73];
+        let lengths: Vec<usize> = vec![9, 32, 32, 1];
 
         assert_eq!(4, schema.num_columns());
         assert_eq!(74, schema.row_len());
+        assert_eq!(offsets, schema.column_offsets());
+        assert_eq!(lengths, schema.column_lengths());
     }
 
     #[test]
@@ -201,9 +294,6 @@ mod tests_schema {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/schema/test_schema_trailing_commas.json");
 
-        let json = fs::File::open(path).unwrap();
-        let reader = io::BufReader::new(json);
-
-        let _schema: FixedSchema = serde_json::from_reader(reader).unwrap();
+        let _schema: FixedSchema = FixedSchema::from_path(path);
     }
 }

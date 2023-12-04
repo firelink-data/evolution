@@ -22,12 +22,12 @@
 * SOFTWARE.
 *
 * File created: 2023-11-21
-* Last updated: 2023-11-21
+* Last updated: 2023-12-01
 */
 
 use chrono::Local;
 use colored::Colorize;
-use log::{Level, Log, Metadata, Record, SetLoggerError};
+use log::{error, Level, Log, Metadata, Record, SetLoggerError};
 
 use std::env;
 
@@ -147,4 +147,15 @@ pub fn init_logging() -> Result<(), SetLoggerError> {
     let logger = Logger::new(log_level);
     log::set_boxed_logger(Box::new(logger))
         .map(|()| log::set_max_level(log_level.to_level_filter()))
+}
+
+///
+pub(crate) fn setup_log() -> Result<(), SetLoggerError> {
+    match init_logging() {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            error!("Could not initialize boxed logger, exiting!");
+            Err(e)
+        }
+    }
 }
