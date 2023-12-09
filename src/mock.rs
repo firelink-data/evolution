@@ -22,10 +22,10 @@
 * SOFTWARE.
 *
 * File created: 2023-11-28
-* Last updated: 2023-12-04
+* Last updated: 2023-12-09
 */
 
-use crate::schema;
+use crate::schema::{self, FixedColumn};
 use log::{debug, info};
 use rand::distributions::{Alphanumeric, DistString};
 use std::fs;
@@ -65,6 +65,16 @@ impl FixedMocker {
         }
     }
 
+    pub fn kgenerate(&self, n_rows: usize) {
+        for row in 0..n_rows {
+            let mut buffer: Vec<u8> = Vec::new();
+            
+            for col in self.schema.iter() {
+                let mocked_values: Vec<u8> = col.mock();
+            }
+        }
+    }
+
     /// TODO: randomize data based on dtype
     pub fn generate(&self, n_rows: usize) {
         let now = SystemTime::now();
@@ -96,12 +106,20 @@ impl FixedMocker {
     }
 }
 
+pub trait Mock {
+    fn mock(&self) -> Vec<u8>;
+}
+
+pub(crate) fn mock_bool(len: usize) -> Vec<u8> {
+}
+
 ///
 pub(crate) fn mock_from_schema(schema_path: String, n_rows: usize) {
     let schema = schema::FixedSchema::from_path(schema_path.into());
     let mocker = FixedMocker::new(schema);
     //mocker.generate(n_rows);
-    mocker.generate_threaded(n_rows, 5);
+    //mocker.generate_threaded(n_rows, 5);
+    mocker.kgenerate(n_rows);
 }
 
 #[cfg(test)]
