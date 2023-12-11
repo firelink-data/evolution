@@ -32,6 +32,7 @@ mod builder;
 mod logging;
 mod mock;
 mod schema;
+mod slicer;
 
 ///
 fn main() -> Result<(), SetLoggerError> {
