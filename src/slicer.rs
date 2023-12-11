@@ -90,9 +90,9 @@ pub(crate) fn slice_and_process(fn_line_break: FnLineBreak,
             chunk_len_toread);
 
         remaining_file_length-=chunk_len_effective_read;
-        fn_process_slices(slices);
+        let (bytes_processed_for_slices,_)=fn_process_slices(slices);
 
-
+        bytes_processed+=bytes_processed_for_slices;
         bytes_processed+=residue_len;
 
 
@@ -101,10 +101,11 @@ pub(crate) fn slice_and_process(fn_line_break: FnLineBreak,
 
         if remaining_file_length == 0 {
             if(0!=residue_len) {
-                // Whoopsie what to do whith
-//                file_out.write_all(&residue[0..residue_len]).expect("dasd");
+                let   slice: Vec<& [u8]> = vec![&residue[0..residue_len]];
+                let (bytes_processed_for_slices,_)=fn_process_slices(slice);
+                bytes_processed+=bytes_processed_for_slices;
+
             }
-            println!("End of data with a residual ... not handled atm or.. is this never happening ? Drives me insane to think about it :) ");
             break;
         }
 
@@ -211,7 +212,7 @@ fn find_last_nlcr(bytes: &[u8]) -> (bool,usize) {
 
 }
 // Returns the INDEX in the u8 byte array
-fn find_last_nl(bytes: &[u8]) -> (bool,usize) {
+pub(crate) fn find_last_nl(bytes: &[u8]) -> (bool, usize) {
     if 0 == bytes.len() {
         return (false,0); // Indicate we didnt found nl.
     }
@@ -234,7 +235,7 @@ fn find_last_nl(bytes: &[u8]) -> (bool,usize) {
 
 }
 
-fn dummy_handle_slices_to_file(slices:Vec<&[u8]>) -> (usize,usize) {
+pub(crate) fn dummy_handle_slices_to_file(slices:Vec<&[u8]>) -> (usize, usize) {
     let mut bytes_processed:usize=0;
 
     for val in slices {
@@ -243,7 +244,7 @@ fn dummy_handle_slices_to_file(slices:Vec<&[u8]>) -> (usize,usize) {
             Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
         };
 
-        print!("result: {}", s);
+        print!("{}", s);
 
         let l = val.len();
         bytes_processed = bytes_processed + l;

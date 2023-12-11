@@ -40,7 +40,7 @@ fn main() -> Result<(), SetLoggerError> {
 
     let mut matches = Command::new("evolution")
         .author("Wilhelm Ågren <wilhelmagren98@gmail.com>")
-        .version("0.2.0")
+        .version("0.2.1")
         .about(
             "🦖 Evolve your fixed length data files into Apache Arrow tables, fully parallelized!",
         )
@@ -54,7 +54,6 @@ fn main() -> Result<(), SetLoggerError> {
             Arg::new("file")
                 .short('f')
                 .long("file")
-                .requires("schema")
                 .action(ArgAction::Set),
         )
         .arg(
@@ -62,6 +61,7 @@ fn main() -> Result<(), SetLoggerError> {
                 .short('m')
                 .long("mock")
                 .requires("schema")
+                .requires("file")
                 .action(ArgAction::SetTrue),
         )
         .arg(
@@ -73,6 +73,21 @@ fn main() -> Result<(), SetLoggerError> {
                 .default_value("1000")
                 .value_parser(value_parser!(usize)),
         )
+        .arg(
+            Arg::new("slicer")
+            .long("slicer")
+            .requires("file")
+            .action(ArgAction::SetTrue),
+        )
+        .arg(
+        Arg::new("cores")
+            .short('c')
+            .long("cores")
+            .requires("slicer")
+            .action(ArgAction::Set)
+            .default_value("8")
+            .value_parser(value_parser!(usize)),
+    )
         .get_matches();
 
     if matches.get_flag("mock") {
@@ -81,6 +96,12 @@ fn main() -> Result<(), SetLoggerError> {
             matches.remove_one::<usize>("n-rows").unwrap(),
         );
     }
+
+    if matches.get_flag("slicer") {
+        let mut file = std::fs::File::open(matches.remove_one::<String>("file").unwrap()).expect("bbb");
+        slicer::slice_and_process(slicer::find_last_nl, slicer::dummy_handle_slices_to_file, file, matches.remove_one::<usize>("cores").unwrap() as i16);
+    }
+
 
     Ok(())
 }
