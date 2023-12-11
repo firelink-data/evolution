@@ -25,16 +25,15 @@
 * Last updated: 2023-12-11
 */
 
-use crate::schema::{self, FixedColumn};
+use crate::schema::{self};
 use arrow2::error::Error;
 use log::{debug, info};
 use rand::distributions::{Alphanumeric, DistString};
-use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
-use std::time::SystemTime;
 use std::thread;
+use std::time::SystemTime;
 
 pub(crate) static MOCKED_FILENAME_LEN: usize = 16;
 pub(crate) static ROW_BUFFER_LEN: usize = 1024 * 1024;
@@ -51,6 +50,7 @@ impl FixedMocker {
         Self { schema }
     }
 
+    #[allow(dead_code)]
     pub fn generate_threaded(&self, n_rows: usize, n_threads: usize) {
         let threads: Vec<_> = (0..n_threads)
             .map(|t| {
@@ -72,9 +72,8 @@ impl FixedMocker {
     pub fn generate(&self, n_rows: usize) {
         let rowlen = self.schema.row_len();
         let mut buffer: Vec<u8> = Vec::with_capacity(ROW_BUFFER_LEN * rowlen + ROW_BUFFER_LEN * 4);
-        let mut path = PathBuf::from(Alphanumeric.sample_string(
-            &mut rand::thread_rng(), MOCKED_FILENAME_LEN
-        ));
+        let mut path =
+            PathBuf::from(Alphanumeric.sample_string(&mut rand::thread_rng(), MOCKED_FILENAME_LEN));
         path.set_extension("flf");
 
         let mut file = OpenOptions::new()
@@ -86,14 +85,11 @@ impl FixedMocker {
         let now = SystemTime::now();
 
         for row in 0..n_rows {
-
             if row % ROW_BUFFER_LEN == 0 {
-                file
-                    .write_all(&buffer)
-                    .expect("Bad buffer, write failed!");
+                file.write_all(&buffer).expect("Bad buffer, write failed!");
                 buffer = Vec::with_capacity(ROW_BUFFER_LEN * rowlen + ROW_BUFFER_LEN * 4);
             }
-            
+
             for col in self.schema.iter() {
                 let mocked_values: Vec<u8> = col.mock().unwrap();
                 buffer.extend_from_slice(mocked_values.as_slice());
@@ -108,9 +104,7 @@ impl FixedMocker {
             now.elapsed().unwrap().as_millis(),
         );
 
-        file
-            .write_all(&buffer)
-            .expect("Bad buffer, write failed!");
+        file.write_all(&buffer).expect("Bad buffer, write failed!");
     }
 }
 
@@ -127,7 +121,10 @@ pub(crate) fn mock_number(len: usize) -> Vec<u8> {
 }
 
 pub(crate) fn mock_string(len: usize) -> Vec<u8> {
-    Alphanumeric.sample_string(&mut rand::thread_rng(), len).as_bytes().to_vec()
+    Alphanumeric
+        .sample_string(&mut rand::thread_rng(), len)
+        .as_bytes()
+        .to_vec()
 }
 
 ///
