@@ -22,17 +22,21 @@
 * SOFTWARE.
 *
 * File created: 2023-11-28
-* Last updated: 2023-12-04
+* Last updated: 2023-12-11
 */
 
-use crate::schema;
-use log::info;
+use crate::schema::{self};
+use arrow2::error::Error;
+use log::{debug, info};
 use rand::distributions::{Alphanumeric, DistString};
-use std::fs;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::PathBuf;
+use std::thread;
 use std::time::SystemTime;
 
 pub(crate) static MOCKED_FILENAME_LEN: usize = 16;
+pub(crate) static ROW_BUFFER_LEN: usize = 1024 * 1024;
 
 ///
 pub struct FixedMocker {
@@ -46,21 +50,52 @@ impl FixedMocker {
         Self { schema }
     }
 
-    /// TODO: randomize data based on dtype
+    #[allow(dead_code)]
+    pub fn generate_threaded(&self, n_rows: usize, n_threads: usize) {
+        let threads: Vec<_> = (0..n_threads)
+            .map(|t| {
+                thread::spawn(move || {
+                    info!("Thread #{} starts working...", t);
+                    for _ in 0..n_rows {
+                        debug!("hello from #{}", t);
+                    }
+                    info!("Thread #{} done!", t);
+                })
+            })
+            .collect();
+
+        for handle in threads {
+            handle.join().unwrap();
+        }
+    }
+
     pub fn generate(&self, n_rows: usize) {
+        let rowlen = self.schema.row_len();
+        let mut buffer: Vec<u8> = Vec::with_capacity(ROW_BUFFER_LEN * rowlen + ROW_BUFFER_LEN * 4);
+        let mut path =
+            PathBuf::from(Alphanumeric.sample_string(&mut rand::thread_rng(), MOCKED_FILENAME_LEN));
+        path.set_extension("flf");
+
+        let mut file = OpenOptions::new()
+            .create_new(true)
+            .append(true)
+            .open(path)
+            .expect("Could not open file.");
+
         let now = SystemTime::now();
 
-        let mut rows: Vec<u8> = Vec::new();
-        for _row in 0..n_rows {
-            let mut row_builder: Vec<u8> = Vec::new();
-            for col in self.schema.iter() {
-                let col_len = col.length();
-                let mocked_values: Vec<u8> =
-                    (0..col_len).map(|_| "a").collect::<String>().into_bytes();
-                row_builder.extend_from_slice(mocked_values.as_slice());
+        for row in 0..n_rows {
+            if row % ROW_BUFFER_LEN == 0 {
+                file.write_all(&buffer).expect("Bad buffer, write failed!");
+                buffer = Vec::with_capacity(ROW_BUFFER_LEN * rowlen + ROW_BUFFER_LEN * 4);
             }
-            row_builder.extend_from_slice("\rn\n".as_bytes());
-            rows.extend_from_slice(row_builder.as_slice());
+
+            for col in self.schema.iter() {
+                let mocked_values: Vec<u8> = col.mock().unwrap();
+                buffer.extend_from_slice(mocked_values.as_slice());
+            }
+
+            buffer.extend_from_slice("\r\n".as_bytes());
         }
 
         info!(
@@ -69,12 +104,27 @@ impl FixedMocker {
             now.elapsed().unwrap().as_millis(),
         );
 
-        let mut path =
-            PathBuf::from(Alphanumeric.sample_string(&mut rand::thread_rng(), MOCKED_FILENAME_LEN));
-
-        path.set_extension("flf");
-        fs::write(path, rows).unwrap();
+        file.write_all(&buffer).expect("Bad buffer, write failed!");
     }
+}
+
+pub trait Mock {
+    fn mock(&self) -> Result<Vec<u8>, Error>;
+}
+
+pub(crate) fn mock_bool(len: usize) -> Vec<u8> {
+    vec![0; len]
+}
+
+pub(crate) fn mock_number(len: usize) -> Vec<u8> {
+    vec![0; len]
+}
+
+pub(crate) fn mock_string(len: usize) -> Vec<u8> {
+    Alphanumeric
+        .sample_string(&mut rand::thread_rng(), len)
+        .as_bytes()
+        .to_vec()
 }
 
 ///
@@ -82,6 +132,7 @@ pub(crate) fn mock_from_schema(schema_path: String, n_rows: usize) {
     let schema = schema::FixedSchema::from_path(schema_path.into());
     let mocker = FixedMocker::new(schema);
     mocker.generate(n_rows);
+    //mocker.generate_threaded(n_rows, 5);
 }
 
 #[cfg(test)]

@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2023-11-25
-* Last updated: 2023-12-04
+* Last updated: 2023-12-11
 */
 
 use arrow2::datatypes::{DataType, Field, Schema};
@@ -31,6 +31,8 @@ use serde::{Deserialize, Serialize};
 
 use std::path::PathBuf;
 use std::{fs, io};
+
+use crate::mock;
 
 ///
 #[derive(Default, Debug, Deserialize, Serialize)]
@@ -122,6 +124,29 @@ impl FixedColumn {
                 self.dtype,
             ))),
         }
+    }
+}
+
+///
+impl mock::Mock for FixedColumn {
+    fn mock(&self) -> Result<Vec<u8>, Error> {
+        let bytes = match self.dtype.as_str() {
+            "bool" => mock::mock_bool(self.length),
+            "boolean" => mock::mock_bool(self.length),
+            "i16" => mock::mock_number(self.length),
+            "i32" => mock::mock_number(self.length),
+            "i64" => mock::mock_number(self.length),
+            "f16" => mock::mock_number(self.length),
+            "f32" => mock::mock_number(self.length),
+            "f64" => mock::mock_number(self.length),
+            "utf8" => mock::mock_string(self.length),
+            "string" => mock::mock_string(self.length),
+            "lutf8" => mock::mock_string(self.length),
+            "lstring" => mock::mock_string(self.length),
+            _ => return Err(Error::ExternalFormat("xd".to_string())),
+        };
+
+        Ok(bytes)
     }
 }
 
