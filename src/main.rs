@@ -75,19 +75,19 @@ fn main() -> Result<(), SetLoggerError> {
         )
         .arg(
             Arg::new("slicer")
-            .long("slicer")
-            .requires("file")
-            .action(ArgAction::SetTrue),
+                .long("slicer")
+                .requires("file")
+                .action(ArgAction::SetTrue),
         )
         .arg(
-        Arg::new("cores")
-            .short('c')
-            .long("cores")
-            .requires("slicer")
-            .action(ArgAction::Set)
-            .default_value("8")
-            .value_parser(value_parser!(usize)),
-    )
+            Arg::new("cores")
+                .short('c')
+                .long("cores")
+                .requires("slicer")
+                .action(ArgAction::Set)
+                .default_value("8")
+                .value_parser(value_parser!(usize)),
+        )
         .get_matches();
 
     if matches.get_flag("mock") {
@@ -98,10 +98,15 @@ fn main() -> Result<(), SetLoggerError> {
     }
 
     if matches.get_flag("slicer") {
-        let mut file = std::fs::File::open(matches.remove_one::<String>("file").unwrap()).expect("bbb");
-        slicer::slice_and_process(slicer::find_last_nl, slicer::dummy_handle_slices_to_file, file, matches.remove_one::<usize>("cores").unwrap() as i16);
+        let file =
+            std::fs::File::open(matches.remove_one::<String>("file").unwrap()).expect("bbb");
+        slicer::slice_and_process(
+            slicer::find_last_nl,
+            slicer::dummy_handle_slices_to_file,
+            file,
+            matches.remove_one::<usize>("cores").unwrap() as i16,
+        );
     }
-
 
     Ok(())
 }

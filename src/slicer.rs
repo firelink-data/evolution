@@ -25,10 +25,9 @@
 * Last updated: 2023-12-11
 */
 
-use std::{cmp, fs};
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Seek, Write};
-
+use std::io::{BufReader,  Read};
+use std::{cmp};
 
 /**
 GOAL(s)
@@ -47,83 +46,79 @@ in_chunk_cores (how man splits will be made)
 
 */
 type FnLineBreak = fn(bytes: &[u8]) -> (bool, usize);
-type FnProcessSlices = fn(slices: Vec<& [u8]> ) -> (usize,usize);
+type FnProcessSlices = fn(slices: Vec<&[u8]>) -> (usize, usize);
 
 //let mut file = File::open("src/seks/fixed_width_output.txt").expect("bbb");
 // slice_and_process(find_last_nl,dummy_handle_slices_to_file,file,8)
-pub(crate) fn slice_and_process(fn_line_break: FnLineBreak,
-                   fn_process_slices:FnProcessSlices,
-                                mut file:File,
-                                in_chunk_cores:i16
-)
-{
+pub(crate) fn slice_and_process(
+    fn_line_break: FnLineBreak,
+    fn_process_slices: FnProcessSlices,
+    mut file: File,
+    in_chunk_cores: i16,
+) {
     let mut bytes_processed = 0;
-    const IN_CHUNK_SIZE: usize = 1024*1024;
+    const IN_CHUNK_SIZE: usize = 1024 * 1024;
     let in_max_chunks: i8 = 3;
-    let mut remaining_file_length=file.metadata().unwrap().len() as usize;
-    let mut chunks=[[0_u8; IN_CHUNK_SIZE],[0_u8; IN_CHUNK_SIZE],[0_u8; IN_CHUNK_SIZE]];
+    let mut remaining_file_length = file.metadata().unwrap().len() as usize;
+    let mut chunks = [
+        [0_u8; IN_CHUNK_SIZE],
+        [0_u8; IN_CHUNK_SIZE],
+        [0_u8; IN_CHUNK_SIZE],
+    ];
     let mut next_chunk = 0;
-    let  residue: &mut [u8] = & mut[0_u8; IN_CHUNK_SIZE];
-    let mut residue_len =0;
+    let residue: &mut [u8] = &mut [0_u8; IN_CHUNK_SIZE];
+    let mut residue_len = 0;
 
     loop {
+        let mut slices: Vec<&[u8]> = vec![];
 
-        let mut  slices: Vec<& [u8]> = vec![];
-
-        let n: bool = false;
- //       let chunk_len_toread=std::cmp::min(IN_CHUNK_SIZE,remaining_file_length) as usize;
-
-        let mut chunk_len_toread=IN_CHUNK_SIZE;
-        if (remaining_file_length<IN_CHUNK_SIZE) {
-            chunk_len_toread=remaining_file_length;
+        let mut chunk_len_toread = IN_CHUNK_SIZE;
+        if remaining_file_length < IN_CHUNK_SIZE {
+            chunk_len_toread = remaining_file_length;
         }
 
-        let mut chunk_len_effective_read:usize=0;
+        let mut chunk_len_effective_read: usize = 0;
 
-         (residue_len,chunk_len_effective_read ,slices)=read_chunk_and_slice (
+        (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
             fn_line_break,
             residue,
             &mut chunks[next_chunk],
             &mut file,
             in_chunk_cores,
             residue_len,
-            chunk_len_toread);
+            chunk_len_toread,
+        );
 
-        remaining_file_length-=chunk_len_effective_read;
-        let (bytes_processed_for_slices,_)=fn_process_slices(slices);
+        remaining_file_length -= chunk_len_effective_read;
+        let (bytes_processed_for_slices, _) = fn_process_slices(slices);
 
-        bytes_processed+=bytes_processed_for_slices;
-        bytes_processed+=residue_len;
-
+        bytes_processed += bytes_processed_for_slices;
+        bytes_processed += residue_len;
 
         next_chunk += 1;
-        next_chunk = next_chunk % (in_max_chunks as usize);
+        next_chunk %= in_max_chunks as usize;
 
         if remaining_file_length == 0 {
-            if(0!=residue_len) {
-                let   slice: Vec<& [u8]> = vec![&residue[0..residue_len]];
-                let (bytes_processed_for_slices,_)=fn_process_slices(slice);
-                bytes_processed+=bytes_processed_for_slices;
-
+            if 0 != residue_len {
+                let slice: Vec<&[u8]> = vec![&residue[0..residue_len]];
+                let (bytes_processed_for_slices, _) = fn_process_slices(slice);
+                bytes_processed += bytes_processed_for_slices;
             }
             break;
         }
-
     }
     println!("Bytes processed {}", bytes_processed)
 }
 
-
 fn read_chunk_and_slice<'a>(
     fn_line_break: FnLineBreak,
-    residue  : &'a mut [u8],
-    chunk : &'a mut[u8],
+    residue: &'a mut [u8],
+    chunk: &'a mut [u8],
     file: &mut File,
     chunk_cores: i16,
     residue_effective_len: usize,
-    chunk_len_toread: usize
-) -> (usize,usize, Vec<&'a  [u8]>) {
-
+    chunk_len_toread: usize,
+) -> (usize, usize, Vec<&'a [u8]>) {
     let mut target_chunk_residue: &mut [u8] = &mut [];
     let mut target_chunk_read: &mut [u8] = &mut [];
 
@@ -131,21 +126,20 @@ fn read_chunk_and_slice<'a>(
     if 0 != residue_effective_len {
         target_chunk_residue.copy_from_slice(&residue[0..residue_effective_len]);
     }
-    let target_chunk_read_len=    target_chunk_read.len();
+    let target_chunk_read_len = target_chunk_read.len();
 
-    let read_exact_buffer =&mut target_chunk_read[0..cmp::min(target_chunk_read_len, chunk_len_toread)];
+    let read_exact_buffer =
+        &mut target_chunk_read[0..cmp::min(target_chunk_read_len, chunk_len_toread)];
 
-    let n = BufReader::new(file)
-        .read_exact(read_exact_buffer)
-        .is_ok();
-    let chunk_len_was_read= read_exact_buffer.len();
+    BufReader::new(file).read_exact(read_exact_buffer).is_ok();
+    let chunk_len_was_read = read_exact_buffer.len();
 
     //
     // Below could be separate function called Split !
     //
 
-    let mut r: Vec<&  [u8]> =  vec![];
-    let mut data_to_split_len=chunk_len_was_read+residue_effective_len;
+    let mut r: Vec<&[u8]> = vec![];
+    let data_to_split_len = chunk_len_was_read + residue_effective_len;
 
     let core_block_size = data_to_split_len / chunk_cores as usize;
 
@@ -154,11 +148,11 @@ fn read_chunk_and_slice<'a>(
     for i in 0..chunk_cores {
         // Adjust p2 to nearest found newline
 
-        let  (mut found,mut line_break_offset)=fn_line_break( & chunk[p1..=p2]);
+        let (mut found, mut line_break_offset) = fn_line_break(&chunk[p1..=p2]);
 
-        if(false==found) {
+        if !found {
             // Corner case  to short lines vs core amount ?
-            (found,line_break_offset)=fn_line_break( & chunk[p1..=data_to_split_len -1]);
+            (found, line_break_offset) = fn_line_break(&chunk[p1..=data_to_split_len - 1]);
             if !found {
                 panic!("Could not find a linebreak in chunk. Might be due to chunks shorter than line lenght , or missing linebreak in data. Chunk  lenght {}", chunk_len_toread);
             }
@@ -169,74 +163,69 @@ fn read_chunk_and_slice<'a>(
         r.push(&chunk[p1..=p2]);
 
         p1 = p2 + 1; // Check we inside chunk before continue!!
-        if(p1 > data_to_split_len - 1) {
-            break // All data consumed.
+        if p1 > data_to_split_len - 1 {
+            break; // All data consumed.
         }
 
         p2 = cmp::min(p1 + core_block_size, data_to_split_len - 1);
     }
 
-
-    if(p1 > data_to_split_len - 1) {
+    if p1 > data_to_split_len - 1 {
         (0, chunk_len_was_read, r)
     } else {
-        let residual=& chunk[p1..=data_to_split_len - 1].to_vec();
+        let residual = &chunk[p1..=data_to_split_len - 1].to_vec();
         residue[0..residual.len()].copy_from_slice(residual);
         (residual.len(), chunk_len_was_read, r)
     }
-
-
 }
 
-fn find_last_nlcr(bytes: &[u8]) -> (bool,usize) {
-    if 0 == bytes.len() {
-        return (false,0); // TODO should report err ...
+fn find_last_nlcr(bytes: &[u8]) -> (bool, usize) {
+    if bytes.is_empty() {
+        return (false, 0); // TODO should report err ...
     }
 
     let mut p2 = bytes.len() - 1;
 
     if 0 == p2 {
-        return (false,0); // hmm
+        return (false, 0); // hmm
     }
 
     loop {
         if bytes[p2 - 1] == 0x0d && bytes[p2] == 0x0a {
-            return (true,p2 + 1);
+            return (true, p2 + 1);
         }
-        if (0==p2) {
-            return (false,0); // indicate we didnt find nl
+        if 0 == p2 {
+            return (false, 0); // indicate we didnt find nl
         }
 
-        p2 = p2 - 1;
+        p2 -= 1;
     }
-
 }
 // Returns the INDEX in the u8 byte array
 pub(crate) fn find_last_nl(bytes: &[u8]) -> (bool, usize) {
-    if 0 == bytes.len() {
-        return (false,0); // Indicate we didnt found nl.
+    if bytes.is_empty() {
+        return (false, 0); // Indicate we didnt found nl.
     }
 
     let mut p2 = bytes.len() - 1;
 
     if 0 == p2 {
-        return (false,0); // hmm
+        return (false, 0); // hmm
     }
 
     loop {
         if bytes[p2] == 0x0a {
-            return (true,p2);
+            return (true, p2);
         }
-        if (0==p2) {
-            return (false,0); // indicate we didnt find nl
+        if 0 == p2 {
+            return (false, 0); // indicate we didnt find nl
         }
-        p2 = p2 - 1;
+        p2 -= 1;
     }
-
 }
 
-pub(crate) fn dummy_handle_slices_to_file(slices:Vec<&[u8]>) -> (usize, usize) {
-    let mut bytes_processed:usize=0;
+pub(crate) fn dummy_handle_slices_to_file(slices: Vec<&[u8]>) -> (usize, usize) {
+    let mut bytes_processed: usize = 0;
 
     for val in slices {
         let s = match std::str::from_utf8(val) {
@@ -247,7 +236,7 @@ pub(crate) fn dummy_handle_slices_to_file(slices:Vec<&[u8]>) -> (usize, usize) {
         print!("{}", s);
 
         let l = val.len();
-        bytes_processed = bytes_processed + l;
+        bytes_processed += l;
     }
-    (bytes_processed,0)
+    (bytes_processed, 0)
 }
