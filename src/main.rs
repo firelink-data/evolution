@@ -98,8 +98,7 @@ fn main() -> Result<(), SetLoggerError> {
     }
 
     if matches.get_flag("slicer") {
-        let file =
-            std::fs::File::open(matches.remove_one::<String>("file").unwrap()).expect("bbb");
+        let file = std::fs::File::open(matches.remove_one::<String>("file").unwrap()).expect("bbb");
         slicer::slice_and_process(
             slicer::find_last_nl,
             slicer::dummy_handle_slices_to_file,

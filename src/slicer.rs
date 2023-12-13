@@ -25,9 +25,9 @@
 * Last updated: 2023-12-11
 */
 
+use std::cmp;
 use std::fs::File;
-use std::io::{BufReader,  Read};
-use std::{cmp};
+use std::io::{BufReader, Read};
 
 /**
 GOAL(s)
