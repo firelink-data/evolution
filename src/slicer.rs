@@ -70,14 +70,16 @@ pub(crate) fn slice_and_process(
     let mut residue_len = 0;
 
     loop {
-        let mut slices: Vec<&[u8]> = vec![];
+        #[allow(unused_mut)]
+        let mut slices: Vec<&[u8]>;
 
         let mut chunk_len_toread = IN_CHUNK_SIZE;
         if remaining_file_length < IN_CHUNK_SIZE {
             chunk_len_toread = remaining_file_length;
         }
 
-        let mut chunk_len_effective_read: usize = 0;
+        #[allow(unused_mut)]
+        let mut chunk_len_effective_read: usize;
 
         (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
             fn_line_break,
@@ -119,8 +121,10 @@ fn read_chunk_and_slice<'a>(
     residue_effective_len: usize,
     chunk_len_toread: usize,
 ) -> (usize, usize, Vec<&'a [u8]>) {
-    let mut target_chunk_residue: &mut [u8] = &mut [];
-    let mut target_chunk_read: &mut [u8] = &mut [];
+    #[allow(unused_mut)]
+    let mut target_chunk_residue: &mut [u8];
+    #[allow(unused_mut)]
+    let mut target_chunk_read: &mut [u8];
 
     (target_chunk_residue, target_chunk_read) = chunk.split_at_mut(residue_effective_len);
     if 0 != residue_effective_len {
@@ -131,7 +135,7 @@ fn read_chunk_and_slice<'a>(
     let read_exact_buffer =
         &mut target_chunk_read[0..cmp::min(target_chunk_read_len, chunk_len_toread)];
 
-    BufReader::new(file).read_exact(read_exact_buffer).is_ok();
+    let _ = BufReader::new(file).read_exact(read_exact_buffer).is_ok();
     let chunk_len_was_read = read_exact_buffer.len();
 
     //
@@ -145,7 +149,7 @@ fn read_chunk_and_slice<'a>(
 
     let mut p1: usize = 0;
     let mut p2: usize = core_block_size;
-    for i in 0..chunk_cores {
+    for _i in 0..chunk_cores {
         // Adjust p2 to nearest found newline
 
         let (mut found, mut line_break_offset) = fn_line_break(&chunk[p1..=p2]);
@@ -179,6 +183,7 @@ fn read_chunk_and_slice<'a>(
     }
 }
 
+#[allow(dead_code)]
 fn find_last_nlcr(bytes: &[u8]) -> (bool, usize) {
     if bytes.is_empty() {
         return (false, 0); // TODO should report err ...
@@ -201,6 +206,8 @@ fn find_last_nlcr(bytes: &[u8]) -> (bool, usize) {
         p2 -= 1;
     }
 }
+
+#[allow(dead_code)]
 // Returns the INDEX in the u8 byte array
 pub(crate) fn find_last_nl(bytes: &[u8]) -> (bool, usize) {
     if bytes.is_empty() {
