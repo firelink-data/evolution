@@ -22,11 +22,13 @@
 * SOFTWARE.
 *
 * File created: 2023-11-21
-* Last updated: 2023-12-04
+* Last updated: 2023-12-14
 */
 
+use crate::slicer::{find_last_nl, SampleSliceAggregator};
 use clap::{value_parser, Arg, ArgAction, Command};
-use log::SetLoggerError;
+use log::{info, SetLoggerError};
+use std::fs;
 
 mod builder;
 mod logging;
@@ -54,6 +56,7 @@ fn main() -> Result<(), SetLoggerError> {
             Arg::new("file")
                 .short('f')
                 .long("file")
+                .requires("slice")
                 .action(ArgAction::Set),
         )
         .arg(
@@ -61,12 +64,17 @@ fn main() -> Result<(), SetLoggerError> {
                 .short('m')
                 .long("mock")
                 .requires("schema")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("slice")
+                .long("slice")
+                .requires("schema")
                 .requires("file")
                 .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("n-rows")
-                .short('n')
                 .long("n-rows")
                 .requires("mock")
                 .action(ArgAction::Set)
@@ -74,21 +82,29 @@ fn main() -> Result<(), SetLoggerError> {
                 .value_parser(value_parser!(usize)),
         )
         .arg(
-            Arg::new("slicer")
-                .long("slicer")
-                .requires("file")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("cores")
-                .short('c')
-                .long("cores")
-                .requires("slicer")
+            Arg::new("n-threads")
+                .long("n-threads")
                 .action(ArgAction::Set)
-                .default_value("8")
+                .default_value("1")
                 .value_parser(value_parser!(usize)),
         )
         .get_matches();
+
+    let n_logical_threads = num_cpus::get();
+    let mut n_threads = matches.remove_one::<usize>("n-threads").unwrap();
+
+    if n_threads > n_logical_threads {
+        info!(
+            "you specified to use {} thread, but your CPU only has {} logical threads",
+            n_threads, n_logical_threads,
+        );
+        n_threads = n_logical_threads;
+    }
+
+    let multithreaded: bool = n_threads > 1;
+    if multithreaded {
+        info!("multithreading enabled ({} logical threads)", n_threads);
+    }
 
     if matches.get_flag("mock") {
         mock::mock_from_schema(
@@ -97,14 +113,25 @@ fn main() -> Result<(), SetLoggerError> {
         );
     }
 
-    if matches.get_flag("slicer") {
-        let file = std::fs::File::open(matches.remove_one::<String>("file").unwrap()).expect("bbb");
-        slicer::slice_and_process(
-            slicer::find_last_nl,
-            slicer::dummy_handle_slices_to_file,
-            file,
-            matches.remove_one::<usize>("cores").unwrap() as i16,
-        );
+    if matches.get_flag("slice") {
+        let file_name = matches.remove_one::<String>("file").unwrap();
+
+        let file = std::fs::File::open(&file_name).expect("bbb");
+        let mut out_file_name = file_name.clone().to_owned();
+        out_file_name.push_str("SLICED");
+
+        let file_out = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(out_file_name)
+            .expect("aaa");
+
+        let saa: Box<SampleSliceAggregator> = Box::new(slicer::SampleSliceAggregator {
+            file_out,
+            fn_line_break: find_last_nl,
+        });
+
+        slicer::slice_and_process(saa, file, n_threads);
     }
 
     Ok(())
