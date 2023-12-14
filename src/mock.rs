@@ -136,7 +136,40 @@ pub(crate) fn mock_from_schema(schema_path: String, n_rows: usize) {
     //mocker.generate_threaded(n_rows, 5);
 }
 
-fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows) {
+fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: usize) {
+    let rowlen = schema.row_len();
+    let mut buffer: Vec<u8> = Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
+    let mut path = PathBuf::from(Alphanumeric.sample_string(&mut rand::thread_rng(), DEFAULT_MOCKED_FILENAME_LEN));
+    path.set_extension("flf");
+
+    let mut file = OpenOptions::new()
+        .create_new(true)
+        .append(true)
+        .open(path)
+        .unwrap();
+
+    for row in 0..n_rows {
+        if row % DEFAULT_ROW_BUFFER_LEN == 0 {
+            file.write_all(&buffer).expect("Bad buffer, write failed!");
+            buffer = Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
+        }
+
+        for col in schema.iter() {
+            padder::pad_and_push_to_buffer(
+                col.mock().unwrap(),
+                col.length(),
+                padder::Alignment::Right, 
+                ' ',
+                &mut buffer,
+            );
+        }
+
+        buffer.extend_from_slice("\r\n".as_bytes());
+    }
+
+    file.write_all(&buffer).expect("Bad buffer, write failed!");
+
+    println!("thread {} done!", thread);
 
 }
 
@@ -160,9 +193,9 @@ fn generate_threaded(
 
     let threads: Vec<_> = (0..n_threads)
         .map(|t| {
-            let xd = Arc::clone(&arc_schema);
+            let arc_clone = Arc::clone(&arc_schema);
             thread::spawn(move || {
-                generate_from_thread(t, xd, n_rows_per_thread)
+                generate_from_thread(t, arc_clone, n_rows_per_thread)
             })
         })
     .collect();
@@ -170,6 +203,9 @@ fn generate_threaded(
     for handle in threads {
         handle.join().unwrap();
     }
+
+    // TODO: generate rest of rows
+    println!("still have slask rest: {}", rest);
 }
 
 ///
