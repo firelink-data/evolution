@@ -28,12 +28,12 @@
 use crate::schema::{self, FixedSchema};
 use log::{debug, info};
 use padder;
-use rand::distributions::{Alphanumeric, Distribution, DistString, Uniform};
+use rand::distributions::{Alphanumeric, DistString, Distribution, Uniform};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
-use std::thread;
 use std::sync::Arc;
+use std::thread;
 use std::time::SystemTime;
 
 pub(crate) static DEFAULT_MOCKED_FILENAME_LEN: usize = 16;
@@ -72,9 +72,11 @@ impl FixedMocker {
 
     pub fn generate(&self, n_rows: usize) {
         let rowlen = self.schema.row_len();
-        let mut buffer: Vec<u8> = Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
-        let mut path =
-            PathBuf::from(Alphanumeric.sample_string(&mut rand::thread_rng(), DEFAULT_MOCKED_FILENAME_LEN));
+        let mut buffer: Vec<u8> =
+            Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
+        let mut path = PathBuf::from(
+            Alphanumeric.sample_string(&mut rand::thread_rng(), DEFAULT_MOCKED_FILENAME_LEN),
+        );
         path.set_extension("flf");
 
         let mut file = OpenOptions::new()
@@ -88,14 +90,16 @@ impl FixedMocker {
         for row in 0..n_rows {
             if row % DEFAULT_ROW_BUFFER_LEN == 0 {
                 file.write_all(&buffer).expect("Bad buffer, write failed!");
-                buffer = Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
+                buffer = Vec::with_capacity(
+                    DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2,
+                );
             }
 
             for col in self.schema.iter() {
                 padder::pad_and_push_to_buffer(
                     col.mock().unwrap(),
                     col.length(),
-                    padder::Alignment::Right, 
+                    padder::Alignment::Right,
                     ' ',
                     &mut buffer,
                 );
@@ -115,16 +119,18 @@ impl FixedMocker {
 }
 
 pub(crate) fn mock_bool<'a>(len: usize) -> &'a str {
-    if len > 3 { return "true"; }
-    return "false";
+    if len > 3 {
+        return "true";
+    }
+    "false"
 }
 
 pub(crate) fn mock_number<'a>(_len: usize) -> &'a str {
-    return "3";
+    "3"
 }
 
 pub(crate) fn mock_string<'a>(_len: usize) -> &'a str {
-    return "hejj";
+    "hejj"
 }
 
 ///
@@ -138,8 +144,11 @@ pub(crate) fn mock_from_schema(schema_path: String, n_rows: usize) {
 
 fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: usize) {
     let rowlen = schema.row_len();
-    let mut buffer: Vec<u8> = Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
-    let mut path = PathBuf::from(Alphanumeric.sample_string(&mut rand::thread_rng(), DEFAULT_MOCKED_FILENAME_LEN));
+    let mut buffer: Vec<u8> =
+        Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
+    let mut path = PathBuf::from(
+        Alphanumeric.sample_string(&mut rand::thread_rng(), DEFAULT_MOCKED_FILENAME_LEN),
+    );
     path.set_extension("flf");
 
     let mut file = OpenOptions::new()
@@ -151,14 +160,15 @@ fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: usize) 
     for row in 0..n_rows {
         if row % DEFAULT_ROW_BUFFER_LEN == 0 {
             file.write_all(&buffer).expect("Bad buffer, write failed!");
-            buffer = Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
+            buffer =
+                Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
         }
 
         for col in schema.iter() {
             padder::pad_and_push_to_buffer(
                 col.mock().unwrap(),
                 col.length(),
-                padder::Alignment::Right, 
+                padder::Alignment::Right,
                 ' ',
                 &mut buffer,
             );
@@ -170,16 +180,10 @@ fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: usize) 
     file.write_all(&buffer).expect("Bad buffer, write failed!");
 
     println!("thread {} done!", thread);
-
 }
 
 ///
-fn generate_threaded(
-    schema: FixedSchema,
-    n_rows: usize,
-    n_threads: usize,
-) {
-
+fn generate_threaded(schema: FixedSchema, n_rows: usize, n_threads: usize) {
     let n_rows_per_thread = n_rows / n_threads;
     let n_buffers_per_thread = std::cmp::max(n_rows_per_thread / DEFAULT_ROW_BUFFER_LEN, 1);
 
@@ -194,11 +198,9 @@ fn generate_threaded(
     let threads: Vec<_> = (0..n_threads)
         .map(|t| {
             let arc_clone = Arc::clone(&arc_schema);
-            thread::spawn(move || {
-                generate_from_thread(t, arc_clone, n_rows_per_thread)
-            })
+            thread::spawn(move || generate_from_thread(t, arc_clone, n_rows_per_thread))
         })
-    .collect();
+        .collect();
 
     for handle in threads {
         handle.join().unwrap();
