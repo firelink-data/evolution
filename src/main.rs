@@ -25,8 +25,10 @@
 * Last updated: 2023-12-04
 */
 
+use std::fs;
 use clap::{value_parser, Arg, ArgAction, Command};
 use log::SetLoggerError;
+use crate::slicer::{find_last_nl, SampleSliceAggregator};
 
 mod builder;
 mod logging;
@@ -98,10 +100,18 @@ fn main() -> Result<(), SetLoggerError> {
     }
 
     if matches.get_flag("slicer") {
-        let file = std::fs::File::open(matches.remove_one::<String>("file").unwrap()).expect("bbb");
+        let file_name =matches.remove_one::<String>("file").unwrap();
+
+        let file = std::fs::File::open(&file_name).expect("bbb");
+        let mut out_file_name  = file_name.clone().to_owned();
+        out_file_name.push_str("SLICED");
+
+        let file_out = fs::OpenOptions::new().create(true).append(true).open(&file_name ).expect("aaa");
+
+        let saa: Box<SampleSliceAggregator> =Box::new(slicer::SampleSliceAggregator { file_out: file_out, fn_line_break: find_last_nl });
+
         slicer::slice_and_process(
-            slicer::find_last_nl,
-            slicer::dummy_handle_slices_to_file,
+            saa,
             file,
             matches.remove_one::<usize>("cores").unwrap() as i16,
         );

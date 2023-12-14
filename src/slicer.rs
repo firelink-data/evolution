@@ -25,9 +25,9 @@
 * Last updated: 2023-12-11
 */
 
-use std::cmp;
+use std::{cmp};
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, Write};
 
 /**
 GOAL(s)
@@ -44,18 +44,22 @@ in_max_chunks
 in_chunk_cores (how man splits will be made)
 
 
+
 */
-type FnLineBreak = fn(bytes: &[u8]) -> (bool, usize);
-type FnProcessSlices = fn(slices: Vec<&[u8]>) -> (usize, usize);
+
+
+pub trait SlicerProcessor {
+    fn set_line_break_handler(&mut self, fn_line_break:FnLineBreak);
+    fn get_line_break_handler(&self) -> FnLineBreak;
+
+    fn process(&mut self,slices: Vec<&[u8]>) -> usize;
+}
+
+
 
 //let mut file = File::open("src/seks/fixed_width_output.txt").expect("bbb");
 // slice_and_process(find_last_nl,dummy_handle_slices_to_file,file,8)
-pub(crate) fn slice_and_process(
-    fn_line_break: FnLineBreak,
-    fn_process_slices: FnProcessSlices,
-    mut file: File,
-    in_chunk_cores: i16,
-) {
+pub(crate) fn slice_and_process(mut slicer_processor: Box<dyn SlicerProcessor>, mut file: File, in_chunk_cores: i16,) {
     let mut bytes_processed = 0;
     const IN_CHUNK_SIZE: usize = 1024 * 1024;
     let in_max_chunks: i8 = 3;
@@ -82,7 +86,7 @@ pub(crate) fn slice_and_process(
         let mut chunk_len_effective_read: usize;
 
         (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
-            fn_line_break,
+            slicer_processor.get_line_break_handler(),
             residue,
             &mut chunks[next_chunk],
             &mut file,
@@ -92,7 +96,7 @@ pub(crate) fn slice_and_process(
         );
 
         remaining_file_length -= chunk_len_effective_read;
-        let (bytes_processed_for_slices, _) = fn_process_slices(slices);
+        let bytes_processed_for_slices = slicer_processor.process(slices);
 
         bytes_processed += bytes_processed_for_slices;
         bytes_processed += residue_len;
@@ -103,7 +107,7 @@ pub(crate) fn slice_and_process(
         if remaining_file_length == 0 {
             if 0 != residue_len {
                 let slice: Vec<&[u8]> = vec![&residue[0..residue_len]];
-                let (bytes_processed_for_slices, _) = fn_process_slices(slice);
+                let bytes_processed_for_slices = slicer_processor.process(slice);
                 bytes_processed += bytes_processed_for_slices;
             }
             break;
@@ -183,6 +187,8 @@ fn read_chunk_and_slice<'a>(
     }
 }
 
+type FnLineBreak = fn(bytes: &[u8]) -> (bool, usize);
+
 #[allow(dead_code)]
 fn find_last_nlcr(bytes: &[u8]) -> (bool, usize) {
     if bytes.is_empty() {
@@ -231,19 +237,32 @@ pub(crate) fn find_last_nl(bytes: &[u8]) -> (bool, usize) {
     }
 }
 
-pub(crate) fn dummy_handle_slices_to_file(slices: Vec<&[u8]>) -> (usize, usize) {
-    let mut bytes_processed: usize = 0;
-
-    for val in slices {
-        let s = match std::str::from_utf8(val) {
-            Ok(v) => v,
-            Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-        };
-
-        print!("{}", s);
-
-        let l = val.len();
-        bytes_processed += l;
-    }
-    (bytes_processed, 0)
+pub(crate) struct SampleSliceAggregator {
+    pub(crate) file_out:File,
+    pub(crate) fn_line_break:FnLineBreak
 }
+impl SlicerProcessor for SampleSliceAggregator {
+    fn set_line_break_handler(&mut self, fnl:FnLineBreak) {
+        self.fn_line_break=fnl;
+    }
+    fn get_line_break_handler(&self) -> FnLineBreak {
+        self.fn_line_break
+    }
+
+
+    fn process(&mut self, slices: Vec<&[u8]>) -> usize {
+        let mut bytes_processed: usize = 0;
+
+        for val in slices {
+
+            self.file_out.write_all(val).expect("dasd");
+
+
+            let l = val.len();
+            bytes_processed += l;
+        }
+        bytes_processed
+    }
+
+}
+
