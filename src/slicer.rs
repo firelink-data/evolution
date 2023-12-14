@@ -22,9 +22,10 @@
 * SOFTWARE.
 *
 * File created: 2023-12-11
-* Last updated: 2023-12-11
+* Last updated: 2023-12-14
 */
 
+use log::info;
 use std::cmp;
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
@@ -39,14 +40,15 @@ GOAL(s)
 
 
 V1 Parameters will will be:
-IN_CHUNK_SIZE
+SLICER_IN_CHUNK_SIZE
 in_max_chunks
 in_chunk_cores (how man splits will be made)
 
-
-
 */
 
+pub(crate) const SLICER_IN_CHUNK_SIZE: usize = 1024 * 1024;
+
+///
 pub trait SlicerProcessor {
     fn set_line_break_handler(&mut self, fn_line_break: FnLineBreak);
     fn get_line_break_handler(&self) -> FnLineBreak;
@@ -54,37 +56,35 @@ pub trait SlicerProcessor {
     fn process(&mut self, slices: Vec<&[u8]>) -> usize;
 }
 
-//let mut file = File::open("src/seks/fixed_width_output.txt").expect("bbb");
-// slice_and_process(find_last_nl,dummy_handle_slices_to_file,file,8)
+/// Rickard magic!
 pub(crate) fn slice_and_process(
     mut slicer_processor: Box<dyn SlicerProcessor>,
     mut file: File,
-    in_chunk_cores: i16,
+    in_chunk_cores: usize,
 ) {
     let mut bytes_processed = 0;
-    const IN_CHUNK_SIZE: usize = 1024 * 1024;
     let in_max_chunks: i8 = 3;
+
     let mut remaining_file_length = file.metadata().unwrap().len() as usize;
     let mut chunks = [
-        [0_u8; IN_CHUNK_SIZE],
-        [0_u8; IN_CHUNK_SIZE],
-        [0_u8; IN_CHUNK_SIZE],
+        [0_u8; SLICER_IN_CHUNK_SIZE],
+        [0_u8; SLICER_IN_CHUNK_SIZE],
+        [0_u8; SLICER_IN_CHUNK_SIZE],
     ];
+
     let mut next_chunk = 0;
-    let residue: &mut [u8] = &mut [0_u8; IN_CHUNK_SIZE];
+    let residue: &mut [u8] = &mut [0_u8; SLICER_IN_CHUNK_SIZE];
     let mut residue_len = 0;
 
     loop {
-        #[allow(unused_mut)]
-        let mut slices: Vec<&[u8]>;
+        let slices: Vec<&[u8]>;
 
-        let mut chunk_len_toread = IN_CHUNK_SIZE;
-        if remaining_file_length < IN_CHUNK_SIZE {
+        let mut chunk_len_toread = SLICER_IN_CHUNK_SIZE;
+        if remaining_file_length < SLICER_IN_CHUNK_SIZE {
             chunk_len_toread = remaining_file_length;
         }
 
-        #[allow(unused_mut)]
-        let mut chunk_len_effective_read: usize;
+        let chunk_len_effective_read: usize;
 
         (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
             slicer_processor.get_line_break_handler(),
@@ -114,15 +114,17 @@ pub(crate) fn slice_and_process(
             break;
         }
     }
-    println!("Bytes processed {}", bytes_processed)
+
+    info!("Bytes processed {}", bytes_processed);
 }
 
+///
 fn read_chunk_and_slice<'a>(
     fn_line_break: FnLineBreak,
     residue: &'a mut [u8],
     chunk: &'a mut [u8],
     file: &mut File,
-    chunk_cores: i16,
+    chunk_cores: usize,
     residue_effective_len: usize,
     chunk_len_toread: usize,
 ) -> (usize, usize, Vec<&'a [u8]>) {
@@ -150,7 +152,7 @@ fn read_chunk_and_slice<'a>(
     let mut r: Vec<&[u8]> = vec![];
     let data_to_split_len = chunk_len_was_read + residue_effective_len;
 
-    let core_block_size = data_to_split_len / chunk_cores as usize;
+    let core_block_size = data_to_split_len / chunk_cores;
 
     let mut p1: usize = 0;
     let mut p2: usize = core_block_size;
@@ -188,9 +190,11 @@ fn read_chunk_and_slice<'a>(
     }
 }
 
+///
 type FnLineBreak = fn(bytes: &[u8]) -> (bool, usize);
 
 #[allow(dead_code)]
+///
 fn find_last_nlcr(bytes: &[u8]) -> (bool, usize) {
     if bytes.is_empty() {
         return (false, 0); // TODO should report err ...
@@ -215,7 +219,7 @@ fn find_last_nlcr(bytes: &[u8]) -> (bool, usize) {
 }
 
 #[allow(dead_code)]
-// Returns the INDEX in the u8 byte array
+/// Returns the INDEX in the u8 byte array
 pub(crate) fn find_last_nl(bytes: &[u8]) -> (bool, usize) {
     if bytes.is_empty() {
         return (false, 0); // Indicate we didnt found nl.
@@ -238,10 +242,13 @@ pub(crate) fn find_last_nl(bytes: &[u8]) -> (bool, usize) {
     }
 }
 
+///
 pub(crate) struct SampleSliceAggregator {
     pub(crate) file_out: File,
     pub(crate) fn_line_break: FnLineBreak,
 }
+
+///
 impl SlicerProcessor for SampleSliceAggregator {
     fn set_line_break_handler(&mut self, fnl: FnLineBreak) {
         self.fn_line_break = fnl;
@@ -262,3 +269,6 @@ impl SlicerProcessor for SampleSliceAggregator {
         bytes_processed
     }
 }
+
+#[cfg(test)]
+mod tests_slicer {}

@@ -131,7 +131,7 @@ fn main() -> Result<(), SetLoggerError> {
             fn_line_break: find_last_nl,
         });
 
-        slicer::slice_and_process(saa, file, n_threads as i16);
+        slicer::slice_and_process(saa, file, n_threads);
     }
 
     Ok(())
