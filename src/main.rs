@@ -106,7 +106,7 @@ fn main() -> Result<(), SetLoggerError> {
         let mut out_file_name  = file_name.clone().to_owned();
         out_file_name.push_str("SLICED");
 
-        let file_out = fs::OpenOptions::new().create(true).append(true).open(&file_name ).expect("aaa");
+        let file_out = fs::OpenOptions::new().create(true).append(true).open(out_file_name ).expect("aaa");
 
         let saa: Box<SampleSliceAggregator> =Box::new(slicer::SampleSliceAggregator { file_out: file_out, fn_line_break: find_last_nl });
 
