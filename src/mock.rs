@@ -27,8 +27,7 @@
 
 use crate::schema::{self, FixedSchema};
 use log::{debug, info};
-use padder;
-use rand::distributions::{Alphanumeric, DistString, Distribution, Uniform};
+use rand::distributions::{Alphanumeric, DistString};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
@@ -45,6 +44,7 @@ pub struct FixedMocker {
 }
 
 ///
+#[allow(dead_code)]
 impl FixedMocker {
     ///
     pub fn new(schema: schema::FixedSchema) -> Self {
@@ -211,6 +211,7 @@ fn generate_threaded(schema: FixedSchema, n_rows: usize, n_threads: usize) {
 }
 
 ///
+#[allow(dead_code)]
 pub(crate) fn mock_from_schema_threaded(schema_path: String, n_rows: usize, n_threads: usize) {
     let schema = schema::FixedSchema::from_path(schema_path.into());
     generate_threaded(schema, n_rows, n_threads);
