@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2023-11-25
-* Last updated: 2023-12-11
+* Last updated: 2023-12-14
 */
 
 use arrow2::datatypes::{DataType, Field, Schema};
@@ -35,7 +35,7 @@ use std::{fs, io};
 use crate::mock;
 
 ///
-#[derive(Default, Debug, Deserialize, Serialize)]
+#[derive(Default, Debug, Deserialize, Serialize, Clone)]
 pub struct FixedColumn {
     /// The symbolic name of the column.
     name: String,
@@ -128,30 +128,30 @@ impl FixedColumn {
 }
 
 ///
-impl mock::Mock for FixedColumn {
-    fn mock(&self) -> Result<Vec<u8>, Error> {
-        let bytes = match self.dtype.as_str() {
-            "bool" => mock::mock_bool(self.length),
-            "boolean" => mock::mock_bool(self.length),
-            "i16" => mock::mock_number(self.length),
-            "i32" => mock::mock_number(self.length),
-            "i64" => mock::mock_number(self.length),
-            "f16" => mock::mock_number(self.length),
-            "f32" => mock::mock_number(self.length),
-            "f64" => mock::mock_number(self.length),
-            "utf8" => mock::mock_string(self.length),
-            "string" => mock::mock_string(self.length),
-            "lutf8" => mock::mock_string(self.length),
-            "lstring" => mock::mock_string(self.length),
+impl FixedColumn {
+    pub fn mock<'a>(&self) -> Result<&'a str, Error> {
+        let string = match self.dtype.as_str() {
+            "bool" => mock::mock_bool(std::cmp::max(self.length, 0)),
+            "boolean" => mock::mock_bool(std::cmp::max(self.length, 0)),
+            "i16" => mock::mock_number(std::cmp::max(self.length, 0)),
+            "i32" => mock::mock_number(std::cmp::max(self.length, 0)),
+            "i64" => mock::mock_number(std::cmp::max(self.length, 0)),
+            "f16" => mock::mock_number(std::cmp::max(self.length, 0)),
+            "f32" => mock::mock_number(std::cmp::max(self.length, 0)),
+            "f64" => mock::mock_number(std::cmp::max(self.length, 0)),
+            "utf8" => mock::mock_string(std::cmp::max(self.length, 0)),
+            "string" => mock::mock_string(std::cmp::max(self.length, 0)),
+            "lutf8" => mock::mock_string(std::cmp::max(self.length, 0)),
+            "lstring" => mock::mock_string(std::cmp::max(self.length, 0)),
             _ => return Err(Error::ExternalFormat("xd".to_string())),
         };
 
-        Ok(bytes)
+        Ok(string)
     }
 }
 
 ///
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct FixedSchema {
     name: String,
     version: i32,
@@ -305,10 +305,10 @@ mod tests_schema {
 
         let schema: FixedSchema = FixedSchema::from_path(path);
         let offsets: Vec<usize> = vec![0, 9, 41, 73];
-        let lengths: Vec<usize> = vec![9, 32, 32, 1];
+        let lengths: Vec<usize> = vec![9, 32, 32, 5];
 
         assert_eq!(4, schema.num_columns());
-        assert_eq!(74, schema.row_len());
+        assert_eq!(78, schema.row_len());
         assert_eq!(offsets, schema.column_offsets());
         assert_eq!(lengths, schema.column_lengths());
     }
