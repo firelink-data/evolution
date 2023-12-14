@@ -25,7 +25,7 @@
 * Last updated: 2023-12-11
 */
 
-use std::{cmp};
+use std::cmp;
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
 
@@ -47,19 +47,20 @@ in_chunk_cores (how man splits will be made)
 
 */
 
-
 pub trait SlicerProcessor {
-    fn set_line_break_handler(&mut self, fn_line_break:FnLineBreak);
+    fn set_line_break_handler(&mut self, fn_line_break: FnLineBreak);
     fn get_line_break_handler(&self) -> FnLineBreak;
 
-    fn process(&mut self,slices: Vec<&[u8]>) -> usize;
+    fn process(&mut self, slices: Vec<&[u8]>) -> usize;
 }
-
-
 
 //let mut file = File::open("src/seks/fixed_width_output.txt").expect("bbb");
 // slice_and_process(find_last_nl,dummy_handle_slices_to_file,file,8)
-pub(crate) fn slice_and_process(mut slicer_processor: Box<dyn SlicerProcessor>, mut file: File, in_chunk_cores: i16,) {
+pub(crate) fn slice_and_process(
+    mut slicer_processor: Box<dyn SlicerProcessor>,
+    mut file: File,
+    in_chunk_cores: i16,
+) {
     let mut bytes_processed = 0;
     const IN_CHUNK_SIZE: usize = 1024 * 1024;
     let in_max_chunks: i8 = 3;
@@ -238,31 +239,26 @@ pub(crate) fn find_last_nl(bytes: &[u8]) -> (bool, usize) {
 }
 
 pub(crate) struct SampleSliceAggregator {
-    pub(crate) file_out:File,
-    pub(crate) fn_line_break:FnLineBreak
+    pub(crate) file_out: File,
+    pub(crate) fn_line_break: FnLineBreak,
 }
 impl SlicerProcessor for SampleSliceAggregator {
-    fn set_line_break_handler(&mut self, fnl:FnLineBreak) {
-        self.fn_line_break=fnl;
+    fn set_line_break_handler(&mut self, fnl: FnLineBreak) {
+        self.fn_line_break = fnl;
     }
     fn get_line_break_handler(&self) -> FnLineBreak {
         self.fn_line_break
     }
 
-
     fn process(&mut self, slices: Vec<&[u8]>) -> usize {
         let mut bytes_processed: usize = 0;
 
         for val in slices {
-
             self.file_out.write_all(val).expect("dasd");
-
 
             let l = val.len();
             bytes_processed += l;
         }
         bytes_processed
     }
-
 }
-
