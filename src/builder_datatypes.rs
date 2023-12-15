@@ -28,106 +28,11 @@
 use arrow2::array::MutablePrimitiveArray;
 use arrow2::datatypes::{DataType, Field, Schema};
 use arrow2::io::ipc::write::Record;
-use crate::builder_datatypes::column_builder_type;
+use arrow2::types::NativeType;
+use crate::builder::ColumnBuilder;
 use crate::schema;
 use crate::schema::FixedSchema;
 
-///
-#[allow(dead_code)]
-struct FixedField {
-    /// The destination field.
-    field: Field,
-
-    /// The source datatype.
-    dtype: DataType,
-
-    ///
-    len: u32,
-
-    ///
-    id: u32,
-}
-
-///
-#[allow(dead_code)]
-struct FixedRow<'a> {
-    ///
-    fixed_fields: Vec<&'a FixedField>,
-}
-
-///
-#[allow(dead_code)]
-struct FixedTableChunk<'a> {
-    ///
-    chunk_idx: u32,
-
-    ///
-    fixed_table: &'a FixedTable<'a>,
-
-    column_builders: Vec<Box<dyn ColumnBuilder>>,
-
-    // record_builder: Vec<Box< ??? >>
-    records: Vec<&'a Record<'a>>,
-
-    bytes: Vec<u8>,
-}
-
-///
-#[allow(dead_code)]
-struct FixedTable<'a> {
-    ///
-    bytes: Vec<u8>,
-
-    ///
-    fixed_table_chunks: Vec<&'a FixedTableChunk<'a>>,
-
-    ///
-    row: FixedRow<'a>,
-
-    ///
-    schemas: Vec<&'a Schema>,
-
-    ///
-    table_n_cols: Vec<u32>,
-
-    ///
-    header: Option<String>,
-
-    ///
-    footer: Option<String>,
-
-    ///
-    encoding: String,
-}
-
-///
-pub trait ColumnBuilder {
-    ///
-    fn parse_value(&mut self, name: &str) ;
-
-    ///
-    fn finish_column(&mut self) ;
-
-    /// I think this function won't be necessary.
-    /// `[arrow2]` supports bitmap nulling out-of-the-box.
-    fn nullify(&mut self);
-}
-
-pub(crate) fn parse_from_schema(schema_path: String,in_file_path: String,out_file_path: String,n_threads: i16) {
-
-    let mut builders: Vec<Box<dyn ColumnBuilder>>=Vec::new();
-    for val in schema::FixedSchema::from_path(schema_path.into()).iter() {
-
-        match val.dtype().as_str() {
-            "i32" => builders.push(Box::new(column_builder_type::<i32> { rows: MutablePrimitiveArray::new() })),
-            "i64" => builders.push(Box::new(column_builder_type::<i64> { rows: MutablePrimitiveArray::new() })),
-
-            &_ => {}
-        };
-    }
-
-
-}
 /*
 
    "bool" => Ok(DataType::Boolean),
@@ -144,3 +49,47 @@ pub(crate) fn parse_from_schema(schema_path: String,in_file_path: String,out_fil
             "lstring" => Ok(DataType::LargeUtf8),
 
  */
+
+pub(crate) struct column_builder_type<T1: NativeType+> {
+    pub rows: MutablePrimitiveArray<T1>,
+}
+
+impl ColumnBuilder for column_builder_type::<i32> {
+    fn parse_value(&mut self, name: &str) where Self: Sized {
+        match name.parse::<i32>() {
+            Ok(n) => { self.rows.push(Some(n)) ; n},
+            Err(e) => {
+                self.nullify();
+                0
+            },
+        };
+    }
+
+    fn finish_column(&mut self) where Self: Sized {
+        todo!()
+    }
+
+    fn nullify(&mut self) where Self: Sized {
+        self.rows.push(None);
+    }
+}
+
+impl ColumnBuilder for column_builder_type::<i64> {
+    fn parse_value(&mut self, name: &str)  where Self: Sized {
+        match name.parse::<i64>() {
+            Ok(n) => { self.rows.push(Some(n)); n},
+            Err(e) => {
+                self.nullify();
+                0
+            },
+        };
+    }
+
+    fn finish_column(&mut self) where Self: Sized {
+        todo!()
+    }
+
+    fn nullify(&mut self) where Self: Sized {
+        self.rows.push(None);
+    }
+}

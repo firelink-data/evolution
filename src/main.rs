@@ -35,6 +35,7 @@ mod logging;
 mod mock;
 mod schema;
 mod slicer;
+mod builder_datatypes;
 
 ///
 fn main() -> Result<(), SetLoggerError> {
