@@ -48,7 +48,7 @@ pub struct FixedMocker {
 impl FixedMocker {
     ///
     pub fn new(schema: schema::FixedSchema) -> Self {
-        Self { schema }
+        Self { schema}
     }
 
     #[allow(dead_code)]
@@ -147,12 +147,12 @@ fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: usize) 
     let mut buffer: Vec<u8> =
         Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
     let mut path = PathBuf::from(
-        Alphanumeric.sample_string(&mut rand::thread_rng(), DEFAULT_MOCKED_FILENAME_LEN),
+        String::from("resources/mock_files/test_mock"),
     );
     path.set_extension("flf");
 
     let mut file = OpenOptions::new()
-        .create_new(true)
+        .create(true)
         .append(true)
         .open(path)
         .unwrap();
