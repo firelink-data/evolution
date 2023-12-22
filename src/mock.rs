@@ -22,11 +22,12 @@
 * SOFTWARE.
 *
 * File created: 2023-11-28
-* Last updated: 2023-12-14
+* Last updated: 2023-12-22
 */
 
 use crate::schema::{self, FixedSchema};
 use log::{debug, info};
+use padder::*;
 use rand::distributions::{Alphanumeric, DistString};
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -96,11 +97,11 @@ impl FixedMocker {
             }
 
             for col in self.schema.iter() {
-                padder::pad_and_push_to_buffer(
-                    col.mock().unwrap(),
+                pad_and_push_to_buffer(
+                    col.mock().unwrap().as_bytes().to_vec(),
                     col.length(),
-                    padder::Alignment::Right,
-                    ' ',
+                    Alignment::Right,
+                    Symbol::Whitespace,
                     &mut buffer,
                 );
             }
@@ -165,11 +166,11 @@ fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: usize) 
         }
 
         for col in schema.iter() {
-            padder::pad_and_push_to_buffer(
-                col.mock().unwrap(),
+            pad_and_push_to_buffer(
+                col.mock().unwrap().as_bytes().to_vec(),
                 col.length(),
-                padder::Alignment::Right,
-                ' ',
+                Alignment::Right,
+                Symbol::Whitespace,
                 &mut buffer,
             );
         }
