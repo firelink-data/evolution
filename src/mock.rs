@@ -27,11 +27,11 @@
 
 use crate::schema::{self, FixedSchema};
 use log::{debug, info};
+use padder::*;
 use rand::distributions::{Alphanumeric, DistString};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
-use padder::*;
 use std::sync::Arc;
 use std::thread;
 use std::time::SystemTime;
