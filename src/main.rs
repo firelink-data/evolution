@@ -108,102 +108,19 @@ fn main() -> Result<(), SetLoggerError> {
 
     match &cli.command {
         Some(Commands::Mock { schema, file, n_rows }) => {
-            let mut filename:String= "ad".parse().unwrap();
-//            filename=schema.unwrap(). into_os_string().into_string();
-            mock::mock_from_schema(filename,n_rows.unwrap() as usize
+            mock::mock_from_schema(schema.as_ref().expect("REASON").to_path_buf(),n_rows.unwrap() as usize
             );
 
         }
         Some(Commands::Slice { file }) => {
 
-        }
-        Some(Commands::Convert { schema, file }) => {
 
-        }
-
-        None => {}
-        _ => {}
-    }
-
-    let mut matches = Command::new("evolution")
-        .author("Wilhelm Ågren <wilhelmagren98@gmail.com>")
-        .version("0.2.2")
-        .about(
-            "🦖 Evolve your fixed length data files into Apache Arrow tables, fully parallelized!",
-        )
-        .arg(
-            Arg::new("schema")
-                .short('s')
-                .long("schema")
-                .action(ArgAction::Set),
-        )
-        .arg(
-            Arg::new("file")
-                .short('f')
-                .long("file")
-                .requires("slice")
-                .action(ArgAction::Set),
-        )
-        .arg(
-            Arg::new("mock")
-                .short('m')
-                .long("mock")
-                .requires("schema")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("slice")
-                .long("slice")
-                .requires("schema")
-                .requires("file")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("n-rows")
-                .long("n-rows")
-                .requires("mock")
-                .action(ArgAction::Set)
-                .default_value("1000")
-                .value_parser(value_parser!(usize)),
-        )
-        .arg(
-            Arg::new("n-threads")
-                .long("n-threads")
-                .action(ArgAction::Set)
-                .default_value("1")
-                .value_parser(value_parser!(usize)),
-        )
-        .get_matches();
-
-    let n_logical_threads = num_cpus::get();
-    let mut n_threads = matches.remove_one::<usize>("n-threads").unwrap();
-
-    if n_threads > n_logical_threads {
-        info!(
-            "you specified to use {} thread, but your CPU only has {} logical threads",
-            n_threads, n_logical_threads,
-        );
-        n_threads = n_logical_threads;
-    }
-
-    let multithreaded: bool = n_threads > 1;
-    if multithreaded {
-        info!("multithreading enabled ({} logical threads)", n_threads);
-    }
-
-    if matches.get_flag("mock") {
-        mock::mock_from_schema(
-            matches.remove_one::<String>("schema").unwrap(),
-            matches.remove_one::<usize>("n-rows").unwrap(),
-        );
-    }
-
-    if matches.get_flag("slice") {
-        let file_name = matches.remove_one::<String>("file").unwrap();
+     //   let file_name = matches.remove_one::<String>("file").unwrap();
+        let file_name =     file.as_ref().expect("REASON").to_path_buf();
 
         let file = std::fs::File::open(&file_name).expect("bbb");
         let mut out_file_name = file_name.clone().to_owned();
-        out_file_name.push_str("SLICED");
+        out_file_name.push("SLICED");
 
         let file_out = fs::OpenOptions::new()
             .create(true)
@@ -215,9 +132,20 @@ fn main() -> Result<(), SetLoggerError> {
             file_out,
             fn_line_break: find_last_nl,
         });
-
         slicer::slice_and_process(saa, file, n_threads);
+
+        }
+        Some(Commands::Convert { schema, file }) => {
+
+        }
+
+        None => {}
+        _ => {}
     }
+
+
+
+
 
     Ok(())
 }

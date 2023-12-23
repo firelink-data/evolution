@@ -30,7 +30,7 @@ use log::{debug, info};
 use rand::distributions::{Alphanumeric, DistString};
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
 use std::time::SystemTime;
@@ -134,8 +134,10 @@ pub(crate) fn mock_string<'a>(_len: usize) -> &'a str {
 }
 
 ///
-pub(crate) fn mock_from_schema(schema_path: String, n_rows: usize) {
-    let schema = schema::FixedSchema::from_path(schema_path.into());
+pub(crate) fn mock_from_schema(schema_path: PathBuf, n_rows: usize) {
+    let schema = schema::FixedSchema::from_path(schema_path);
+
+//    let schema = schema::FixedSchema::from_path(schema_path.into());
     // let mocker = FixedMocker::new(schema);
     //mocker.generate(n_rows);
     generate_threaded(schema, n_rows, 16);
