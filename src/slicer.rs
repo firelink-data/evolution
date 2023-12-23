@@ -66,11 +66,20 @@ pub(crate) fn slice_and_process(
     let in_max_chunks: i8 = 3;
 
     let mut remaining_file_length = file.metadata().unwrap().len() as usize;
+/*
+TODO use heap instead...
+    let mut chunks = [
+        Box::new([0_u8; SLICER_IN_CHUNK_SIZE]),
+        Box::new([0_u8; SLICER_IN_CHUNK_SIZE]),
+        Box::new([0_u8; SLICER_IN_CHUNK_SIZE])
+    ];
+*/
     let mut chunks = [
         [0_u8; SLICER_IN_CHUNK_SIZE],
         [0_u8; SLICER_IN_CHUNK_SIZE],
         [0_u8; SLICER_IN_CHUNK_SIZE],
     ];
+
 
     let mut next_chunk = 0;
     let residue: &mut [u8] = &mut [0_u8; SLICER_IN_CHUNK_SIZE];
@@ -191,7 +200,7 @@ fn read_chunk_and_slice<'a>(
 }
 
 ///
-type FnLineBreak = fn(bytes: &[u8]) -> (bool, usize);
+pub(crate) type FnLineBreak = fn(bytes: &[u8]) -> (bool, usize);
 
 #[allow(dead_code)]
 ///

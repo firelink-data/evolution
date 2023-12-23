@@ -26,9 +26,11 @@
 */
 
 use crate::slicer::{find_last_nl, SampleSliceAggregator};
-use clap::{value_parser, Arg, ArgAction, Command};
+use clap::{value_parser, Arg, ArgAction, Command, Subcommand, Parser};
 use log::{info, SetLoggerError};
 use std::fs;
+use std::path::PathBuf;
+use arrow2::array::DictionaryKey;
 
 mod builder;
 mod logging;
@@ -37,13 +39,95 @@ mod schema;
 mod slicer;
 mod builder_datatypes;
 
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    /// Optional name to operate on
+    name: Option<String>,
+
+    /// Threads
+    #[arg(short , long, action=clap::ArgAction::Count)]
+    n_threads: u8,
+//    value_parser(value_parser!(usize))
+
+    /// Turn debugging information on
+    #[arg(short, long, action = clap::ArgAction::Count)]
+    debug: u8,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// does testing things
+    Mock {
+        /// Sets schema file
+        #[arg(short, long, value_name = "SCHEMA")]
+        schema: Option<PathBuf>,
+        /// Sets input file
+        #[arg(short, long, value_name = "FILE")]
+        file: Option<PathBuf>,
+        #[arg(short , long, value_name = "n-rows")]
+        n_rows: Option<i64>
+    }, Slice {
+        /// Sets input file
+        #[arg(short, long, value_name = "FILE")]
+        /// Sets amount of rows to generate.
+        file: Option<PathBuf>,
+    }, Convert {
+        /// Sets schema file
+        #[arg(short, long, value_name = "SCHEMA")]
+        schema: Option<PathBuf>,
+        /// Sets input file
+        #[arg(short, long, value_name = "FILE")]
+        file: Option<PathBuf>,
+    }
+}
+
 ///
 fn main() -> Result<(), SetLoggerError> {
     logging::setup_log()?;
+    let cli = Cli::parse();
+
+    let n_logical_threads = num_cpus::get();
+    let mut n_threads:usize = cli.n_threads as usize;
+
+    if n_threads > n_logical_threads {
+        info!(
+            "you specified to use {} thread, but your CPU only has {} logical threads",
+            n_threads, n_logical_threads,
+        );
+        n_threads = n_logical_threads;
+    }
+
+    let multithreaded: bool = n_threads > 1;
+    if multithreaded {
+        info!("multithreading enabled ({} logical threads)", n_threads);
+    }
+
+    match &cli.command {
+        Some(Commands::Mock { schema, file, n_rows }) => {
+            let mut filename:String= "ad".parse().unwrap();
+//            filename=schema.unwrap(). into_os_string().into_string();
+            mock::mock_from_schema(filename,n_rows.unwrap() as usize
+            );
+
+        }
+        Some(Commands::Slice { file }) => {
+
+        }
+        Some(Commands::Convert { schema, file }) => {
+
+        }
+
+        None => {}
+        _ => {}
+    }
 
     let mut matches = Command::new("evolution")
         .author("Wilhelm Ågren <wilhelmagren98@gmail.com>")
-        .version("0.2.1")
+        .version("0.2.2")
         .about(
             "🦖 Evolve your fixed length data files into Apache Arrow tables, fully parallelized!",
         )
