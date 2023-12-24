@@ -30,7 +30,7 @@ use log::{debug, info};
 use rand::distributions::{Alphanumeric, DistString};
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use std::sync::Arc;
 use std::thread;
 use std::time::SystemTime;

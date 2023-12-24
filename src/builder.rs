@@ -25,12 +25,12 @@
 * Last updated: 2023-11-21
 */
 
+use std::path::PathBuf;
 use arrow2::array::MutablePrimitiveArray;
 use arrow2::datatypes::{DataType, Field, Schema};
 use arrow2::io::ipc::write::Record;
-use crate::builder_datatypes::column_builder_type;
+use crate::builder_datatypes::ColumnBuilderType;
 use crate::schema;
-use crate::schema::FixedSchema;
 
 ///
 #[allow(dead_code)]
@@ -113,14 +113,14 @@ pub trait ColumnBuilder {
     fn nullify(&mut self);
 }
 
-pub(crate) fn parse_from_schema(schema_path: String,in_file_path: String,out_file_path: String,n_threads: i16) {
+pub(crate) fn parse_from_schema(schema_path: PathBuf, _in_file_path: PathBuf, _out_file_path: PathBuf, _n_threads: i16) {
 
     let mut builders: Vec<Box<dyn ColumnBuilder>>=Vec::new();
     for val in schema::FixedSchema::from_path(schema_path.into()).iter() {
 
         match val.dtype().as_str() {
-            "i32" => builders.push(Box::new(column_builder_type::<i32> { rows: MutablePrimitiveArray::new() })),
-            "i64" => builders.push(Box::new(column_builder_type::<i64> { rows: MutablePrimitiveArray::new() })),
+            "i32" => builders.push(Box::new(ColumnBuilderType::<i32> { rows: MutablePrimitiveArray::new() })),
+            "i64" => builders.push(Box::new(ColumnBuilderType::<i64> { rows: MutablePrimitiveArray::new() })),
 
             &_ => {}
         };

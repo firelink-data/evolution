@@ -26,11 +26,11 @@
 */
 
 use crate::slicer::{find_last_nl, SampleSliceAggregator};
-use clap::{value_parser, Arg, ArgAction, Command, Subcommand, Parser};
+use clap::{Subcommand, Parser};
 use log::{info, SetLoggerError};
 use std::fs;
 use std::path::PathBuf;
-use arrow2::array::DictionaryKey;
+use crate::builder::parse_from_schema;
 
 mod builder;
 mod logging;
@@ -46,7 +46,7 @@ struct Cli {
     name: Option<String>,
 
     /// Threads
-    #[arg(short , long, action=clap::ArgAction::Count)]
+    #[arg(short, long, action = clap::ArgAction::Count)]
     n_threads: u8,
 //    value_parser(value_parser!(usize))
 
@@ -68,21 +68,28 @@ enum Commands {
         /// Sets input file
         #[arg(short, long, value_name = "FILE")]
         file: Option<PathBuf>,
-        #[arg(short , long, value_name = "n-rows")]
-        n_rows: Option<i64>
-    }, Slice {
+        #[arg(short, long, value_name = "n-rows")]
+        n_rows: Option<i64>,
+    },
+    Slice {
         /// Sets input file
         #[arg(short, long, value_name = "FILE")]
         /// Sets amount of rows to generate.
         file: Option<PathBuf>,
-    }, Convert {
+    },
+    Convert {
         /// Sets schema file
         #[arg(short, long, value_name = "SCHEMA")]
         schema: Option<PathBuf>,
+
         /// Sets input file
-        #[arg(short, long, value_name = "FILE")]
-        file: Option<PathBuf>,
-    }
+        #[arg(short, long, value_name = "IN-FILE")]
+        in_file: Option<PathBuf>,
+
+        /// Sets input file
+        #[arg(short, long, value_name = "OUT-FILE")]
+        out_file: Option<PathBuf>,
+    },
 }
 
 ///
@@ -91,7 +98,7 @@ fn main() -> Result<(), SetLoggerError> {
     let cli = Cli::parse();
 
     let n_logical_threads = num_cpus::get();
-    let mut n_threads:usize = cli.n_threads as usize;
+    let mut n_threads: usize = cli.n_threads as usize;
 
     if n_threads > n_logical_threads {
         info!(
@@ -107,44 +114,38 @@ fn main() -> Result<(), SetLoggerError> {
     }
 
     match &cli.command {
-        Some(Commands::Mock { schema, file, n_rows }) => {
-            mock::mock_from_schema(schema.as_ref().expect("REASON").to_path_buf(),n_rows.unwrap() as usize
+        Some(Commands::Mock { schema, file: _, n_rows }) => {
+            mock::mock_from_schema(schema.as_ref().expect("REASON").to_path_buf(), n_rows.unwrap() as usize,
             );
-
         }
         Some(Commands::Slice { file }) => {
+            let file_name = file.as_ref().expect("REASON").to_path_buf();
+            let file = std::fs::File::open(&file_name).expect("bbb");
+            let mut out_file_name = file_name.clone().to_owned();
+            out_file_name.push("SLICED");
 
+            let file_out = fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(out_file_name)
+                .expect("aaa");
 
-     //   let file_name = matches.remove_one::<String>("file").unwrap();
-        let file_name =     file.as_ref().expect("REASON").to_path_buf();
-
-        let file = std::fs::File::open(&file_name).expect("bbb");
-        let mut out_file_name = file_name.clone().to_owned();
-        out_file_name.push("SLICED");
-
-        let file_out = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(out_file_name)
-            .expect("aaa");
-
-        let saa: Box<SampleSliceAggregator> = Box::new(slicer::SampleSliceAggregator {
-            file_out,
-            fn_line_break: find_last_nl,
-        });
-        slicer::slice_and_process(saa, file, n_threads);
-
+            let saa: Box<SampleSliceAggregator> = Box::new(slicer::SampleSliceAggregator {
+                file_out,
+                fn_line_break: find_last_nl,
+            });
+            slicer::slice_and_process(saa, file, n_threads);
         }
-        Some(Commands::Convert { schema, file }) => {
 
+        Some(Commands::Convert { schema, in_file, out_file: _ }) => {
+            parse_from_schema(schema.as_ref().expect("REASON").to_path_buf(), in_file.as_ref().expect("REASON").to_path_buf(), in_file.as_ref().expect("REASON").to_path_buf(), 0);
+            
         }
 
         None => {}
+        #[allow(unreachable_patterns)]
         _ => {}
     }
-
-
-
 
 
     Ok(())

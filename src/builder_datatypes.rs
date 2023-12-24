@@ -26,12 +26,8 @@
 */
 
 use arrow2::array::MutablePrimitiveArray;
-use arrow2::datatypes::{DataType, Field, Schema};
-use arrow2::io::ipc::write::Record;
 use arrow2::types::NativeType;
 use crate::builder::ColumnBuilder;
-use crate::schema;
-use crate::schema::FixedSchema;
 
 /*
 
@@ -50,15 +46,15 @@ use crate::schema::FixedSchema;
 
  */
 
-pub(crate) struct column_builder_type<T1: NativeType+> {
+pub(crate) struct ColumnBuilderType<T1: NativeType+> {
     pub rows: MutablePrimitiveArray<T1>,
 }
 
-impl ColumnBuilder for column_builder_type::<i32> {
+impl ColumnBuilder for ColumnBuilderType::<i32> {
     fn parse_value(&mut self, name: &str) where Self: Sized {
         match name.parse::<i32>() {
             Ok(n) => { self.rows.push(Some(n)) ; n},
-            Err(e) => {
+            Err(_e) => {
                 self.nullify();
                 0
             },
@@ -74,11 +70,11 @@ impl ColumnBuilder for column_builder_type::<i32> {
     }
 }
 
-impl ColumnBuilder for column_builder_type::<i64> {
+impl ColumnBuilder for ColumnBuilderType::<i64> {
     fn parse_value(&mut self, name: &str)  where Self: Sized {
         match name.parse::<i64>() {
             Ok(n) => { self.rows.push(Some(n)); n},
-            Err(e) => {
+            Err(_e) => {
                 self.nullify();
                 0
             },
