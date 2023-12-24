@@ -74,7 +74,6 @@ pub(crate) fn slice_and_process(
         [0_u8; SLICER_IN_CHUNK_SIZE],
     ];
 
-
     let mut next_chunk = 0;
     let residue: &mut [u8] = &mut [0_u8; SLICER_IN_CHUNK_SIZE];
     let mut residue_len = 0;
@@ -132,9 +131,9 @@ fn read_chunk_and_slice<'a>(
     chunk_len_toread: usize,
 ) -> (usize, usize, Vec<&'a [u8]>) {
     #[allow(unused_mut)]
-        let mut target_chunk_residue: &mut [u8];
+    let mut target_chunk_residue: &mut [u8];
     #[allow(unused_mut)]
-        let mut target_chunk_read: &mut [u8];
+    let mut target_chunk_read: &mut [u8];
 
     (target_chunk_residue, target_chunk_read) = chunk.split_at_mut(residue_effective_len);
     if 0 != residue_effective_len {

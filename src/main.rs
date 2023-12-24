@@ -35,11 +35,11 @@ use crate::builder::parse_from_schema;
 use crate::slicer::{find_last_nl, SampleSliceAggregator};
 
 mod builder;
+mod builder_datatypes;
 mod logging;
 mod mock;
 mod schema;
 mod slicer;
-mod builder_datatypes;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -50,8 +50,7 @@ struct Cli {
     /// Threads
     #[arg(short, long, action = clap::ArgAction::Count)]
     n_threads: u8,
-//    value_parser(value_parser!(usize))
-
+    //    value_parser(value_parser!(usize))
     /// Turn debugging information on
     #[arg(short, long, action = clap::ArgAction::Count)]
     debug: u8,
@@ -116,8 +115,14 @@ fn main() -> Result<(), SetLoggerError> {
     }
 
     match &cli.command {
-        Some(Commands::Mock { schema, file: _, n_rows }) => {
-            mock::mock_from_schema(schema.as_ref().expect("REASON").to_path_buf(), n_rows.unwrap() as usize,
+        Some(Commands::Mock {
+            schema,
+            file: _,
+            n_rows,
+        }) => {
+            mock::mock_from_schema(
+                schema.as_ref().expect("REASON").to_path_buf(),
+                n_rows.unwrap() as usize,
             );
         }
         Some(Commands::Slice { file }) => {
@@ -139,15 +144,23 @@ fn main() -> Result<(), SetLoggerError> {
             slicer::slice_and_process(saa, file, n_threads);
         }
 
-        Some(Commands::Convert { schema, in_file, out_file: _ }) => {
-            parse_from_schema(schema.as_ref().expect("REASON").to_path_buf(), in_file.as_ref().expect("REASON").to_path_buf(), in_file.as_ref().expect("REASON").to_path_buf(), 0);
+        Some(Commands::Convert {
+            schema,
+            in_file,
+            out_file: _,
+        }) => {
+            parse_from_schema(
+                schema.as_ref().expect("REASON").to_path_buf(),
+                in_file.as_ref().expect("REASON").to_path_buf(),
+                in_file.as_ref().expect("REASON").to_path_buf(),
+                0,
+            );
         }
 
         None => {}
         #[allow(unreachable_patterns)]
         _ => {}
     }
-
 
     Ok(())
 }

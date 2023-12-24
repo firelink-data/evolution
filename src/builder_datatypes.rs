@@ -32,27 +32,30 @@ use crate::builder::ColumnBuilder;
 
 /*
 
-   "bool" => Ok(DataType::Boolean),
-            "boolean" => Ok(DataType::Boolean),
-            "i16" => Ok(DataType::Int16),
-            "i32" => Ok(DataType::Int32),
-            "i64" => Ok(DataType::Int64),
-            "f16" => Ok(DataType::Float16),
-            "f32" => Ok(DataType::Float32),
-            "f64" => Ok(DataType::Float64),
-            "utf8" => Ok(DataType::Utf8),
-            "string" => Ok(DataType::Utf8),
-            "lutf8" => Ok(DataType::LargeUtf8),
-            "lstring" => Ok(DataType::LargeUtf8),
+  "bool" => Ok(DataType::Boolean),
+           "boolean" => Ok(DataType::Boolean),
+           "i16" => Ok(DataType::Int16),
+           "i32" => Ok(DataType::Int32),
+           "i64" => Ok(DataType::Int64),
+           "f16" => Ok(DataType::Float16),
+           "f32" => Ok(DataType::Float32),
+           "f64" => Ok(DataType::Float64),
+           "utf8" => Ok(DataType::Utf8),
+           "string" => Ok(DataType::Utf8),
+           "lutf8" => Ok(DataType::LargeUtf8),
+           "lstring" => Ok(DataType::LargeUtf8),
 
- */
+*/
 
-pub(crate) struct ColumnBuilderType<T1: NativeType +> {
+pub(crate) struct ColumnBuilderType<T1: NativeType> {
     pub rows: MutablePrimitiveArray<T1>,
 }
 
-impl ColumnBuilder for ColumnBuilderType::<i32> {
-    fn parse_value(&mut self, name: &str) where Self: Sized {
+impl ColumnBuilder for ColumnBuilderType<i32> {
+    fn parse_value(&mut self, name: &str)
+    where
+        Self: Sized,
+    {
         match name.parse::<i32>() {
             Ok(n) => {
                 self.rows.push(Some(n));
@@ -65,17 +68,26 @@ impl ColumnBuilder for ColumnBuilderType::<i32> {
         };
     }
 
-    fn finish_column(&mut self) where Self: Sized {
+    fn finish_column(&mut self)
+    where
+        Self: Sized,
+    {
         todo!()
     }
 
-    fn nullify(&mut self) where Self: Sized {
+    fn nullify(&mut self)
+    where
+        Self: Sized,
+    {
         self.rows.push(None);
     }
 }
 
-impl ColumnBuilder for ColumnBuilderType::<i64> {
-    fn parse_value(&mut self, name: &str) where Self: Sized {
+impl ColumnBuilder for ColumnBuilderType<i64> {
+    fn parse_value(&mut self, name: &str)
+    where
+        Self: Sized,
+    {
         match name.parse::<i64>() {
             Ok(n) => {
                 self.rows.push(Some(n));
@@ -88,11 +100,17 @@ impl ColumnBuilder for ColumnBuilderType::<i64> {
         };
     }
 
-    fn finish_column(&mut self) where Self: Sized {
+    fn finish_column(&mut self)
+    where
+        Self: Sized,
+    {
         todo!()
     }
 
-    fn nullify(&mut self) where Self: Sized {
+    fn nullify(&mut self)
+    where
+        Self: Sized,
+    {
         self.rows.push(None);
     }
 }
