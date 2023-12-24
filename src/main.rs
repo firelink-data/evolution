@@ -25,12 +25,14 @@
 * Last updated: 2023-12-14
 */
 
-use crate::slicer::{find_last_nl, SampleSliceAggregator};
-use clap::{Subcommand, Parser};
-use log::{info, SetLoggerError};
 use std::fs;
 use std::path::PathBuf;
+
+use clap::{Parser, Subcommand};
+use log::{info, SetLoggerError};
+
 use crate::builder::parse_from_schema;
+use crate::slicer::{find_last_nl, SampleSliceAggregator};
 
 mod builder;
 mod logging;
@@ -139,7 +141,6 @@ fn main() -> Result<(), SetLoggerError> {
 
         Some(Commands::Convert { schema, in_file, out_file: _ }) => {
             parse_from_schema(schema.as_ref().expect("REASON").to_path_buf(), in_file.as_ref().expect("REASON").to_path_buf(), in_file.as_ref().expect("REASON").to_path_buf(), 0);
-            
         }
 
         None => {}

@@ -22,13 +22,15 @@
 * SOFTWARE.
 *
 * File created: 2023-11-21
-* Last updated: 2023-11-21
+* Last updated: 2023-12-24
 */
 
 use std::path::PathBuf;
+
 use arrow2::array::MutablePrimitiveArray;
 use arrow2::datatypes::{DataType, Field, Schema};
 use arrow2::io::ipc::write::Record;
+
 use crate::builder_datatypes::ColumnBuilderType;
 use crate::schema;
 
@@ -103,10 +105,10 @@ struct FixedTable<'a> {
 ///
 pub trait ColumnBuilder {
     ///
-    fn parse_value(&mut self, name: &str) ;
+    fn parse_value(&mut self, name: &str);
 
     ///
-    fn finish_column(&mut self) ;
+    fn finish_column(&mut self);
 
     /// I think this function won't be necessary.
     /// `[arrow2]` supports bitmap nulling out-of-the-box.
@@ -114,10 +116,8 @@ pub trait ColumnBuilder {
 }
 
 pub(crate) fn parse_from_schema(schema_path: PathBuf, _in_file_path: PathBuf, _out_file_path: PathBuf, _n_threads: i16) {
-
-    let mut builders: Vec<Box<dyn ColumnBuilder>>=Vec::new();
+    let mut builders: Vec<Box<dyn ColumnBuilder>> = Vec::new();
     for val in schema::FixedSchema::from_path(schema_path.into()).iter() {
-
         match val.dtype().as_str() {
             "i32" => builders.push(Box::new(ColumnBuilderType::<i32> { rows: MutablePrimitiveArray::new() })),
             "i64" => builders.push(Box::new(ColumnBuilderType::<i64> { rows: MutablePrimitiveArray::new() })),
@@ -125,8 +125,6 @@ pub(crate) fn parse_from_schema(schema_path: PathBuf, _in_file_path: PathBuf, _o
             &_ => {}
         };
     }
-
-
 }
 /*
 

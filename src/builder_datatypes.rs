@@ -27,6 +27,7 @@
 
 use arrow2::array::MutablePrimitiveArray;
 use arrow2::types::NativeType;
+
 use crate::builder::ColumnBuilder;
 
 /*
@@ -46,18 +47,21 @@ use crate::builder::ColumnBuilder;
 
  */
 
-pub(crate) struct ColumnBuilderType<T1: NativeType+> {
+pub(crate) struct ColumnBuilderType<T1: NativeType +> {
     pub rows: MutablePrimitiveArray<T1>,
 }
 
 impl ColumnBuilder for ColumnBuilderType::<i32> {
     fn parse_value(&mut self, name: &str) where Self: Sized {
         match name.parse::<i32>() {
-            Ok(n) => { self.rows.push(Some(n)) ; n},
+            Ok(n) => {
+                self.rows.push(Some(n));
+                n
+            }
             Err(_e) => {
                 self.nullify();
                 0
-            },
+            }
         };
     }
 
@@ -71,13 +75,16 @@ impl ColumnBuilder for ColumnBuilderType::<i32> {
 }
 
 impl ColumnBuilder for ColumnBuilderType::<i64> {
-    fn parse_value(&mut self, name: &str)  where Self: Sized {
+    fn parse_value(&mut self, name: &str) where Self: Sized {
         match name.parse::<i64>() {
-            Ok(n) => { self.rows.push(Some(n)); n},
+            Ok(n) => {
+                self.rows.push(Some(n));
+                n
+            }
             Err(_e) => {
                 self.nullify();
                 0
-            },
+            }
         };
     }
 

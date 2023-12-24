@@ -25,10 +25,11 @@
 * Last updated: 2023-12-14
 */
 
-use log::info;
 use std::cmp;
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
+
+use log::info;
 
 /**
 GOAL(s)
@@ -44,7 +45,7 @@ SLICER_IN_CHUNK_SIZE
 in_max_chunks
 in_chunk_cores (how man splits will be made)
 
-*/
+ */
 
 pub(crate) const SLICER_IN_CHUNK_SIZE: usize = 1024 * 1024;
 
@@ -66,14 +67,7 @@ pub(crate) fn slice_and_process(
     let in_max_chunks: i8 = 3;
 
     let mut remaining_file_length = file.metadata().unwrap().len() as usize;
-/*
-TODO use heap instead...
-    let mut chunks = [
-        Box::new([0_u8; SLICER_IN_CHUNK_SIZE]),
-        Box::new([0_u8; SLICER_IN_CHUNK_SIZE]),
-        Box::new([0_u8; SLICER_IN_CHUNK_SIZE])
-    ];
-*/
+
     let mut chunks = [
         [0_u8; SLICER_IN_CHUNK_SIZE],
         [0_u8; SLICER_IN_CHUNK_SIZE],
@@ -138,9 +132,9 @@ fn read_chunk_and_slice<'a>(
     chunk_len_toread: usize,
 ) -> (usize, usize, Vec<&'a [u8]>) {
     #[allow(unused_mut)]
-    let mut target_chunk_residue: &mut [u8];
+        let mut target_chunk_residue: &mut [u8];
     #[allow(unused_mut)]
-    let mut target_chunk_read: &mut [u8];
+        let mut target_chunk_read: &mut [u8];
 
     (target_chunk_residue, target_chunk_read) = chunk.split_at_mut(residue_effective_len);
     if 0 != residue_effective_len {
