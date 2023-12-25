@@ -34,6 +34,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 use std::time::SystemTime;
+use crossbeam::channel;
 
 pub(crate) static DEFAULT_MOCKED_FILENAME_LEN: usize = 16;
 pub(crate) static DEFAULT_ROW_BUFFER_LEN: usize = 1024 * 1024;
@@ -142,24 +143,15 @@ pub(crate) fn mock_from_schema(schema_path: String, n_rows: usize) {
     //mocker.generate_threaded(n_rows, 5);
 }
 
-fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: usize) {
+fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: usize, sender: channel::Sender<Vec<u8>>) {
     let rowlen = schema.row_len();
     let mut buffer: Vec<u8> =
         Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
-    let mut path = PathBuf::from(
-        String::from("resources/mock_files/test_mock"),
-    );
-    path.set_extension("flf");
-
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .unwrap();
 
     for row in 0..n_rows {
         if row % DEFAULT_ROW_BUFFER_LEN == 0 {
-            file.write_all(&buffer).expect("Bad buffer, write failed!");
+            sender.send(buffer).expect("Bad buffer, send failed");
+            //file.write_all(&buffer).expect("Bad buffer, write failed!");
             buffer =
                 Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
         }
@@ -176,10 +168,11 @@ fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: usize) 
 
         buffer.extend_from_slice("\r\n".as_bytes());
     }
-
-    file.write_all(&buffer).expect("Bad buffer, write failed!");
-
+    sender.send(buffer).expect("Bad buffer, send failed");
+    //file.write_all(&buffer).expect("Bad buffer, write failed!");
+    
     println!("thread {} done!", thread);
+    drop(sender);
 }
 
 ///
@@ -195,19 +188,43 @@ fn generate_threaded(schema: FixedSchema, n_rows: usize, n_threads: usize) {
 
     let arc_schema = Arc::new(schema);
 
+    let (sender, receiver) = channel::unbounded();
+    
     let threads: Vec<_> = (0..n_threads)
         .map(|t| {
             let arc_clone = Arc::clone(&arc_schema);
-            thread::spawn(move || generate_from_thread(t, arc_clone, n_rows_per_thread))
+            let sender_clone = sender.clone();
+            thread::spawn(move || generate_from_thread(t, arc_clone, n_rows_per_thread, sender_clone))
         })
         .collect();
+    drop(sender);
+    write_mock_file(&receiver);
 
     for handle in threads {
         handle.join().unwrap();
     }
-
+    
     // TODO: generate rest of rows
     println!("still have slask rest: {}", rest);
+    
+    
+}
+
+fn write_mock_file(receiver: &channel::Receiver<Vec<u8>>) {
+    let mut path = PathBuf::from(
+        String::from("resources/mock_files/test_mock"),
+    );
+    path.set_extension("flf");
+
+    let mut file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open(path)
+        .unwrap();
+
+    for buf in receiver {
+        file.write_all(&buf).expect("Bad buffer, write failed!");
+    }
 }
 
 ///
