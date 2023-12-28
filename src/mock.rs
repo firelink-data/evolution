@@ -35,6 +35,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::SystemTime;
 use crossbeam::channel;
+use threadpool::ThreadPool;
 
 pub(crate) static DEFAULT_MOCKED_FILENAME_LEN: usize = 16;
 pub(crate) static DEFAULT_ROW_BUFFER_LEN: usize = 1024 * 1024;
@@ -143,15 +144,14 @@ pub(crate) fn mock_from_schema(schema_path: String, n_rows: usize) {
     //mocker.generate_threaded(n_rows, 5);
 }
 
-fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: usize, sender: channel::Sender<Vec<u8>>) {
+fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: &usize, sender: channel::Sender<Vec<u8>>) {
     let rowlen = schema.row_len();
     let mut buffer: Vec<u8> =
         Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
 
-    for row in 0..n_rows {
+    for row in 0..*n_rows {
         if row % DEFAULT_ROW_BUFFER_LEN == 0 {
             sender.send(buffer).expect("Bad buffer, send failed");
-            //file.write_all(&buffer).expect("Bad buffer, write failed!");
             buffer =
                 Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
         }
@@ -169,16 +169,37 @@ fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: usize, 
         buffer.extend_from_slice("\r\n".as_bytes());
     }
     sender.send(buffer).expect("Bad buffer, send failed");
-    //file.write_all(&buffer).expect("Bad buffer, write failed!");
     
     println!("thread {} done!", thread);
     drop(sender);
 }
 
+fn distribute_thread_workload(n_rows: usize, n_threads: usize) -> Vec<usize> {
+    let n_tasks = n_threads;
+    let thread_local_rows = (n_rows - 1) / n_tasks + 1;
+    let remaining_rows = thread_local_rows * n_tasks - n_rows;
+    let mut thread_workload = Vec::with_capacity(n_tasks);
+    let mut nth = 0;
+    for n in 0..n_tasks {
+        let min = nth;
+        let spare = if n < remaining_rows { 1 } else { 0 };
+        let max = min + thread_local_rows - spare;
+        thread_workload.insert(n, max - min);
+        nth = max;
+    }
+    thread_workload
+}
 ///
 fn generate_threaded(schema: FixedSchema, n_rows: usize, n_threads: usize) {
+    //let pool = ThreadPool::new(num_cpus::get());
     let n_rows_per_thread = n_rows / n_threads;
     let n_buffers_per_thread = std::cmp::max(n_rows_per_thread / DEFAULT_ROW_BUFFER_LEN, 1);
+
+    let worksize = distribute_thread_workload(n_rows, n_threads);
+    println!("Worksize: {:?}", worksize);
+    println!("Worksize len {}", worksize.len());
+    let chunksize = (n_rows + n_threads -1 ) / n_threads;
+    println!("Chunksize is: {}", chunksize);
 
     let rest = n_rows - (n_rows_per_thread * n_threads);
 
@@ -192,9 +213,11 @@ fn generate_threaded(schema: FixedSchema, n_rows: usize, n_threads: usize) {
     
     let threads: Vec<_> = (0..n_threads)
         .map(|t| {
+            println!("t is: {}", t);
             let arc_clone = Arc::clone(&arc_schema);
             let sender_clone = sender.clone();
-            thread::spawn(move || generate_from_thread(t, arc_clone, n_rows_per_thread, sender_clone))
+            let rows = worksize[t];
+            thread::spawn(move || generate_from_thread(t, arc_clone, &rows, sender_clone))
         })
         .collect();
     drop(sender);
