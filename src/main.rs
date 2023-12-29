@@ -48,7 +48,7 @@ struct Cli {
     name: Option<String>,
 
     /// Threads
-    #[arg(short, long, action = clap::ArgAction::Count)]
+    #[arg(short, long, action = clap::ArgAction::Count,default_value = "4" )]
     n_threads: u8,
     //    value_parser(value_parser!(usize))
     /// Turn debugging information on
@@ -69,7 +69,7 @@ enum Commands {
         /// Sets input file
         #[arg(short, long, value_name = "FILE")]
         file: Option<PathBuf>,
-        #[arg(short, long, value_name = "n-rows")]
+        #[arg(short, long, value_name = "n-rows",default_value = "100" )]
         n_rows: Option<i64>,
     },
     Slice {
@@ -117,9 +117,11 @@ fn main() -> Result<(), SetLoggerError> {
     match &cli.command {
         Some(Commands::Mock {
             schema,
-            file: _,
+            file,
             n_rows,
         }) => {
+            print!("target file {:?}", file.as_ref());
+
             mock::mock_from_schema(
                 schema.as_ref().expect("REASON").to_path_buf(),
                 n_rows.unwrap() as usize,
