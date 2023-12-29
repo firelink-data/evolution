@@ -26,6 +26,7 @@
 */
 
 use crate::schema::{self, FixedSchema};
+use crossbeam::channel;
 use log::{debug, info};
 use rand::distributions::{Alphanumeric, DistString};
 use std::fs::OpenOptions;
@@ -34,7 +35,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 use std::time::SystemTime;
-use crossbeam::channel;
 
 pub(crate) static DEFAULT_MOCKED_FILENAME_LEN: usize = 16;
 pub(crate) static DEFAULT_ROW_BUFFER_LEN: usize = 1024 * 1024;
@@ -49,7 +49,7 @@ pub struct FixedMocker {
 impl FixedMocker {
     ///
     pub fn new(schema: schema::FixedSchema) -> Self {
-        Self { schema}
+        Self { schema }
     }
 
     #[allow(dead_code)]
@@ -143,19 +143,23 @@ pub(crate) fn mock_from_schema(schema_path: String, n_rows: usize) {
     //mocker.generate_threaded(n_rows, 5);
 }
 
-fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: usize, sender: channel::Sender<Vec<u8>>) {
+fn generate_from_thread(
+    thread: usize,
+    schema: Arc<FixedSchema>,
+    n_rows: usize,
+    sender: channel::Sender<Vec<u8>>,
+) {
     let rowlen = schema.row_len();
     let mut buffer: Vec<u8> =
         Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
 
     for row in 0..n_rows {
-        
         if row % DEFAULT_ROW_BUFFER_LEN == 0 {
             sender.send(buffer).expect("Bad buffer, send failed");
             buffer =
                 Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
         }
-        
+
         for col in schema.iter() {
             padder::pad_and_push_to_buffer(
                 col.mock().unwrap(),
@@ -165,11 +169,11 @@ fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: usize, 
                 &mut buffer,
             );
         }
-        
+
         buffer.extend_from_slice("\r\n".as_bytes());
     }
     sender.send(buffer).expect("Bad buffer, send failed");
-    
+
     println!("thread {} done!", thread);
     drop(sender);
 }
@@ -177,7 +181,7 @@ fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: usize, 
 fn distribute_thread_workload(n_rows: usize, n_threads: usize) -> Vec<usize> {
     let thread_local_rows = (n_rows - 1) / n_threads + 1;
     let remaining_rows = thread_local_rows * n_threads - n_rows;
-    let mut thread_workload = Vec::with_capacity(n_threads);
+    let mut thread_workload: Vec<usize> = Vec::with_capacity(n_threads);
     for n in 0..n_threads {
         let spare = if n < remaining_rows { 1 } else { 0 };
         let rows_to_process = n + thread_local_rows - spare;
@@ -192,7 +196,7 @@ fn generate_threaded(schema: FixedSchema, n_rows: usize, n_threads: usize) {
     let arc_schema = Arc::new(schema);
 
     let (sender, receiver) = channel::unbounded();
-    
+
     let threads: Vec<_> = (0..n_threads)
         .map(|t| {
             let arc_clone = Arc::clone(&arc_schema);
@@ -207,15 +211,10 @@ fn generate_threaded(schema: FixedSchema, n_rows: usize, n_threads: usize) {
     for handle in threads {
         handle.join().unwrap();
     }
-    
-    
-    
 }
 
 fn write_mock_file(receiver: &channel::Receiver<Vec<u8>>) {
-    let mut path = PathBuf::from(
-        String::from("resources/mock_files/test_mock"),
-    );
+    let mut path = PathBuf::from(String::from("resources/mock_files/test_mock"));
     path.set_extension("flf");
 
     let mut file = OpenOptions::new()
@@ -277,7 +276,7 @@ mod tests_mock {
     }
 
     #[test]
-    fn test_workload_distribution_16_threads_1000_rows(){
+    fn test_workload_distribution_16_threads_1000_rows() {
         let threads = 16;
         let rows = 1000;
         let workload = distribute_thread_workload(rows, threads);
