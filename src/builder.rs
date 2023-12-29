@@ -22,11 +22,17 @@
 * SOFTWARE.
 *
 * File created: 2023-11-21
-* Last updated: 2023-11-21
+* Last updated: 2023-12-24
 */
 
+use std::path::PathBuf;
+
+use arrow2::array::MutablePrimitiveArray;
 use arrow2::datatypes::{DataType, Field, Schema};
 use arrow2::io::ipc::write::Record;
+
+use crate::builder_datatypes::ColumnBuilderType;
+use crate::schema;
 
 ///
 #[allow(dead_code)]
@@ -99,12 +105,49 @@ struct FixedTable<'a> {
 ///
 pub trait ColumnBuilder {
     ///
-    fn parse_value(&self, name: String) -> bool;
+    fn parse_value(&mut self, name: &str);
 
     ///
-    fn finish_column(&self) -> bool;
+    fn finish_column(&mut self);
 
     /// I think this function won't be necessary.
     /// `[arrow2]` supports bitmap nulling out-of-the-box.
-    fn nullify(&self);
+    fn nullify(&mut self);
 }
+
+pub(crate) fn parse_from_schema(
+    schema_path: PathBuf,
+    _in_file_path: PathBuf,
+    _out_file_path: PathBuf,
+    _n_threads: i16,
+) {
+    let mut builders: Vec<Box<dyn ColumnBuilder>> = Vec::new();
+    for val in schema::FixedSchema::from_path(schema_path.into()).iter() {
+        match val.dtype().as_str() {
+            "i32" => builders.push(Box::new(ColumnBuilderType::<i32> {
+                rows: MutablePrimitiveArray::new(),
+            })),
+            "i64" => builders.push(Box::new(ColumnBuilderType::<i64> {
+                rows: MutablePrimitiveArray::new(),
+            })),
+
+            &_ => {}
+        };
+    }
+}
+/*
+
+  "bool" => Ok(DataType::Boolean),
+           "boolean" => Ok(DataType::Boolean),
+           "i16" => Ok(DataType::Int16),
+           "i32" => Ok(DataType::Int32),
+           "i64" => Ok(DataType::Int64),
+           "f16" => Ok(DataType::Float16),
+           "f32" => Ok(DataType::Float32),
+           "f64" => Ok(DataType::Float64),
+           "utf8" => Ok(DataType::Utf8),
+           "string" => Ok(DataType::Utf8),
+           "lutf8" => Ok(DataType::LargeUtf8),
+           "lstring" => Ok(DataType::LargeUtf8),
+
+*/

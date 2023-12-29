@@ -136,8 +136,10 @@ pub(crate) fn mock_string<'a>(_len: usize) -> &'a str {
 }
 
 ///
-pub(crate) fn mock_from_schema(schema_path: String, n_rows: usize) {
-    let schema = schema::FixedSchema::from_path(schema_path.into());
+pub(crate) fn mock_from_schema(schema_path: PathBuf, n_rows: usize) {
+    let schema = schema::FixedSchema::from_path(schema_path);
+
+    //    let schema = schema::FixedSchema::from_path(schema_path.into());
     // let mocker = FixedMocker::new(schema);
     //mocker.generate(n_rows);
     generate_threaded(schema, n_rows, 16);

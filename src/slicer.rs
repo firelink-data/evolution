@@ -25,10 +25,11 @@
 * Last updated: 2023-12-14
 */
 
-use log::info;
 use std::cmp;
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
+
+use log::info;
 
 /**
 GOAL(s)
@@ -44,7 +45,7 @@ SLICER_IN_CHUNK_SIZE
 in_max_chunks
 in_chunk_cores (how man splits will be made)
 
-*/
+ */
 
 pub(crate) const SLICER_IN_CHUNK_SIZE: usize = 1024 * 1024;
 
@@ -66,6 +67,7 @@ pub(crate) fn slice_and_process(
     let in_max_chunks: i8 = 3;
 
     let mut remaining_file_length = file.metadata().unwrap().len() as usize;
+
     let mut chunks = [
         [0_u8; SLICER_IN_CHUNK_SIZE],
         [0_u8; SLICER_IN_CHUNK_SIZE],
@@ -191,7 +193,7 @@ fn read_chunk_and_slice<'a>(
 }
 
 ///
-type FnLineBreak = fn(bytes: &[u8]) -> (bool, usize);
+pub(crate) type FnLineBreak = fn(bytes: &[u8]) -> (bool, usize);
 
 #[allow(dead_code)]
 ///
