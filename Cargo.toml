@@ -21,6 +21,7 @@ default-run = "evolution"
 arrow2 = { version = "0.18.0", features = ["io_ipc"] }
 chrono = "0.4.31"
 clap = { version = "4.4.8", features = ["derive"] }
+crossbeam = "0.8.2"
 colored = "2.0.4"
 env_logger = "0.10.1"
 half = "2.3.1"
@@ -30,6 +31,7 @@ padder = "1.0.0"
 rand = "0.8.5"
 serde = { version = "1.0.193", features = ["derive"] }
 serde_json = "1.0.108"
+threadpool = "1.8.1"
 
 [dev-dependencies]
 glob = "0.3.1"
