@@ -35,7 +35,6 @@ use std::sync::Arc;
 use std::thread;
 use std::time::SystemTime;
 use crossbeam::channel;
-use threadpool::ThreadPool;
 
 pub(crate) static DEFAULT_MOCKED_FILENAME_LEN: usize = 16;
 pub(crate) static DEFAULT_ROW_BUFFER_LEN: usize = 1024 * 1024;
@@ -144,18 +143,19 @@ pub(crate) fn mock_from_schema(schema_path: String, n_rows: usize) {
     //mocker.generate_threaded(n_rows, 5);
 }
 
-fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: &usize, sender: channel::Sender<Vec<u8>>) {
+fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: usize, sender: channel::Sender<Vec<u8>>) {
     let rowlen = schema.row_len();
     let mut buffer: Vec<u8> =
         Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
 
-    for row in 0..*n_rows {
+    for row in 0..n_rows {
+        
         if row % DEFAULT_ROW_BUFFER_LEN == 0 {
             sender.send(buffer).expect("Bad buffer, send failed");
             buffer =
                 Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
         }
-
+        
         for col in schema.iter() {
             padder::pad_and_push_to_buffer(
                 col.mock().unwrap(),
@@ -165,7 +165,7 @@ fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: &usize,
                 &mut buffer,
             );
         }
-
+        
         buffer.extend_from_slice("\r\n".as_bytes());
     }
     sender.send(buffer).expect("Bad buffer, send failed");
@@ -175,37 +175,19 @@ fn generate_from_thread(thread: usize, schema: Arc<FixedSchema>, n_rows: &usize,
 }
 
 fn distribute_thread_workload(n_rows: usize, n_threads: usize) -> Vec<usize> {
-    let n_tasks = n_threads;
-    let thread_local_rows = (n_rows - 1) / n_tasks + 1;
-    let remaining_rows = thread_local_rows * n_tasks - n_rows;
-    let mut thread_workload = Vec::with_capacity(n_tasks);
-    let mut nth = 0;
-    for n in 0..n_tasks {
-        let min = nth;
+    let thread_local_rows = (n_rows - 1) / n_threads + 1;
+    let remaining_rows = thread_local_rows * n_threads - n_rows;
+    let mut thread_workload = Vec::with_capacity(n_threads);
+    for n in 0..n_threads {
         let spare = if n < remaining_rows { 1 } else { 0 };
-        let max = min + thread_local_rows - spare;
-        thread_workload.insert(n, max - min);
-        nth = max;
+        let rows_to_process = n + thread_local_rows - spare;
+        thread_workload.insert(n, rows_to_process - n);
     }
     thread_workload
 }
 ///
 fn generate_threaded(schema: FixedSchema, n_rows: usize, n_threads: usize) {
-    //let pool = ThreadPool::new(num_cpus::get());
-    let n_rows_per_thread = n_rows / n_threads;
-    let n_buffers_per_thread = std::cmp::max(n_rows_per_thread / DEFAULT_ROW_BUFFER_LEN, 1);
-
     let worksize = distribute_thread_workload(n_rows, n_threads);
-    println!("Worksize: {:?}", worksize);
-    println!("Worksize len {}", worksize.len());
-    let chunksize = (n_rows + n_threads -1 ) / n_threads;
-    println!("Chunksize is: {}", chunksize);
-
-    let rest = n_rows - (n_rows_per_thread * n_threads);
-
-    println!("n rows per thread: {}", n_rows_per_thread);
-    println!("n buffers per thread (total): {}", n_buffers_per_thread);
-    println!("slask rest: {}", rest);
 
     let arc_schema = Arc::new(schema);
 
@@ -213,11 +195,10 @@ fn generate_threaded(schema: FixedSchema, n_rows: usize, n_threads: usize) {
     
     let threads: Vec<_> = (0..n_threads)
         .map(|t| {
-            println!("t is: {}", t);
             let arc_clone = Arc::clone(&arc_schema);
             let sender_clone = sender.clone();
             let rows = worksize[t];
-            thread::spawn(move || generate_from_thread(t, arc_clone, &rows, sender_clone))
+            thread::spawn(move || generate_from_thread(t, arc_clone, rows, sender_clone))
         })
         .collect();
     drop(sender);
@@ -227,8 +208,6 @@ fn generate_threaded(schema: FixedSchema, n_rows: usize, n_threads: usize) {
         handle.join().unwrap();
     }
     
-    // TODO: generate rest of rows
-    println!("still have slask rest: {}", rest);
     
     
 }
@@ -295,5 +274,14 @@ mod tests_mock {
                 let _ = fs::remove_file(p);
             }
         }
+    }
+
+    #[test]
+    fn test_workload_distribution_16_threads_1000_rows(){
+        let threads = 16;
+        let rows = 1000;
+        let workload = distribute_thread_workload(rows, threads);
+        let row_sum: usize = workload.iter().sum();
+        assert_eq!(rows, row_sum)
     }
 }
