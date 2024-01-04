@@ -69,7 +69,7 @@ enum Commands {
         /// Sets input file
         #[arg(short, long, value_name = "FILE")]
         file: Option<PathBuf>,
-        #[arg(short, long, value_name = "n-rows",default_value = "100" )]
+        #[arg(short, long, value_name = "n-rows", default_value = "100")]
         n_rows: Option<i64>,
     },
     Slice {
@@ -129,9 +129,9 @@ fn main() -> Result<(), SetLoggerError> {
         }
         Some(Commands::Slice { file }) => {
             let file_name = file.as_ref().expect("REASON").to_path_buf();
-            let file = std::fs::File::open(&file_name).expect("bbb");
+            let file = fs::File::open(&file_name).expect("bbb");
             let mut out_file_name = file_name.clone().to_owned();
-            out_file_name.push("SLICED");
+            out_file_name.set_extension("sliced.txt");
 
             let file_out = fs::OpenOptions::new()
                 .create(true)
@@ -139,7 +139,7 @@ fn main() -> Result<(), SetLoggerError> {
                 .open(out_file_name)
                 .expect("aaa");
 
-            let saa: Box<SampleSliceAggregator> = Box::new(slicer::SampleSliceAggregator {
+            let saa: Box<SampleSliceAggregator> = Box::new(SampleSliceAggregator {
                 file_out,
                 fn_line_break: find_last_nl,
             });
