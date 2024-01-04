@@ -115,26 +115,6 @@ pub trait ColumnBuilder {
     fn nullify(&mut self);
 }
 
-pub(crate) fn parse_from_schema(
-    schema_path: PathBuf,
-    _in_file_path: PathBuf,
-    _out_file_path: PathBuf,
-    _n_threads: i16,
-) {
-    let mut builders: Vec<Box<dyn ColumnBuilder>> = Vec::new();
-    for val in schema::FixedSchema::from_path(schema_path.into()).iter() {
-        match val.dtype().as_str() {
-            "i32" => builders.push(Box::new(ColumnBuilderType::<i32> {
-                rows: MutablePrimitiveArray::new(),
-            })),
-            "i64" => builders.push(Box::new(ColumnBuilderType::<i64> {
-                rows: MutablePrimitiveArray::new(),
-            })),
-
-            &_ => {}
-        };
-    }
-}
 /*
 
   "bool" => Ok(DataType::Boolean),

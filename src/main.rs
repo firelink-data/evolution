@@ -31,7 +31,7 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use log::{info, SetLoggerError};
 
-use crate::builder::parse_from_schema;
+use crate::convert::parse_from_schema;
 use crate::slicer::{find_last_nl, SampleSliceAggregator};
 
 mod builder;
