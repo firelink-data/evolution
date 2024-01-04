@@ -40,6 +40,7 @@ mod logging;
 mod mock;
 mod schema;
 mod slicer;
+mod convert;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
