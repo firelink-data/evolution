@@ -1,12 +1,10 @@
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
-use arrow2::array::MutablePrimitiveArray;
 use rayon::prelude::*;
 use crate::builder::ColumnBuilder;
-use crate::builder_datatypes::ColumnBuilderType;
-use crate::schema;
-use crate::slicer::{FnLineBreak, SampleSliceAggregator, SlicerProcessor};
+use crate::builder;
+use crate::slicer::{FnLineBreak, SlicerProcessor};
 
 pub(crate) struct Slice2Arrowchunk {
 // TODO arrow record array or such
@@ -44,16 +42,9 @@ pub(crate) fn parse_from_schema(
     _n_threads: i16,
 ) {
     let mut builders: Vec<Box<dyn ColumnBuilder>> = Vec::new();
-    for val in schema::FixedSchema::from_path(schema_path.into()).iter() {
-        match val.dtype().as_str() {
-            "i32" => builders.push(Box::new(ColumnBuilderType::<i32> {
-                rows: MutablePrimitiveArray::new(),
-            })),
-            "i64" => builders.push(Box::new(ColumnBuilderType::<i64> {
-                rows: MutablePrimitiveArray::new(),
-            })),
 
-            &_ => {}
-        };
-    }
+    // TODO allow custom datatypes to be added/provided to builders.
+
+    builder::builder_factory(schema_path, &mut builders);
+
 }
