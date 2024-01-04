@@ -262,7 +262,7 @@ impl SlicerProcessor for SampleSliceAggregator {
     fn process(&mut self, slices: Vec<&[u8]>) -> usize {
         let mut bytes_processed: usize = 0;
 
-        slices.par_iter().for_each(|n| print!("slice: {:?}", n));
+        slices.par_iter().enumerate().for_each(|(i, n)| println!("index {}, slice: {}", i,n));
         for val in slices {
             self.file_out.write_all(val).expect("dasd");
 
