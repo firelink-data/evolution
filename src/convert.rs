@@ -26,7 +26,7 @@ impl SlicerProcessor for Slice2Arrowchunk {
     fn process(&mut self, slices: Vec<&[u8]>) -> usize {
         let mut bytes_processed: usize = 0;
 
-//        let chunk = Chunk::new(vec![a.arced(), b.arced()]);
+//
         // TODO declare a array of chunks[slices.len]  , pass it on to the parse_slice funktion
         slices.par_iter().enumerate().for_each(|(i, n)| parse_slice(i,n));
         /*
