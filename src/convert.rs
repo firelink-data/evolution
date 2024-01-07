@@ -2,6 +2,7 @@ use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
+use arrow2::chunk::Chunk;
 use rayon::prelude::*;
 use crate::builder::ColumnBuilder;
 use crate::{builder, slicer};
@@ -25,15 +26,25 @@ impl SlicerProcessor for Slice2Arrowchunk {
     fn process(&mut self, slices: Vec<&[u8]>) -> usize {
         let mut bytes_processed: usize = 0;
 
-        slices.par_iter().enumerate().for_each(|(i, n)| println!("index {} {}", i, n.len()));
+//        let chunk = Chunk::new(vec![a.arced(), b.arced()]);
+        // TODO declare a array of chunks[slices.len]  , pass it on to the parse_slice funktion
+        slices.par_iter().enumerate().for_each(|(i, n)| parse_slice(i,n));
+        /*
         for val in slices {
             self.file_out.write_all(val).expect("dasd");
 
             let l = val.len();
             bytes_processed += l;
         }
+         */
         bytes_processed
     }
+}
+fn parse_slice(i:usize,n: &&[u8]) {
+
+    println!("index {} {}", i, n.len());
+    // parse each line
+    // when all lines are parsed , create an Chunk acording to https://docs.rs/arrow2/latest/arrow2/
 }
 
 pub(crate) fn parse_from_schema(
