@@ -150,13 +150,13 @@ fn main() -> Result<(), SetLoggerError> {
         Some(Commands::Convert {
             schema,
             in_file,
-            out_file: _,
+            out_file
         }) => {
             parse_from_schema(
                 schema.as_ref().expect("REASON").to_path_buf(),
                 in_file.as_ref().expect("REASON").to_path_buf(),
-                in_file.as_ref().expect("REASON").to_path_buf(),
-                0,
+                out_file.as_ref().expect("REASON").to_path_buf(),
+                n_threads as i16,
             );
         }
 
