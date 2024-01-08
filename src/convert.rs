@@ -1,18 +1,21 @@
 use std::fs;
 use std::fs::File;
+use std::str;
 use std::io::Write;
 use std::path::PathBuf;
+use str::from_utf8_unchecked;
+use arrow2::array::Array;
 use arrow2::chunk::Chunk;
 use rayon::prelude::*;
 use crate::builder::ColumnBuilder;
 use crate::{builder, slicer};
 use crate::slicer::{find_last_nl, FnLineBreak, SampleSliceAggregator, SlicerProcessor};
+use substring::Substring;
 
 pub(crate) struct Slice2Arrowchunk {
-// TODO arrow record array or such
-// TODO desired minimum records per partion. Save to disk/parquet when passing this value
     pub(crate) file_out: File,
     pub(crate) fn_line_break: FnLineBreak,
+    pub(crate) builders: Vec<Box<dyn ColumnBuilder>>
 }
 
 impl SlicerProcessor for Slice2Arrowchunk {
@@ -25,24 +28,33 @@ impl SlicerProcessor for Slice2Arrowchunk {
 
     fn process(&mut self, slices: Vec<&[u8]>) -> usize {
         let mut bytes_processed: usize = 0;
+//        let chunks:Chunk<?>;
 
-//
+
         // TODO declare a array of chunks[slices.len]  , pass it on to the parse_slice funktion
-        slices.par_iter().enumerate().for_each(|(i, n)| parse_slice(i,n));
-        /*
-        for val in slices {
-            self.file_out.write_all(val).expect("dasd");
+        slices.par_iter().enumerate().for_each(|(i, n)| parse_slice(i, n, vec![]));
 
-            let l = val.len();
-            bytes_processed += l;
-        }
-         */
         bytes_processed
     }
 }
-fn parse_slice(i:usize,n: &&[u8]) {
+fn parse_slice(i:usize, n: &&[u8],builders: Vec<Box<dyn ColumnBuilder>>)  {
+
 
     println!("index {} {}", i, n.len());
+//    let builders: Vec<Box<dyn ColumnBuilder>>;
+    let start_byte_pos=0;
+
+    // TODO make safe/unsafe configurable
+    let text:&str = unsafe {
+        from_utf8_unchecked(&n)
+    };
+
+    let offset=0;
+
+    for mut builder in builders {
+            let amount_of_chars=builder.lenght_in_chars() as usize;
+            builder.parse_value(text.substring(offset,offset+amount_of_chars));
+    }
     // parse each line
     // when all lines are parsed , create an Chunk acording to https://docs.rs/arrow2/latest/arrow2/
 }
@@ -68,7 +80,7 @@ pub(crate) fn parse_from_schema(
         .expect("aaa");
 
 
-    let s2a: Box<Slice2Arrowchunk> = Box::new(Slice2Arrowchunk { file_out: out_file, fn_line_break: find_last_nl });
+    let s2a: Box<Slice2Arrowchunk> = Box::new(Slice2Arrowchunk { file_out: out_file, fn_line_break: find_last_nl, builders });
     slicer::slice_and_process(s2a, in_file, _n_threads as usize);
 
 }

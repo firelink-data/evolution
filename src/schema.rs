@@ -41,7 +41,7 @@ pub struct FixedColumn {
     name: String,
     /// The starting offset index for the column.
     offset: usize,
-    /// The length of the column value.
+    /// column length as cardinal of Rusts char type. Dont mix with byte lenght
     length: usize,
     /// The datatype of the column.
     dtype: String,

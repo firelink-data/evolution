@@ -81,6 +81,10 @@ impl ColumnBuilder for ColumnBuilderType<i32> {
     {
         self.rows.push(None);
     }
+
+    fn lenght_in_chars(&mut self) -> i16 {
+        todo!()
+    }
 }
 
 impl ColumnBuilder for ColumnBuilderType<i64> {
@@ -112,5 +116,9 @@ impl ColumnBuilder for ColumnBuilderType<i64> {
         Self: Sized,
     {
         self.rows.push(None);
+    }
+
+    fn lenght_in_chars(&mut self) -> i16 {
+        todo!()
     }
 }
