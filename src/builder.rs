@@ -134,18 +134,35 @@ pub trait ColumnBuilder {
            "lstring" => Ok(DataType::LargeUtf8),
 
 */
-
-pub fn builder_factory(schema_path: PathBuf, builders: &mut Vec<Box<dyn ColumnBuilder>>) {
-    for val in schema::FixedSchema::from_path(schema_path.into()).iter() {
-        match val.dtype().as_str() {
-            "i32" => builders.push(Box::new(ColumnBuilderType::<i32> {
-                rows: MutablePrimitiveArray::new(),
-            })),
-            "i64" => builders.push(Box::new(ColumnBuilderType::<i64> {
-                rows: MutablePrimitiveArray::new(),
-            })),
-
-            &_ => {}
-        };
-    }
+pub(crate) struct MasterBuilder<'a> {
+    builders:  &'a Vec<Box<dyn ColumnBuilder>>
 }
+
+impl MasterBuilder<'_> {
+    pub fn builder_factory<'a>(schema_path: PathBuf) -> Self {
+//    builders: &mut Vec<Box<dyn ColumnBuilder>>
+        let schema=schema::FixedSchema::from_path(schema_path.into());
+        let antal_col=schema.num_columns();
+
+        let mut buildersmut: Vec<Box<dyn crate::builder::ColumnBuilder>>=Vec::with_capacity(antal_col);
+
+
+        for val in schema.iter() {
+            match val.dtype().as_str() {
+                "i32" => buildersmut.push(Box::new(ColumnBuilderType::<i32> {
+                    rows: MutablePrimitiveArray::new(),
+                })),
+                "i64" => buildersmut.push(Box::new(ColumnBuilderType::<i64> {
+                    rows: MutablePrimitiveArray::new(),
+                })),
+
+                &_ => {}
+            };
+        }
+
+        MasterBuilder { builders: &buildersmut }
+
+    }
+
+}
+
