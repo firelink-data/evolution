@@ -135,8 +135,11 @@ pub trait ColumnBuilder {
 
 */
 pub(crate) struct MasterBuilder<'a> {
-    builders:  &'a Vec<Box<dyn ColumnBuilder>>
+    builders: Vec<Box<dyn Sync + Send + 'a + ColumnBuilder>>
 }
+
+unsafe impl Send for MasterBuilder<'_> {}
+unsafe impl Sync for MasterBuilder<'_> {}
 
 impl MasterBuilder<'_> {
     pub fn builder_factory<'a>(schema_path: PathBuf) -> Self {
@@ -144,7 +147,7 @@ impl MasterBuilder<'_> {
         let schema=schema::FixedSchema::from_path(schema_path.into());
         let antal_col=schema.num_columns();
 
-        let mut buildersmut: Vec<Box<dyn crate::builder::ColumnBuilder>>=Vec::with_capacity(antal_col);
+        let mut buildersmut: Vec<Box<dyn crate::builder::ColumnBuilder + Send + Sync>>=Vec::with_capacity(antal_col);
 
 
         for val in schema.iter() {
@@ -160,7 +163,8 @@ impl MasterBuilder<'_> {
             };
         }
 
-        MasterBuilder { builders: &buildersmut }
+        let builders = buildersmut;
+        MasterBuilder { builders }
 
     }
 

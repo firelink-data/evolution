@@ -11,6 +11,7 @@ use crate::builder::{ColumnBuilder, MasterBuilder};
 use crate::{builder, slicer};
 use crate::slicer::{find_last_nl, FnLineBreak, SampleSliceAggregator, SlicerProcessor};
 use substring::Substring;
+use std::sync::Arc;
 
 pub(crate) struct Slice2Arrowchunk<'a> {
     pub(crate) file_out: File,
@@ -29,9 +30,12 @@ impl SlicerProcessor for Slice2Arrowchunk<'_> {
     fn process(&mut self, slices: Vec<&[u8]>) -> usize {
         let mut bytes_processed: usize = 0;
 //        let chunks:Chunk<?>;
-
+        let arc_masterbuilder = Arc::new(&self.master_builder);
         // TODO declare a array of chunks[slices.len]  , pass it on to the parse_slice funktion
-        slices.par_iter().enumerate().for_each(|(i, n)| parse_slice(i, n, &self.master_builder));
+        slices.par_iter().enumerate().for_each(|(i, n)| {
+            let arc_mastbuilder_clone = Arc::clone(&arc_masterbuilder);
+            parse_slice(i, n, &arc_mastbuilder_clone);
+        });
 
         bytes_processed
     }
