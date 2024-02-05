@@ -1,7 +1,7 @@
 /*
 * MIT License
 *
-* Copyright (c) 2023 Firelink Data
+* Copyright (c) 2024 Firelink Data
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -21,8 +21,8 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 * SOFTWARE.
 *
-* File created: 2023-11-28
-* Last updated: 2023-12-22
+* File created: 2024-02-05
+* Last updated: 2024-02-05
 */
 
 use crate::schema::{self, FixedSchema};
@@ -34,11 +34,26 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::thread;
+use std::{thread, usize};
 use std::time::SystemTime;
 
 pub(crate) static DEFAULT_MOCKED_FILENAME_LEN: usize = 16;
 pub(crate) static DEFAULT_ROW_BUFFER_LEN: usize = 1024 * 1024;
+
+pub struct Mocker {
+    schema: schema::FixedSchema,
+    target_file: Option<PathBuf>,
+}
+
+impl Mocker {
+    pub fn new(schema: schema::FixedSchema, target_file: Option<PathBuf>) -> Self {
+        Self { schema, target_file }
+    }
+
+    pub fn generate(&self, n_rows: usize, multithreaded: bool) {
+        todo!()
+    }
+}
 
 ///
 pub struct FixedMocker {
