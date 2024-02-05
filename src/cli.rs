@@ -127,7 +127,8 @@ impl Cli {
                 mock::Mocker::new(
                     schema::FixedSchema::from_path(schema.to_owned()),
                     target_file.to_owned(),
-                ).generate(n_rows.unwrap(), multithreaded);
+                    n_threads,
+                ).generate(n_rows.unwrap());
             },
         }
 
