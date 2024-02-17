@@ -1,7 +1,7 @@
 /*
 * MIT License
 *
-* Copyright (c) 2023 Firelink Data
+* Copyright (c) 2024 Firelink Data
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2023-11-25
-* Last updated: 2023-12-14
+* Last updated: 2024-02-17
 */
 
 use arrow2::datatypes::{DataType, Field, Schema};

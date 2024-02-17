@@ -1,7 +1,7 @@
 /*
 * MIT License
 *
-* Copyright (c) 2023 Firelink Data
+* Copyright (c) 2024 Firelink Data
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -22,30 +22,13 @@
 * SOFTWARE.
 *
 * File created: 2023-11-21
-* Last updated: 2023-11-21
+* Last updated: 2024-02-17
 */
 
 use arrow2::array::MutablePrimitiveArray;
 use arrow2::types::NativeType;
 
 use crate::builder::ColumnBuilder;
-
-/*
-
-  "bool" => Ok(DataType::Boolean),
-           "boolean" => Ok(DataType::Boolean),
-           "i16" => Ok(DataType::Int16),
-           "i32" => Ok(DataType::Int32),
-           "i64" => Ok(DataType::Int64),
-           "f16" => Ok(DataType::Float16),
-           "f32" => Ok(DataType::Float32),
-           "f64" => Ok(DataType::Float64),
-           "utf8" => Ok(DataType::Utf8),
-           "string" => Ok(DataType::Utf8),
-           "lutf8" => Ok(DataType::LargeUtf8),
-           "lstring" => Ok(DataType::LargeUtf8),
-
-*/
 
 pub(crate) struct ColumnBuilderType<T1: NativeType> {
     pub rows: MutablePrimitiveArray<T1>,
