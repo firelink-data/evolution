@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2023-11-21
-* Last updated: 2024-02-05
+* Last updated: 2024-02-17
 */
 
 use clap::Parser;
@@ -47,7 +47,7 @@ fn main() {
     };
 
     match cli.run() {
-        Ok(_) => info!("Ok! Bye."),
+        Ok(_) => info!("All done! Bye."),
         Err(e) => error!("Something went wrong during execution: {:?}", e),
     }
 }
