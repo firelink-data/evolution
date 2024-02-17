@@ -10,7 +10,7 @@
 [![CI](https://github.com/firelink-data/evolution/actions/workflows/ci.yml/badge.svg)](https://github.com/firelink-data/evolution/actions/workflows/ci.yml)
 [![Tests](https://github.com/firelink-data/evolution/actions/workflows/tests.yml/badge.svg)](https://github.com/firelink-data/evolution/actions/workflows/tests.yml)
 
-🦖 *Evolve your fixed length data files into Apache Arrow tables, fully parallelized!*
+🦖 *Evolve your fixed-length data files into Apache Arrow tables, fully parallelized!*
 
 
 </div>
