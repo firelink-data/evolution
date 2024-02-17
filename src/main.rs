@@ -26,10 +26,10 @@
 */
 
 use clap::Parser;
-use log::{info, error};
+use log::{error, info};
 
-mod error;
 mod cli;
+mod error;
 mod logging;
 mod mock;
 mod schema;
@@ -38,7 +38,6 @@ use cli::Cli;
 
 ///
 fn main() {
-    
     let cli = Cli::parse();
 
     match logging::setup_log() {

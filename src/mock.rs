@@ -52,8 +52,17 @@ pub struct Mocker {
 ///
 impl Mocker {
     ///
-    pub fn new(schema: schema::FixedSchema, target_file: Option<PathBuf>, n_threads: usize) -> Self {
-        Self { schema, target_file, n_threads, multithreaded: n_threads > 1 }
+    pub fn new(
+        schema: schema::FixedSchema,
+        target_file: Option<PathBuf>,
+        n_threads: usize,
+    ) -> Self {
+        Self {
+            schema,
+            target_file,
+            n_threads,
+            multithreaded: n_threads > 1,
+        }
     }
 
     ///
@@ -62,7 +71,10 @@ impl Mocker {
             self.generate_multithreaded(n_rows);
         } else {
             if self.multithreaded {
-                warn!("You specified to use multithreading but only want to mock {} rows", n_rows);
+                warn!(
+                    "You specified to use multithreading but only want to mock {} rows",
+                    n_rows
+                );
                 warn!("This is done more efficiently single-threaded, ignoring multithreading...");
             }
             self.generate_single_threaded(n_rows);
@@ -112,13 +124,21 @@ impl Mocker {
     ///
     fn generate_multithreaded(&self, n_rows: usize) {
         let thread_workload = self.distribute_thread_workload(n_rows);
-        threaded_mock(n_rows, thread_workload, self.schema.to_owned(), self.n_threads, self.target_file.clone());
+        threaded_mock(
+            n_rows,
+            thread_workload,
+            self.schema.to_owned(),
+            self.n_threads,
+            self.target_file.clone(),
+        );
     }
 
     /// Calculate how many rows each thread should work on generating.
     fn distribute_thread_workload(&self, n_rows: usize) -> Vec<usize> {
         let n_rows_per_thread = n_rows / self.n_threads;
-        (0..self.n_threads).map(|_| n_rows_per_thread).collect::<Vec<usize>>()
+        (0..self.n_threads)
+            .map(|_| n_rows_per_thread)
+            .collect::<Vec<usize>>()
     }
 }
 
@@ -154,7 +174,6 @@ pub fn worker_thread_mock(
     schema: Arc<FixedSchema>,
     sender: channel::Sender<Vec<u8>>,
 ) {
-    
     let rowlen: usize = schema.row_len();
     // We need to add 2 bytes for each row because of "\r\n"
     let buffer_size: usize = DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2;
@@ -162,7 +181,9 @@ pub fn worker_thread_mock(
 
     for row in 0..n_rows {
         if row % DEFAULT_ROW_BUFFER_LEN == 0 && row != 0 {
-            sender.send(buffer).expect("Bad buffer, or something, could not send from worker thread!");
+            sender
+                .send(buffer)
+                .expect("Bad buffer, or something, could not send from worker thread!");
             // Here maybe we should just use the same allocated memory?, but overwrite it..
             // Because re-allocation is slow (::with_capacity will re-allocate on heap).
             buffer = Vec::with_capacity(buffer_size);
@@ -180,7 +201,9 @@ pub fn worker_thread_mock(
     }
 
     // Send the rest of the remaining buffer to the master thread.
-    sender.send(buffer).expect("Bad buffer, could not send last buffer from worker thread!");
+    sender
+        .send(buffer)
+        .expect("Bad buffer, could not send last buffer from worker thread!");
 
     info!("Thread {} done!", thread);
     drop(sender);
@@ -213,17 +236,14 @@ pub fn spawn_workers(
     (threads, receiver)
 }
 
-pub fn spawn_master(
-    channel: &channel::Receiver<Vec<u8>>,
-    target_file: Option<PathBuf>,
-) {
+pub fn spawn_master(channel: &channel::Receiver<Vec<u8>>, target_file: Option<PathBuf>) {
     let path = match target_file {
         Some(p) => p,
         None => {
             let mut path = PathBuf::from(randomize_file_name());
             path.set_extension("flf");
             path
-        },
+        }
     };
 
     let mut file = OpenOptions::new()
@@ -234,15 +254,18 @@ pub fn spawn_master(
 
     info!("Writing to target file: {}", path.to_str().unwrap());
     for buff in channel {
-        file.write_all(&buff).expect("Got bad buffer from thread, write failed!");
+        file.write_all(&buff)
+            .expect("Got bad buffer from thread, write failed!");
     }
 }
 
 pub fn randomize_file_name() -> String {
     let mut path_name: String = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
-    path_name.push_str("_");
+    path_name.push('_');
     path_name.push_str(
-        Alphanumeric.sample_string(&mut rand::thread_rng(), DEFAULT_MOCKED_FILENAME_LEN).as_str(),
+        Alphanumeric
+            .sample_string(&mut rand::thread_rng(), DEFAULT_MOCKED_FILENAME_LEN)
+            .as_str(),
     );
     path_name
 }
@@ -261,4 +284,3 @@ pub(crate) fn mock_number<'a>(_len: usize) -> &'a str {
 pub(crate) fn mock_string<'a>(_len: usize) -> &'a str {
     "hejj"
 }
-
