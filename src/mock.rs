@@ -22,96 +22,89 @@
 * SOFTWARE.
 *
 * File created: 2024-02-05
-* Last updated: 2024-02-05
+* Last updated: 2024-02-17
 */
 
 use crate::schema::{self, FixedSchema};
 use crossbeam::channel;
-use log::{debug, info};
+use log::{info, warn};
 use padder::*;
 use rand::distributions::{Alphanumeric, DistString};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::thread::JoinHandle;
 use std::{thread, usize};
-use std::time::SystemTime;
 
-pub(crate) static DEFAULT_MOCKED_FILENAME_LEN: usize = 16;
+pub(crate) static MINIMUM_N_ROWS_FOR_MULTITHREADING: usize = 1000;
+pub(crate) static DEFAULT_MOCKED_FILENAME_LEN: usize = 8;
 pub(crate) static DEFAULT_ROW_BUFFER_LEN: usize = 1024 * 1024;
 
+///
 pub struct Mocker {
     schema: schema::FixedSchema,
     target_file: Option<PathBuf>,
+    n_threads: usize,
+    multithreaded: bool,
 }
 
+///
 impl Mocker {
-    pub fn new(schema: schema::FixedSchema, target_file: Option<PathBuf>) -> Self {
-        Self { schema, target_file }
-    }
-
-    pub fn generate(&self, n_rows: usize, multithreaded: bool) {
-        todo!()
-    }
-}
-
-///
-pub struct FixedMocker {
-    schema: schema::FixedSchema,
-}
-
-///
-#[allow(dead_code)]
-impl FixedMocker {
     ///
-    pub fn new(schema: schema::FixedSchema) -> Self {
-        Self { schema }
-    }
-
-    #[allow(dead_code)]
-    pub fn generate_threaded(&self, n_rows: usize, n_threads: usize) {
-        let threads: Vec<_> = (0..n_threads)
-            .map(|t| {
-                thread::spawn(move || {
-                    info!("Thread #{} starts working...", t);
-                    for _ in 0..n_rows {
-                        debug!("hello from #{}", t);
-                    }
-                    info!("Thread #{} done!", t);
-                })
-            })
-            .collect();
-
-        for handle in threads {
-            handle.join().unwrap();
+    pub fn new(
+        schema: schema::FixedSchema,
+        target_file: Option<PathBuf>,
+        n_threads: usize,
+    ) -> Self {
+        Self {
+            schema,
+            target_file,
+            n_threads,
+            multithreaded: n_threads > 1,
         }
     }
 
+    ///
     pub fn generate(&self, n_rows: usize) {
-        let rowlen = self.schema.row_len();
-        let mut buffer: Vec<u8> =
-            Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
-        let mut path = PathBuf::from(
-            Alphanumeric.sample_string(&mut rand::thread_rng(), DEFAULT_MOCKED_FILENAME_LEN),
-        );
+        if self.multithreaded && n_rows > MINIMUM_N_ROWS_FOR_MULTITHREADING {
+            self.generate_multithreaded(n_rows);
+        } else {
+            if self.multithreaded {
+                warn!(
+                    "You specified to use multithreading but only want to mock {} rows",
+                    n_rows
+                );
+                warn!("This is done more efficiently single-threaded, ignoring multithreading...");
+            }
+            self.generate_single_threaded(n_rows);
+        }
+    }
+
+    ///
+    fn generate_single_threaded(&self, n_rows: usize) {
+        let rowlen: usize = self.schema.row_len();
+        // We need to add 2 bytes for each row because of "\r\n"
+        let buffer_size: usize = DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2;
+        let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
+
+        let mut path: PathBuf = PathBuf::from(randomize_file_name());
         path.set_extension("flf");
 
         let mut file = OpenOptions::new()
             .create_new(true)
             .append(true)
-            .open(path)
-            .expect("Could not open file.");
+            .open(&path)
+            .expect("Could not open target file!");
 
-        let now = SystemTime::now();
-
+        info!("Writing to target file: {}", path.to_str().unwrap());
         for row in 0..n_rows {
-            if row % DEFAULT_ROW_BUFFER_LEN == 0 {
+            if row % DEFAULT_ROW_BUFFER_LEN == 0 && row != 0 {
                 file.write_all(&buffer).expect("Bad buffer, write failed!");
-                buffer = Vec::with_capacity(
-                    DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2,
-                );
+                // Here maybe we should just use the same allocated memory?, but overwrite it..
+                // Because re-allocation is slow (::with_capacity will re-allocate on heap).
+                buffer = Vec::with_capacity(buffer_size);
             }
-
             for col in self.schema.iter() {
                 pad_and_push_to_buffer(
                     col.mock().unwrap().as_bytes().to_vec(),
@@ -121,18 +114,160 @@ impl FixedMocker {
                     &mut buffer,
                 );
             }
-
             buffer.extend_from_slice("\r\n".as_bytes());
         }
 
-        info!(
-            "Produced {} rows in {}ms",
-            n_rows,
-            now.elapsed().unwrap().as_millis(),
-        );
-
+        // Write the remaining contents of the buffer to file.
         file.write_all(&buffer).expect("Bad buffer, write failed!");
     }
+
+    ///
+    fn generate_multithreaded(&self, n_rows: usize) {
+        let thread_workload = self.distribute_thread_workload(n_rows);
+        threaded_mock(
+            n_rows,
+            thread_workload,
+            self.schema.to_owned(),
+            self.n_threads,
+            self.target_file.clone(),
+        );
+    }
+
+    /// Calculate how many rows each thread should work on generating.
+    fn distribute_thread_workload(&self, n_rows: usize) -> Vec<usize> {
+        let n_rows_per_thread = n_rows / self.n_threads;
+        (0..self.n_threads)
+            .map(|_| n_rows_per_thread)
+            .collect::<Vec<usize>>()
+    }
+}
+
+/// Worker threads generate mocked data, and pass it to the master thread which writes it
+/// to disk, but maybe this will become bottleneck?
+///
+/// pub struct Arc<T, A = Global>
+/// where
+///     A: Allocator,
+///     T:  ?Sized,
+///
+/// is a "Thread-safe reference-counting pointer. Arc stands for 'Atomically Reference Counted'."
+///
+pub fn threaded_mock(
+    n_rows: usize,
+    thread_workload: Vec<usize>,
+    schema: FixedSchema,
+    n_threads: usize,
+    target_file: Option<PathBuf>,
+) {
+    let (thread_handles, receiver) = spawn_workers(n_rows, thread_workload, schema, n_threads);
+    spawn_master(&receiver, target_file);
+
+    for handle in thread_handles {
+        handle.join().expect("Could not join thread handle!");
+    }
+}
+
+///
+pub fn worker_thread_mock(
+    thread: usize,
+    n_rows: usize,
+    schema: Arc<FixedSchema>,
+    sender: channel::Sender<Vec<u8>>,
+) {
+    let rowlen: usize = schema.row_len();
+    // We need to add 2 bytes for each row because of "\r\n"
+    let buffer_size: usize = DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2;
+    let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
+
+    for row in 0..n_rows {
+        if row % DEFAULT_ROW_BUFFER_LEN == 0 && row != 0 {
+            sender
+                .send(buffer)
+                .expect("Bad buffer, or something, could not send from worker thread!");
+            // Here maybe we should just use the same allocated memory?, but overwrite it..
+            // Because re-allocation is slow (::with_capacity will re-allocate on heap).
+            buffer = Vec::with_capacity(buffer_size);
+        }
+        for col in schema.iter() {
+            pad_and_push_to_buffer(
+                col.mock().unwrap().as_bytes().to_vec(),
+                col.length(),
+                Alignment::Right,
+                Symbol::Whitespace,
+                &mut buffer,
+            );
+        }
+        buffer.extend_from_slice("\r\n".as_bytes());
+    }
+
+    // Send the rest of the remaining buffer to the master thread.
+    sender
+        .send(buffer)
+        .expect("Bad buffer, could not send last buffer from worker thread!");
+
+    info!("Thread {} done!", thread);
+    drop(sender);
+}
+
+///
+pub fn spawn_workers(
+    n_rows: usize,
+    thread_workload: Vec<usize>,
+    schema: FixedSchema,
+    n_threads: usize,
+) -> (Vec<JoinHandle<()>>, channel::Receiver<Vec<u8>>) {
+    let remaining_rows = n_rows - thread_workload.iter().sum::<usize>();
+    info!("Distributed thread workload: {:?}", thread_workload);
+    info!("Remaining rows to handle: {}", remaining_rows);
+
+    let arc_schema = Arc::new(schema);
+    let (sender, receiver) = channel::unbounded();
+
+    let threads: Vec<JoinHandle<()>> = (0..n_threads)
+        .map(|t| {
+            let t_rows = thread_workload[t];
+            let t_schema = Arc::clone(&arc_schema);
+            let t_sender = sender.clone();
+            thread::spawn(move || worker_thread_mock(t, t_rows, t_schema, t_sender))
+        })
+        .collect();
+
+    drop(sender);
+    (threads, receiver)
+}
+
+pub fn spawn_master(channel: &channel::Receiver<Vec<u8>>, target_file: Option<PathBuf>) {
+    let path = match target_file {
+        Some(p) => p,
+        None => {
+            let mut path = PathBuf::from(randomize_file_name());
+            path.set_extension("flf");
+            path
+        }
+    };
+
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .expect("Could not open target file!");
+
+    info!("Writing to target file: {}", path.to_str().unwrap());
+    for buff in channel {
+        file.write_all(&buff)
+            .expect("Got bad buffer from thread, write failed!");
+    }
+}
+
+pub fn randomize_file_name() -> String {
+    let mut path_name: String = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
+    path_name.push('_');
+    path_name.push_str(
+        Alphanumeric
+            .sample_string(&mut rand::thread_rng(), DEFAULT_MOCKED_FILENAME_LEN)
+            .as_str(),
+    );
+    path_name
 }
 
 pub(crate) fn mock_bool<'a>(len: usize) -> &'a str {
@@ -148,157 +283,4 @@ pub(crate) fn mock_number<'a>(_len: usize) -> &'a str {
 
 pub(crate) fn mock_string<'a>(_len: usize) -> &'a str {
     "hejj"
-}
-
-///
-pub(crate) fn mock_from_schema(schema_path: PathBuf, n_rows: usize) {
-    let schema = schema::FixedSchema::from_path(schema_path);
-
-    //    let schema = schema::FixedSchema::from_path(schema_path.into());
-    // let mocker = FixedMocker::new(schema);
-    //mocker.generate(n_rows);
-    generate_threaded(schema, n_rows, 16);
-    //mocker.generate_threaded(n_rows, 5);
-}
-
-fn generate_from_thread(
-    thread: usize,
-    schema: Arc<FixedSchema>,
-    n_rows: usize,
-    sender: channel::Sender<Vec<u8>>,
-) {
-    let rowlen = schema.row_len();
-    let mut buffer: Vec<u8> =
-        Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
-
-    for row in 0..n_rows {
-        if row % DEFAULT_ROW_BUFFER_LEN == 0 {
-            sender.send(buffer).expect("Bad buffer, send failed");
-            buffer =
-                Vec::with_capacity(DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2);
-        }
-
-        for col in schema.iter() {
-            pad_and_push_to_buffer(
-                col.mock().unwrap().as_bytes().to_vec(),
-                col.length(),
-                Alignment::Right,
-                Symbol::Whitespace,
-                &mut buffer,
-            );
-        }
-
-        buffer.extend_from_slice("\r\n".as_bytes());
-    }
-    sender.send(buffer).expect("Bad buffer, send failed");
-
-    println!("thread {} done!", thread);
-    drop(sender);
-}
-
-fn distribute_thread_workload(n_rows: usize, n_threads: usize) -> Vec<usize> {
-    let thread_local_rows = (n_rows - 1) / n_threads + 1;
-    let remaining_rows = thread_local_rows * n_threads - n_rows;
-    let mut thread_workload: Vec<usize> = Vec::with_capacity(n_threads);
-    for n in 0..n_threads {
-        let spare = if n < remaining_rows { 1 } else { 0 };
-        let rows_to_process = n + thread_local_rows - spare;
-        thread_workload.insert(n, rows_to_process - n);
-    }
-    thread_workload
-}
-///
-fn generate_threaded(schema: FixedSchema, n_rows: usize, n_threads: usize) {
-    let worksize = distribute_thread_workload(n_rows, n_threads);
-
-    let arc_schema = Arc::new(schema);
-
-    let (sender, receiver) = channel::unbounded();
-
-    let threads: Vec<_> = (0..n_threads)
-        .map(|t| {
-            let arc_clone = Arc::clone(&arc_schema);
-            let sender_clone = sender.clone();
-            let rows = worksize[t];
-            thread::spawn(move || generate_from_thread(t, arc_clone, rows, sender_clone))
-        })
-        .collect();
-    drop(sender);
-    write_mock_file(&receiver);
-
-    for handle in threads {
-        handle.join().unwrap();
-    }
-}
-
-fn write_mock_file(receiver: &channel::Receiver<Vec<u8>>) {
-    let mut path = PathBuf::from(String::from("resources/mock_files/test_mock"));
-    path.set_extension("flf");
-
-    let mut file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .open(path)
-        .unwrap();
-
-    for buf in receiver {
-        file.write_all(&buf).expect("Bad buffer, write failed!");
-    }
-}
-
-///
-#[allow(dead_code)]
-pub(crate) fn mock_from_schema_threaded(schema_path: String, n_rows: usize, n_threads: usize) {
-    let schema = schema::FixedSchema::from_path(schema_path.into());
-    generate_threaded(schema, n_rows, n_threads);
-}
-
-#[cfg(test)]
-mod tests_mock {
-    use super::*;
-    use crate::schema::{FixedColumn, FixedSchema};
-    use glob::glob;
-    use std::fs;
-
-    #[test]
-    fn test_mock_from_fixed_schema() {
-        let name = String::from("cool Schema");
-        let version: i32 = 4198;
-        let columns: Vec<FixedColumn> = vec![];
-
-        let schema = FixedSchema::new(name, version, columns);
-        let mock = FixedMocker::new(schema);
-        mock.generate(10);
-
-        for entry in glob("*.flf*").unwrap() {
-            if let Ok(p) = entry {
-                let _ = fs::remove_file(p);
-            }
-        }
-    }
-
-    #[test]
-    fn test_mock_generate_1000000() {
-        let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("resources/schema/test_schema.json");
-
-        let schema: FixedSchema = FixedSchema::from_path(path);
-        let mock = FixedMocker::new(schema);
-        mock.generate(1000000);
-
-        for entry in glob("*.flf*").unwrap() {
-            if let Ok(p) = entry {
-                let _ = fs::remove_file(p);
-            }
-        }
-    }
-
-    #[test]
-    fn test_workload_distribution_16_threads_1000_rows() {
-        let threads = 16;
-        let rows = 1000;
-        let workload = distribute_thread_workload(rows, threads);
-        let row_sum: usize = workload.iter().sum();
-        assert_eq!(rows, row_sum)
-    }
 }

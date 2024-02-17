@@ -22,10 +22,10 @@
 * SOFTWARE.
 *
 * File created: 2024-02-05
-* Last updated: 2024-02-05
+* Last updated: 2024-02-17
 */
 
-use clap::{ArgAction, Parser, Subcommand, value_parser};
+use clap::{value_parser, ArgAction, Parser, Subcommand};
 use log::{info, warn};
 use std::path::PathBuf;
 
@@ -40,7 +40,6 @@ use crate::{error, mock, schema};
     long_about = None,
 )]
 pub struct Cli {
-
     #[command(subcommand)]
     command: Commands,
 
@@ -58,10 +57,8 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-
     /// Generate mocked fixed-length files (.flf) for testing purposes.
     Mock {
-
         /// Specify the .json schema file to mock data for.
         #[arg(
             short = 's',
@@ -85,9 +82,9 @@ enum Commands {
             short = 'n',
             long = "n-rows",
             value_name = "NUM-ROWS",
-            default_value = "100",
+            default_value = "100"
         )]
-        n_rows: Option<usize>
+        n_rows: Option<usize>,
     },
 }
 
@@ -100,19 +97,15 @@ fn get_available_threads(n_wanted_threads: usize) -> usize {
             n_wanted_threads, n_logical_threads,
         );
         info!(
-            "Will use all available logical threads ({}).", 
+            "Will use all available logical threads ({}).",
             n_logical_threads,
         );
         return n_logical_threads;
     };
 
-    info!(
-        "Executing using {} logical threads.",
-        n_wanted_threads,
-    );
+    info!("Executing using {} logical threads.", n_wanted_threads,);
 
     n_wanted_threads
-
 }
 
 impl Cli {
@@ -120,15 +113,23 @@ impl Cli {
         let n_threads: usize = get_available_threads(self.n_threads);
 
         let multithreaded: bool = n_threads > 1;
-        if multithreaded { info!("Multithreading enabled!") };
+        if multithreaded {
+            info!("Multithreading enabled!")
+        };
 
         match &self.command {
-            Commands::Mock { schema, target_file, n_rows } => {
+            Commands::Mock {
+                schema,
+                target_file,
+                n_rows,
+            } => {
                 mock::Mocker::new(
                     schema::FixedSchema::from_path(schema.to_owned()),
                     target_file.to_owned(),
-                ).generate(n_rows.unwrap(), multithreaded);
-            },
+                    n_threads,
+                )
+                .generate(n_rows.unwrap());
+            }
         }
 
         Ok(())

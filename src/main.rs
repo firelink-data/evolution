@@ -22,14 +22,14 @@
 * SOFTWARE.
 *
 * File created: 2023-11-21
-* Last updated: 2024-02-05
+* Last updated: 2024-02-17
 */
 
 use clap::Parser;
-use log::{info, error};
+use log::{error, info};
 
-mod error;
 mod cli;
+mod error;
 mod logging;
 mod mock;
 mod schema;
@@ -38,7 +38,6 @@ use cli::Cli;
 
 ///
 fn main() {
-    
     let cli = Cli::parse();
 
     match logging::setup_log() {
@@ -47,7 +46,7 @@ fn main() {
     };
 
     match cli.run() {
-        Ok(_) => info!("Ok! Bye."),
+        Ok(_) => info!("All done! Bye."),
         Err(e) => error!("Something went wrong during execution: {:?}", e),
     }
 }
