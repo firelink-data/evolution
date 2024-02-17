@@ -32,7 +32,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::{fs, io};
 
-use crate::mock;
+use crate::mocker;
 
 ///
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
@@ -130,19 +130,20 @@ impl FixedColumn {
 ///
 impl FixedColumn {
     pub fn mock<'a>(&self) -> Result<&'a str, Error> {
+        // TODO: properly mock the different datatypes!
         let string = match self.dtype.as_str() {
-            "bool" => mock::mock_bool(std::cmp::max(self.length, 0)),
-            "boolean" => mock::mock_bool(std::cmp::max(self.length, 0)),
-            "i16" => mock::mock_number(std::cmp::max(self.length, 0)),
-            "i32" => mock::mock_number(std::cmp::max(self.length, 0)),
-            "i64" => mock::mock_number(std::cmp::max(self.length, 0)),
-            "f16" => mock::mock_number(std::cmp::max(self.length, 0)),
-            "f32" => mock::mock_number(std::cmp::max(self.length, 0)),
-            "f64" => mock::mock_number(std::cmp::max(self.length, 0)),
-            "utf8" => mock::mock_string(std::cmp::max(self.length, 0)),
-            "string" => mock::mock_string(std::cmp::max(self.length, 0)),
-            "lutf8" => mock::mock_string(std::cmp::max(self.length, 0)),
-            "lstring" => mock::mock_string(std::cmp::max(self.length, 0)),
+            "bool" => mocker::mock_bool(std::cmp::max(self.length, 0)),
+            "boolean" => mocker::mock_bool(std::cmp::max(self.length, 0)),
+            "i16" => mocker::mock_number(std::cmp::max(self.length, 0)),
+            "i32" => mocker::mock_number(std::cmp::max(self.length, 0)),
+            "i64" => mocker::mock_number(std::cmp::max(self.length, 0)),
+            "f16" => mocker::mock_number(std::cmp::max(self.length, 0)),
+            "f32" => mocker::mock_number(std::cmp::max(self.length, 0)),
+            "f64" => mocker::mock_number(std::cmp::max(self.length, 0)),
+            "utf8" => mocker::mock_string(std::cmp::max(self.length, 0)),
+            "string" => mocker::mock_string(std::cmp::max(self.length, 0)),
+            "lutf8" => mocker::mock_string(std::cmp::max(self.length, 0)),
+            "lstring" => mocker::mock_string(std::cmp::max(self.length, 0)),
             _ => return Err(Error::ExternalFormat("xd".to_string())),
         };
 

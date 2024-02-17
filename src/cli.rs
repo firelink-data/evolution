@@ -29,7 +29,7 @@ use clap::{value_parser, ArgAction, Parser, Subcommand};
 use log::{info, warn};
 use std::path::PathBuf;
 
-use crate::{error, mock, schema};
+use crate::{converter, error, mocker, schema};
 
 #[derive(Parser)]
 #[command(
@@ -57,6 +57,27 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Convert a fixed-length file (.flf) to parquet.
+    Convert {
+        /// The fixed-length file to convert.
+        #[arg(
+            short = 'f',
+            long = "file",
+            value_name = "FILE",
+            action = ArgAction::Set,
+        )]
+        file: PathBuf,
+
+        /// Specify the .json schema file to use when converting.
+        #[arg(
+            short = 's',
+            long = "schema",
+            value_name = "SCHEMA",
+            action = ArgAction::Set,
+        )]
+        schema: PathBuf,
+    },
+
     /// Generate mocked fixed-length files (.flf) for testing purposes.
     Mock {
         /// Specify the .json schema file to mock data for.
@@ -118,12 +139,23 @@ impl Cli {
         };
 
         match &self.command {
+            Commands::Convert {
+                file,
+                schema,
+            } => {
+                converter::Converter::new(
+                    file.to_owned(),
+                    schema::FixedSchema::from_path(schema.to_owned()),
+                    n_threads,
+                )
+                .convert();
+            },
             Commands::Mock {
                 schema,
                 target_file,
                 n_rows,
             } => {
-                mock::Mocker::new(
+                mocker::Mocker::new(
                     schema::FixedSchema::from_path(schema.to_owned()),
                     target_file.to_owned(),
                     n_threads,

@@ -29,9 +29,10 @@ use clap::Parser;
 use log::{error, info};
 
 mod cli;
+mod converter;
 mod error;
 mod logging;
-mod mock;
+mod mocker;
 mod schema;
 
 use cli::Cli;

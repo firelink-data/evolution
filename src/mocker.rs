@@ -45,7 +45,7 @@ use std::{thread, usize};
 pub(crate) static DEFAULT_THREAD_CHANNEL_CAPACITY: usize = 128;
 pub(crate) static DEFAULT_MIN_N_ROWS_FOR_MULTITHREADING: usize = 1000;
 pub(crate) static DEFAULT_MOCKED_FILENAME_LEN: usize = 8;
-pub(crate) static DEFAULT_ROW_BUFFER_LEN: usize = 1048 * 1024;
+pub(crate) static DEFAULT_ROW_BUFFER_LEN: usize = 1024;
 
 ///
 pub struct Mocker {
