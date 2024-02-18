@@ -30,6 +30,8 @@ use std::fs::File;
 use std::io::{BufReader, Read, Write};
 use rayon::prelude::*;
 use log::info;
+use crate::converters::Converter;
+use crate::slicers::{FnLineBreak, Slicer};
 
 /**
 GOAL(s)
@@ -49,78 +51,77 @@ in_chunk_cores (how man splits will be made)
 
 pub(crate) const SLICER_IN_CHUNK_SIZE: usize = 1024 * 1024;
 
-///
-pub trait SlicerProcessor {
-    fn set_line_break_handler(&mut self, fn_line_break: FnLineBreak);
-    fn get_line_break_handler(&self) -> FnLineBreak;
+/// Rickard magic!
 
-    fn process(&mut self, slices: Vec<&[u8]>) -> usize;
+pub struct slice_min_seek {
 }
 
-/// Rickard magic!
-pub(crate) fn slice_and_process(
-    mut slicer_processor: Box<dyn SlicerProcessor>,
-    mut file: File,
-    in_chunk_cores: usize,
-) {
-    let mut bytes_processed = 0;
-    let in_max_chunks: i8 = 3;
+impl Slicer for slice_min_seek {
+     fn convert(
+        mut converter: Box<dyn Converter>,
+        mut file: File,
+        in_chunk_cores: usize,
+    ) {
+        let mut bytes_processed = 0;
+        let in_max_chunks: i8 = 3;
 
-    let mut remaining_file_length = file.metadata().unwrap().len() as usize;
+        let mut remaining_file_length = file.metadata().unwrap().len() as usize;
 
-    let mut chunks = [
-        [0_u8; SLICER_IN_CHUNK_SIZE],
-        [0_u8; SLICER_IN_CHUNK_SIZE],
-        [0_u8; SLICER_IN_CHUNK_SIZE],
-    ];
+        let mut chunks = [
+            [0_u8; SLICER_IN_CHUNK_SIZE],
+            [0_u8; SLICER_IN_CHUNK_SIZE],
+            [0_u8; SLICER_IN_CHUNK_SIZE],
+        ];
 
-    let mut next_chunk = 0;
-    let residue: &mut [u8] = &mut [0_u8; SLICER_IN_CHUNK_SIZE];
-    let mut residue_len = 0;
+        let mut next_chunk = 0;
+        let residue: &mut [u8] = &mut [0_u8; SLICER_IN_CHUNK_SIZE];
+        let mut residue_len = 0;
 
-    loop {
-        let slices: Vec<&[u8]>;
+        loop {
+            let slices: Vec<&[u8]>;
 
-        let mut chunk_len_toread = SLICER_IN_CHUNK_SIZE;
-        if remaining_file_length < SLICER_IN_CHUNK_SIZE {
-            chunk_len_toread = remaining_file_length;
-        }
-
-        let chunk_len_effective_read: usize;
-
-        (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
-            slicer_processor.get_line_break_handler(),
-            residue,
-            &mut chunks[next_chunk],
-            &mut file,
-            in_chunk_cores,
-            residue_len,
-            chunk_len_toread,
-        );
-
-        remaining_file_length -= chunk_len_effective_read;
-        let bytes_processed_for_slices = slicer_processor.process(slices);
-
-        bytes_processed += bytes_processed_for_slices;
-        bytes_processed += residue_len;
-
-        next_chunk += 1;
-        next_chunk %= in_max_chunks as usize;
-
-        if remaining_file_length == 0 {
-            if 0 != residue_len {
-                let slice: Vec<&[u8]> = vec![&residue[0..residue_len]];
-                let bytes_processed_for_slices = slicer_processor.process(slice);
-                bytes_processed += bytes_processed_for_slices;
+            let mut chunk_len_toread = SLICER_IN_CHUNK_SIZE;
+            if remaining_file_length < SLICER_IN_CHUNK_SIZE {
+                chunk_len_toread = remaining_file_length;
             }
-            break;
+
+            let chunk_len_effective_read: usize;
+
+            (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
+                converter.get_line_break_handler(),
+                residue,
+                &mut chunks[next_chunk],
+                &mut file,
+                in_chunk_cores,
+                residue_len,
+                chunk_len_toread,
+            );
+
+            remaining_file_length -= chunk_len_effective_read;
+            let bytes_processed_for_slices = converter.process(slices);
+
+            bytes_processed += bytes_processed_for_slices;
+            bytes_processed += residue_len;
+
+            next_chunk += 1;
+            next_chunk %= in_max_chunks as usize;
+
+            if remaining_file_length == 0 {
+                if 0 != residue_len {
+                    let slice: Vec<&[u8]> = vec![&residue[0..residue_len]];
+                    let bytes_processed_for_slices = converter.process(slice);
+                    bytes_processed += bytes_processed_for_slices;
+                }
+                break;
+            }
         }
+
+        info!("Bytes processed {}", bytes_processed);
     }
 
-    info!("Bytes processed {}", bytes_processed);
+
 }
 
-///
 fn read_chunk_and_slice<'a>(
     fn_line_break: FnLineBreak,
     residue: &'a mut [u8],
@@ -131,9 +132,9 @@ fn read_chunk_and_slice<'a>(
     chunk_len_toread: usize,
 ) -> (usize, usize, Vec<&'a [u8]>) {
     #[allow(unused_mut)]
-    let mut target_chunk_residue: &mut [u8];
+        let mut target_chunk_residue: &mut [u8];
     #[allow(unused_mut)]
-    let mut target_chunk_read: &mut [u8];
+        let mut target_chunk_read: &mut [u8];
 
     (target_chunk_residue, target_chunk_read) = chunk.split_at_mut(residue_effective_len);
     if 0 != residue_effective_len {
@@ -192,86 +193,6 @@ fn read_chunk_and_slice<'a>(
     }
 }
 
-///
-pub(crate) type FnLineBreak = fn(bytes: &[u8]) -> (bool, usize);
-
-#[allow(dead_code)]
-///
-fn find_last_nlcr(bytes: &[u8]) -> (bool, usize) {
-    if bytes.is_empty() {
-        return (false, 0); // TODO should report err ...
-    }
-
-    let mut p2 = bytes.len() - 1;
-
-    if 0 == p2 {
-        return (false, 0); // hmm
-    }
-
-    loop {
-        if bytes[p2 - 1] == 0x0d && bytes[p2] == 0x0a {
-            return (true, p2 + 1);
-        }
-        if 0 == p2 {
-            return (false, 0); // indicate we didnt find nl
-        }
-
-        p2 -= 1;
-    }
-}
-
-#[allow(dead_code)]
-/// Returns the INDEX in the u8 byte array
-pub(crate) fn find_last_nl(bytes: &[u8]) -> (bool, usize) {
-    if bytes.is_empty() {
-        return (false, 0); // Indicate we didnt found nl.
-    }
-
-    let mut p2 = bytes.len() - 1;
-
-    if 0 == p2 {
-        return (false, 0); // hmm
-    }
-
-    loop {
-        if bytes[p2] == 0x0a {
-            return (true, p2);
-        }
-        if 0 == p2 {
-            return (false, 0); // indicate we didnt find nl
-        }
-        p2 -= 1;
-    }
-}
-
-///
-pub(crate) struct SampleSliceAggregator {
-    pub(crate) file_out: File,
-    pub(crate) fn_line_break: FnLineBreak,
-}
-
-///
-impl SlicerProcessor for SampleSliceAggregator {
-    fn set_line_break_handler(&mut self, fnl: FnLineBreak) {
-        self.fn_line_break = fnl;
-    }
-    fn get_line_break_handler(&self) -> FnLineBreak {
-        self.fn_line_break
-    }
-
-    fn process(&mut self, slices: Vec<&[u8]>) -> usize {
-        let mut bytes_processed: usize = 0;
-
-        slices.par_iter().enumerate().for_each(|(i, n)| println!("index {} {}", i, n.len()));
-        for val in slices {
-            self.file_out.write_all(val).expect("dasd");
-
-            let l = val.len();
-            bytes_processed += l;
-        }
-        bytes_processed
-    }
-}
 
 #[cfg(test)]
-mod tests_slicer {}
+mod tests_slice_min_seek {}

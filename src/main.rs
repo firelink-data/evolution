@@ -30,17 +30,18 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use log::{info, SetLoggerError};
-
-use crate::convert::parse_from_schema;
-use crate::slicer::{find_last_nl, SampleSliceAggregator};
+use crate::slicers::find_last_nl;
+use crate::slicers::slice_min_seek::slice_min_seek;
+use crate::converters::convert_to_arrow::{parse_from_schema, Slice2Arrowchunk};
+use crate::converters::convert_to_self::SampleSliceAggregator;
 
 mod builder;
 mod builder_datatypes;
 mod logging;
 mod mock;
 mod schema;
-mod slicer;
-mod convert;
+mod converters;
+mod slicers;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -140,11 +141,14 @@ fn main() -> Result<(), SetLoggerError> {
                 .open(out_file_name)
                 .expect("aaa");
 
+            let slicer: Box<slice_min_seek> = Box::new(slice_min_seek {  });
+
             let saa: Box<SampleSliceAggregator> = Box::new(SampleSliceAggregator {
                 file_out,
                 fn_line_break: find_last_nl,
             });
-            slicer::slice_and_process(saa, file, n_threads);
+
+            slicer.convert(saa, file, n_threads);
         }
 
         Some(Commands::Convert {

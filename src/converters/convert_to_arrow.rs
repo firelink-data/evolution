@@ -1,17 +1,15 @@
 use std::fs;
 use std::fs::File;
 use std::str;
-use std::io::Write;
 use std::path::PathBuf;
 use str::from_utf8_unchecked;
 use arrow2::array::Array;
-use arrow2::chunk::Chunk;
 use rayon::prelude::*;
 use crate::builder::{ColumnBuilder, MasterBuilder};
-use crate::{builder, slicer};
-use crate::slicer::{find_last_nl, FnLineBreak, SampleSliceAggregator, SlicerProcessor};
-use substring::Substring;
 use std::sync::Arc;
+use crate::converters::{Converter};
+use crate::slicers::{find_last_nl, FnLineBreak, Slicer};
+use crate::slicers::slice_min_seek::{ slice_min_seek};
 
 pub(crate) struct Slice2Arrowchunk<'a> {
     pub(crate) file_out: File,
@@ -19,7 +17,7 @@ pub(crate) struct Slice2Arrowchunk<'a> {
     pub(crate) master_builder: MasterBuilder<'a>
 }
 
-impl SlicerProcessor for Slice2Arrowchunk<'_> {
+impl Converter for Slice2Arrowchunk<'_> {
     fn set_line_break_handler(&mut self, fnl: FnLineBreak) {
         self.fn_line_break = fnl;
     }
@@ -85,7 +83,11 @@ pub(crate) fn parse_from_schema(
         .expect("aaa");
 
 
+    let slicer  = slice_min_seek {};
+
+
     let s2a: Box<Slice2Arrowchunk> = Box::new(Slice2Arrowchunk { file_out: out_file, fn_line_break: find_last_nl, master_builder: masterBuilder });
-    slicer::slice_and_process(s2a, in_file, _n_threads as usize);
+     slicer.convert(s2a, in_file, _n_threads as usize);
 
 }
+
