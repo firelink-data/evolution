@@ -22,11 +22,11 @@
 * SOFTWARE.
 *
 * File created: 2023-11-21
-* Last updated: 2024-02-17
+* Last updated: 2024-02-18
 */
 
 use clap::Parser;
-use log::{error, info};
+use log::{debug, error, info};
 
 mod cli;
 mod converter;
@@ -42,7 +42,7 @@ fn main() {
     let cli = Cli::parse();
 
     match logging::setup_log() {
-        Ok(_) => info!("Logging setup, ok!"),
+        Ok(_) => debug!("Logging setup, ok!"),
         Err(e) => error!("Could not set up env logging: {:?}", e),
     };
 
