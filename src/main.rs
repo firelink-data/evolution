@@ -34,6 +34,7 @@ use crate::slicers::find_last_nl;
 use crate::slicers::slice_min_seek::slice_min_seek;
 use crate::converters::convert_to_arrow::{parse_from_schema, Slice2Arrowchunk};
 use crate::converters::convert_to_self::SampleSliceAggregator;
+use crate::slicers::Slicer;
 
 mod builder;
 mod builder_datatypes;
@@ -141,7 +142,7 @@ fn main() -> Result<(), SetLoggerError> {
                 .open(out_file_name)
                 .expect("aaa");
 
-            let slicer: Box<slice_min_seek> = Box::new(slice_min_seek {  });
+            let mut slicer: Box<slice_min_seek> = Box::new(slice_min_seek {  });
 
             let saa: Box<SampleSliceAggregator> = Box::new(SampleSliceAggregator {
                 file_out,

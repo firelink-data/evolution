@@ -53,11 +53,11 @@ pub(crate) const SLICER_IN_CHUNK_SIZE: usize = 1024 * 1024;
 
 /// Rickard magic!
 
-pub struct slice_min_seek {
+pub(crate) struct slice_min_seek {
 }
 
 impl Slicer for slice_min_seek {
-     fn convert(
+     fn convert(&mut self,
         mut converter: Box<dyn Converter>,
         mut file: File,
         in_chunk_cores: usize,

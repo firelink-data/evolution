@@ -29,7 +29,7 @@ use crate::converters::Converter;
 
 pub mod slice_min_seek;
 pub(crate) trait Slicer {
-    fn convert(converter: Box<dyn Converter>,infile: fs::File, n_threads : usize) ;
+    fn convert(&mut self, converter: Box<dyn Converter>, infile: fs::File, n_threads : usize) ;
 }
 
 pub(crate) type FnLineBreak = fn(bytes: &[u8]) -> (bool, usize);

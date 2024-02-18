@@ -83,7 +83,7 @@ pub(crate) fn parse_from_schema(
         .expect("aaa");
 
 
-    let slicer  = slice_min_seek {};
+    let mut slicer  = slice_min_seek {};
 
 
     let s2a: Box<Slice2Arrowchunk> = Box::new(Slice2Arrowchunk { file_out: out_file, fn_line_break: find_last_nl, master_builder: masterBuilder });
