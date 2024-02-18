@@ -22,11 +22,11 @@
 * SOFTWARE.
 *
 * File created: 2024-02-17
-* Last updated: 2024-02-17
+* Last updated: 2024-02-18
 */
 
 use crate::schema::FixedSchema;
-use log::{info, warn};
+use log::{debug, error, info};
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
@@ -69,49 +69,68 @@ impl Converter {
         todo!()
     }
 
-    /// We can check the total amount of bytes in the file.
-    /// Otherwise, we need to read a size N and split the parsing to
-    /// the worker threads. Not sure how much speed up this will yield though.
+    ///
     fn convert_multithreaded(&mut self) {
-        // let thread_workload = self.distribute_thread_workload();
         let bytes_to_read = self.file.metadata().expect("Could not read file metadata").len() as usize;
         info!("File is {} bytes total!", bytes_to_read);
         let mut remaining_bytes = bytes_to_read;
         let mut bytes_processed: usize = 0;
+        let mut bytes_overlapped: usize = 0;
+
         let mut buff_capacity = DEFAULT_SLICE_BUFFER_LEN;
+        let mut file_reader = BufReader::new(&self.file);
 
         loop {
             // When we have read all the bytes we break.
-            // Should be done at this point.
-            if bytes_to_read <= bytes_processed {
-                break;
-            }
+            // We know about this cus we reach EOF in the BufReader.
+            if bytes_processed >= bytes_to_read { break; }
+
+            debug!("==========================================================");
 
             if remaining_bytes < DEFAULT_SLICE_BUFFER_LEN { buff_capacity = remaining_bytes; };
 
             // Read part of the file and find index of where to slice the file.
             let mut buffer = vec![0u8; buff_capacity];
-            match BufReader::new(&self.file).read_exact(&mut buffer).is_ok() {
+            match file_reader.read_exact(&mut buffer).is_ok() {
                 true => {},
                 false => {
-                    info!("EOF!")
+                    debug!("EOF, this is the last time reading to buffer...");
                 }
             };
 
-            let ln_break_indices: Vec<(usize, usize)> = find_line_breaks(&buffer);
-            let rows: Vec<&[u8]> = vec![];
+            let line_indices: Vec<(usize, usize)> = find_line_breaks(&buffer);
+            let (_, byte_idx_last_line_break) = line_indices.last().expect("The line index list was empty!");
+            let n_bytes_left_after_line_break = buff_capacity - 1 - byte_idx_last_line_break;
 
-            info!("Read this many bytes from file:   {}", buffer.len());
-            info!("Should have read this many bytes: {}", buff_capacity);
-            bytes_processed += buffer.len();
-            remaining_bytes -= bytes_processed;
+            debug!("bytes read:                {}", buff_capacity);
+            debug!("byte idx last ln break:    {}", byte_idx_last_line_break);
+            debug!("bytes left after ln break: {}", n_bytes_left_after_line_break); 
+            debug!("Last byte in buffer:       {:?}", buffer.last().unwrap());
+            debug!("Byte on last ln break:     {}", buffer[*byte_idx_last_line_break]);
+
+            // We want to move the file descriptor cursor back N bytes so
+            // that the next reed starts on a new row! Otherwise we will
+            // miss data, however, this means that we are reading some
+            // of the data multiple times. A little bit of an overlap but that's fine...
+            debug!("we should move cursor back: -{} bytes", n_bytes_left_after_line_break);
+            match file_reader.seek_relative(-(n_bytes_left_after_line_break as i64)).is_ok() {
+                true => {},
+                false => {
+                   error!("WTFFFFFFF we could not move BufReader cursor!"); 
+                }
+            };
+
+            // TODO: This is where we should slice the buffer and send it to workers!
+            let _rows: Vec<&[u8]> = vec![];
+
+            bytes_processed += buff_capacity - n_bytes_left_after_line_break;
+            bytes_overlapped += n_bytes_left_after_line_break;
+            remaining_bytes -= buff_capacity - n_bytes_left_after_line_break;
+
+            debug!("We have processed {} bytes!", bytes_processed);
+            debug!("We have {} bytes left to read!", remaining_bytes);
         }
-    }
-
-    /// This will be a vector containing each read_exact index offset
-    /// for the threads to use when reading the fixed-length file.
-    fn distribute_thread_workload(&self) -> Vec<usize> {
-        todo!()
+        info!("We read {} bytes two times (due to sliding window overlap).", bytes_overlapped);
     }
 }
 
@@ -123,6 +142,8 @@ pub fn find_line_breaks(bytes: &[u8]) -> Vec<(usize, usize)> {
     if bytes.is_empty() { panic!("UUUH, empty bytes slice!, something went wrong..."); }
 
     let n_bytes = bytes.len();
+    // The only way we can have only one byte left to read is if we have read everything
+    // and then this byte will represent EOF, most likely a "\n"?..
     if n_bytes == 0 { panic!("UUUH, bytes is length 1, not good, dont know what to do here..."); }
     
     let mut line_break: Vec<(usize, usize)> = vec![];

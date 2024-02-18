@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2024-02-05
-* Last updated: 2024-02-17
+* Last updated: 2024-02-18
 */
 
 use crate::schema::{self, FixedSchema};
@@ -90,8 +90,9 @@ impl Mocker {
     ///
     fn generate_single_threaded(&self, n_rows: usize) {
         let rowlen: usize = self.schema.row_len();
-        // We need to add 2 bytes for each row because of "\r\n"
-        let buffer_size: usize = DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2;
+        // FOR WINDOWS: We need to add 2 bytes for each row because of "\r\n" (CR-LF)
+        // FOR UNIX: We need to add 1 bytes for each row because of "\n" (LF)
+        let buffer_size: usize = DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 1;
         let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
 
         let mut path: PathBuf = PathBuf::from(randomize_file_name());
@@ -120,7 +121,7 @@ impl Mocker {
                     &mut buffer,
                 );
             }
-            buffer.extend_from_slice("\r\n".as_bytes());
+            buffer.extend_from_slice("\n".as_bytes());
         }
 
         // Write the remaining contents of the buffer to file.
