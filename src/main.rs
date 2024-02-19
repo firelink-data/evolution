@@ -25,15 +25,18 @@
 * Last updated: 2023-12-14
 */
 
+use crate::Slicers::Old;
 use std::fs;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use log::{info, SetLoggerError};
+use crate::builder::MasterBuilder;
 use crate::slicers::find_last_nl;
-use crate::slicers::slice_min_seek::slice_min_seek;
-use crate::converters::convert_to_arrow::{parse_from_schema, Slice2Arrowchunk};
+use crate::slicers::old_slicer::old_slicer;
+use crate::converters::convert_to_arrow::{ Slice2Arrowchunk};
 use crate::converters::convert_to_self::SampleSliceAggregator;
+use crate::converters::Converter;
 use crate::slicers::Slicer;
 
 mod builder;
@@ -61,6 +64,18 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 }
+#[derive(clap::ValueEnum, Clone)]
+enum Converters {
+    Arrow,
+    None,
+}
+
+#[derive(clap::ValueEnum, Clone)]
+enum Slicers {
+    Old,
+    New,
+}
+
 
 #[derive(Subcommand)]
 enum Commands {
@@ -75,24 +90,25 @@ enum Commands {
         #[arg(short, long, value_name = "n-rows", default_value = "100")]
         n_rows: Option<i64>,
     },
-    Slice {
-        /// Sets input file
-        #[arg(short, long, value_name = "FILE")]
-        /// Sets amount of rows to generate.
-        file: Option<PathBuf>,
-    },
     Convert {
         /// Sets schema file
+
+        #[clap(value_enum,value_name = "CONVERTER")]
+        converter: Converters,
+
+        #[clap(value_enum,value_name = "SLICER")]
+        slicer: Slicers,
+
         #[arg(short, long, value_name = "SCHEMA")]
-        schema: Option<PathBuf>,
+        schema: PathBuf,
 
         /// Sets input file
         #[arg(short, long, value_name = "IN-FILE")]
-        in_file: Option<PathBuf>,
+        in_file: PathBuf,
 
         /// Sets input file
         #[arg(short, long, value_name = "OUT-FILE")]
-        out_file: Option<PathBuf>,
+        out_file: PathBuf,
     },
 }
 
@@ -130,39 +146,42 @@ fn main() -> Result<(), SetLoggerError> {
                 n_rows.unwrap() as usize,
             );
         }
-        Some(Commands::Slice { file }) => {
-            let file_name = file.as_ref().expect("REASON").to_path_buf();
-            let file = fs::File::open(&file_name).expect("bbb");
-            let mut out_file_name = file_name.clone().to_owned();
-            out_file_name.set_extension("sliced.txt");
-
-            let file_out = fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(out_file_name)
-                .expect("aaa");
-
-            let mut slicer: Box<slice_min_seek> = Box::new(slice_min_seek {  });
-
-            let saa: Box<SampleSliceAggregator> = Box::new(SampleSliceAggregator {
-                file_out,
-                fn_line_break: find_last_nl,
-            });
-
-            slicer.convert(saa, file, n_threads);
-        }
 
         Some(Commands::Convert {
+            converter,
+            slicer,
             schema,
             in_file,
             out_file
-        }) => {
-            parse_from_schema(
-                schema.as_ref().expect("REASON").to_path_buf(),
-                in_file.as_ref().expect("REASON").to_path_buf(),
-                out_file.as_ref().expect("REASON").to_path_buf(),
-                n_threads as i16,
-            );
+             }) => {
+
+            let _in_file = fs::File::open(&in_file).expect("bbb");
+
+            let _out_file = fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(out_file)
+                .expect("aaa");
+
+            let mut slicer_instance: Box<dyn Slicer> = Box::new(old_slicer {});
+
+            let converter_instance: Box<dyn Converter> = match converter {
+                Converters::Arrow => {
+                    let master_builder = MasterBuilder::builder_factory(schema);
+                    //    let mut slicer  = slice_min_seek {};
+                    let s2a: Box<Slice2Arrowchunk> = Box::new(Slice2Arrowchunk { file_out: _out_file, fn_line_break: find_last_nl, master_builder });
+                    s2a
+                },
+                Converters::None => {
+                    let s3a: Box<SampleSliceAggregator> = Box::new(SampleSliceAggregator { file_out: _out_file, fn_line_break: find_last_nl });
+                    s3a
+                },
+
+            };
+
+
+            slicer_instance.convert(converter_instance, _in_file, n_threads as usize);
+
         }
 
         None => {}

@@ -142,7 +142,7 @@ unsafe impl Send for MasterBuilder<'_> {}
 unsafe impl Sync for MasterBuilder<'_> {}
 
 impl MasterBuilder<'_> {
-    pub fn builder_factory<'a>(schema_path: PathBuf) -> Self {
+    pub fn builder_factory<'a>(schema_path: &PathBuf) -> Self {
 //    builders: &mut Vec<Box<dyn ColumnBuilder>>
         let schema=schema::FixedSchema::from_path(schema_path.into());
         let antal_col=schema.num_columns();
