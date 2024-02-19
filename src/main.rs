@@ -180,7 +180,7 @@ fn main() -> Result<(), SetLoggerError> {
             };
 
 
-            slicer_instance.convert(converter_instance, _in_file, n_threads as usize);
+            slicer_instance.slice_and_convert(converter_instance, _in_file, n_threads as usize);
 
         }
 

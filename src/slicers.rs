@@ -28,8 +28,10 @@ use std::fs;
 use crate::converters::Converter;
 
 pub mod old_slicer;
+mod new_slicer;
+
 pub(crate) trait Slicer {
-    fn convert(&mut self, converter: Box<dyn Converter>, infile: fs::File, n_threads : usize) ;
+    fn slice_and_convert(&mut self, converter: Box<dyn Converter>, infile: fs::File, n_threads : usize) ;
 }
 
 pub(crate) type FnLineBreak = fn(bytes: &[u8]) -> (bool, usize);

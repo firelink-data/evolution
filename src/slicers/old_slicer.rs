@@ -57,10 +57,10 @@ pub(crate) struct old_slicer {
 }
 
 impl Slicer for old_slicer {
-     fn convert(&mut self,
-        mut converter: Box<dyn Converter>,
-        mut file: File,
-        in_chunk_cores: usize,
+     fn slice_and_convert(&mut self,
+                          mut converter: Box<dyn Converter>,
+                          mut file: File,
+                          in_chunk_cores: usize,
     ) {
         let mut bytes_processed = 0;
         let in_max_chunks: i8 = 3;
@@ -149,7 +149,7 @@ fn read_chunk_and_slice<'a>(
     let chunk_len_was_read = read_exact_buffer.len();
 
     //
-    // Below could be separate function called Split !
+    // Below should be separate function called Split !
     //
 
     let mut r: Vec<&[u8]> = vec![];
@@ -195,4 +195,4 @@ fn read_chunk_and_slice<'a>(
 
 
 #[cfg(test)]
-mod tests_slice_min_seek {}
+mod tests_old_slicer {}
