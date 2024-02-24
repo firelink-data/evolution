@@ -67,11 +67,11 @@ impl Slicer for old_slicer {
 
         let mut remaining_file_length = file.metadata().unwrap().len() as usize;
 
-        let mut chunks = [
-            [0_u8; SLICER_IN_CHUNK_SIZE],
-            [0_u8; SLICER_IN_CHUNK_SIZE],
-            [0_u8; SLICER_IN_CHUNK_SIZE],
-        ];
+        let mut chunks:Box<[[u8;SLICER_IN_CHUNK_SIZE];3]>= Box::new([
+             [0_u8; SLICER_IN_CHUNK_SIZE],
+             [0_u8; SLICER_IN_CHUNK_SIZE],
+             [0_u8; SLICER_IN_CHUNK_SIZE],
+         ]);
 
         let mut next_chunk = 0;
         let residue: &mut [u8] = &mut [0_u8; SLICER_IN_CHUNK_SIZE];
