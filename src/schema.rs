@@ -25,8 +25,9 @@
 * Last updated: 2023-12-14
 */
 
-use arrow2::datatypes::{DataType, Field, Schema};
-use arrow2::error::Error;
+use arrow::datatypes::{DataType, Schema};
+use arrow::error::ArrowError;
+use arrow::datatypes::Field;
 use serde::{Deserialize, Serialize};
 
 use std::path::PathBuf;
@@ -105,7 +106,7 @@ impl FixedColumn {
     ///
     /// For a full list of defined datatype mappings, see the documentation
     /// or the file "resources/schema/valid_schema_dtypes.json".
-    pub fn arrow_dtype(&self) -> Result<DataType, Error> {
+    pub fn arrow_dtype(&self) -> Result<DataType, ArrowError> {
         match self.dtype.as_str() {
             "bool" => Ok(DataType::Boolean),
             "boolean" => Ok(DataType::Boolean),
@@ -119,17 +120,17 @@ impl FixedColumn {
             "string" => Ok(DataType::Utf8),
             "lutf8" => Ok(DataType::LargeUtf8),
             "lstring" => Ok(DataType::LargeUtf8),
-            _ => Err(Error::ExternalFormat(format!(
+            _ => Err(ArrowError::ExternalError(Box::from(format!(
                 "Could not parse json schema dtype to arrow datatype, dtype: {:?}",
                 self.dtype,
-            ))),
+            )))),
         }
     }
 }
 
 ///
 impl FixedColumn {
-    pub fn mock<'a>(&self) -> Result<&'a str, Error> {
+    pub fn mock<'a>(&self) -> Result<&'a str, ArrowError> {
         let string = match self.dtype.as_str() {
             "bool" => mock::mock_bool(std::cmp::max(self.length, 0)),
             "boolean" => mock::mock_bool(std::cmp::max(self.length, 0)),
@@ -143,7 +144,7 @@ impl FixedColumn {
             "string" => mock::mock_string(std::cmp::max(self.length, 0)),
             "lutf8" => mock::mock_string(std::cmp::max(self.length, 0)),
             "lstring" => mock::mock_string(std::cmp::max(self.length, 0)),
-            _ => return Err(Error::ExternalFormat("xd".to_string())),
+            _ => return Err(ArrowError::ExternalError(Box::from("xd".to_string()))),
         };
 
         Ok(string)
@@ -234,7 +235,7 @@ impl FixedSchema {
             .map(|c| Field::new(c.name.to_owned(), c.arrow_dtype().unwrap(), c.is_nullable))
             .collect();
 
-        Schema::from(fields)
+        Schema::new(fields)
     }
 
     /// Borrow the stored [`FixedColumn`]s and iterate over them.
