@@ -7,7 +7,8 @@ pub(crate) mod arrow2_converter;
 pub mod arrow2_builder_datatypes;
 pub mod arrow2_builder;
 
-mod arrow_converter;
+pub mod arrow_converter;
+
 
 
 pub(crate) trait Converter {

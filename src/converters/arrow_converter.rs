@@ -25,15 +25,51 @@
 * Last updated: 2023-11-21
 */
 
+use std::fs::File;
 use std::path::PathBuf;
+use std::sync::Arc;
 use arrow2::datatypes::DataType;
 use arrow::array::{ArrayBuilder, Int32Builder, Int64Builder, PrimitiveArray};
 use arrow::datatypes::ArrowNativeType;
-use crate::converters::ColumnBuilder;
+use crate::converters::{ColumnBuilder, Converter};
 use crate::schema;
 use arrow::array::PrimitiveBuilder;
 use arrow::array::types::ArrowPrimitiveType;
+use rayon::iter::IntoParallelRefIterator;
+use crate::converters::arrow2_builder::MasterBuilder;
+use crate::converters::arrow2_converter::Slice2Arrow2chunk;
+use crate::schema::FixedSchema;
+use crate::slicers::FnLineBreak;
 
+pub(crate) struct Slice2Arrow {
+    pub(crate) file_out: File,
+    pub(crate) fn_line_break: FnLineBreak,
+//    pub(crate) schema: FixedSchema,
+    pub(crate) builders: Vec<Box<dyn ArrayBuilder>>
+//    pub(crate) master_builder: MasterBuilder<'a>
+}
+
+impl Converter for Slice2Arrow {
+    fn set_line_break_handler(&mut self, fnl: FnLineBreak) {
+        self.fn_line_break = fnl;
+    }
+    fn get_line_break_handler(&self) -> FnLineBreak {
+        self.fn_line_break
+    }
+
+    fn process(&mut self, slices: Vec<&[u8]>) -> usize {
+        let mut bytes_processed: usize = 0;
+//        let chunks:Chunk<?>;
+//        let arc_masterbuilder = Arc::new(&self.master_builder);
+        // TODO declare a array of chunks[slices.len]  , pass it on to the parse_slice funktion
+//        slices.par_iter().enumerate().for_each(|(i, n)| {
+//            let arc_mastbuilder_clone = Arc::clone(&arc_masterbuilder);
+//            crate::converters::arrow2_converter::parse_slice(i, n, &arc_mastbuilder_clone);
+//        });
+
+        bytes_processed
+    }
+}
 
 pub fn builder_factory<'a>(schema_path: &PathBuf) -> Vec<Box<dyn ArrayBuilder>> {
     let schema=schema::FixedSchema::from_path(schema_path.into());

@@ -35,6 +35,7 @@ use crate::converters::arrow2_builder::MasterBuilder;
 use crate::slicers::find_last_nl;
 use crate::slicers::old_slicer::old_slicer;
 use crate::converters::arrow2_converter::Slice2Arrow2chunk;
+use crate::converters::arrow_converter::Slice2Arrow;
 use crate::converters::self_converter::SampleSliceAggregator;
 use crate::converters::Converter;
 use crate::slicers::Slicer;
@@ -65,6 +66,7 @@ struct Cli {
 #[derive(clap::ValueEnum, Clone)]
 enum Converters {
     Arrow,
+    Arrow2,
     None,
 }
 
@@ -165,11 +167,16 @@ fn main() -> Result<(), SetLoggerError> {
 
             let converter_instance: Box<dyn Converter> = match converter {
                 Converters::Arrow => {
+                    let builders=converters::arrow_converter::builder_factory(schema.into());
+                    let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { file_out: _out_file, fn_line_break: find_last_nl, builders: builders });
+                    s2a
+                },
+                Converters::Arrow2 => {
                     let master_builder = MasterBuilder::builder_factory(schema);
-                    //    let mut slicer  = slice_min_seek {};
                     let s2a: Box<Slice2Arrow2chunk> = Box::new(Slice2Arrow2chunk { file_out: _out_file, fn_line_break: find_last_nl, master_builder });
                     s2a
                 },
+
                 Converters::None => {
                     let s3a: Box<SampleSliceAggregator> = Box::new(SampleSliceAggregator { file_out: _out_file, fn_line_break: find_last_nl });
                     s3a
