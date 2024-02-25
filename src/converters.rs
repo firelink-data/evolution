@@ -1,7 +1,9 @@
 use crate::slicers::FnLineBreak;
 
-pub(crate) mod convert_to_self;
-pub(crate) mod convert_to_arrow;
+pub(crate) mod self_converter;
+pub(crate) mod arrow2_converter;
+pub mod arrow2_builder_datatypes;
+pub mod arrow2_builder;
 
 
 pub(crate) trait Converter {

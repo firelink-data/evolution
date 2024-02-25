@@ -31,16 +31,14 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use log::{info, SetLoggerError};
-use crate::builder::MasterBuilder;
+use crate::converters::arrow2_builder::MasterBuilder;
 use crate::slicers::find_last_nl;
 use crate::slicers::old_slicer::old_slicer;
-use crate::converters::convert_to_arrow::{ Slice2Arrowchunk};
-use crate::converters::convert_to_self::SampleSliceAggregator;
+use crate::converters::arrow2_converter::Slice2Arrow2chunk;
+use crate::converters::self_converter::SampleSliceAggregator;
 use crate::converters::Converter;
 use crate::slicers::Slicer;
 
-mod builder;
-mod builder_datatypes;
 mod logging;
 mod mock;
 mod schema;
@@ -169,7 +167,7 @@ fn main() -> Result<(), SetLoggerError> {
                 Converters::Arrow => {
                     let master_builder = MasterBuilder::builder_factory(schema);
                     //    let mut slicer  = slice_min_seek {};
-                    let s2a: Box<Slice2Arrowchunk> = Box::new(Slice2Arrowchunk { file_out: _out_file, fn_line_break: find_last_nl, master_builder });
+                    let s2a: Box<Slice2Arrow2chunk> = Box::new(Slice2Arrow2chunk { file_out: _out_file, fn_line_break: find_last_nl, master_builder });
                     s2a
                 },
                 Converters::None => {

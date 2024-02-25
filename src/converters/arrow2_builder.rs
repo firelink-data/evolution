@@ -31,7 +31,7 @@ use arrow2::array::MutablePrimitiveArray;
 use arrow2::datatypes::{DataType, Field, Schema};
 use arrow2::io::ipc::write::Record;
 
-use crate::builder_datatypes::ColumnBuilderType;
+use crate::converters::arrow2_builder_datatypes::ColumnBuilderType;
 use crate::schema;
 
 ///
@@ -147,7 +147,7 @@ impl MasterBuilder<'_> {
         let schema=schema::FixedSchema::from_path(schema_path.into());
         let antal_col=schema.num_columns();
 
-        let mut buildersmut: Vec<Box<dyn crate::builder::ColumnBuilder + Send + Sync>>=Vec::with_capacity(antal_col);
+        let mut buildersmut: Vec<Box<dyn crate::converters::arrow2_builder::ColumnBuilder + Send + Sync>>=Vec::with_capacity(antal_col);
 
 
         for val in schema.iter() {

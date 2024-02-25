@@ -28,7 +28,7 @@
 use arrow2::array::MutablePrimitiveArray;
 use arrow2::types::NativeType;
 
-use crate::builder::ColumnBuilder;
+use crate::converters::arrow2_builder::ColumnBuilder;
 
 /*
 

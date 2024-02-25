@@ -5,19 +5,19 @@ use std::path::PathBuf;
 use str::from_utf8_unchecked;
 use arrow2::array::Array;
 use rayon::prelude::*;
-use crate::builder::{ColumnBuilder, MasterBuilder};
+use crate::converters::arrow2_builder::{ColumnBuilder, MasterBuilder};
 use std::sync::Arc;
 use crate::converters::{Converter};
 use crate::slicers::{find_last_nl, FnLineBreak, Slicer};
 use crate::slicers::old_slicer::{old_slicer};
 
-pub(crate) struct Slice2Arrowchunk<'a> {
+pub(crate) struct Slice2Arrow2chunk<'a> {
     pub(crate) file_out: File,
     pub(crate) fn_line_break: FnLineBreak,
     pub(crate) master_builder: MasterBuilder<'a>
 }
 
-impl Converter for Slice2Arrowchunk<'_> {
+impl Converter for Slice2Arrow2chunk<'_> {
     fn set_line_break_handler(&mut self, fnl: FnLineBreak) {
         self.fn_line_break = fnl;
     }
