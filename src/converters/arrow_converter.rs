@@ -50,7 +50,7 @@ pub(crate) struct in_out {
 }
 
 pub(crate) struct ArrowBuffers<'a> {
-    builders: Vec<Box<dyn Sync + Send + 'a + crate::converters::arrow2_builder::ColumnBuilder>>
+    builders: Vec<Box<dyn Sync + Send + 'a + ColumnBuilder>>
 }
 
 

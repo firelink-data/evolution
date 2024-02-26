@@ -4,8 +4,6 @@ use crate::slicers::FnLineBreak;
 
 pub(crate) mod self_converter;
 pub(crate) mod arrow2_converter;
-pub mod arrow2_builder_datatypes;
-pub mod arrow2_builder;
 
 pub mod arrow_converter;
 
