@@ -114,7 +114,7 @@ enum Commands {
 ///
 fn main() -> Result<(), SetLoggerError> {
     logging::setup_log()?;
-    let cli = Cli::parse();
+    let cli:Cli   =  Cli::parse()   ;
 
     let n_logical_threads = num_cpus::get();
     let mut n_threads: usize = cli.n_threads as usize;
@@ -131,8 +131,9 @@ fn main() -> Result<(), SetLoggerError> {
     if multithreaded {
         info!("multithreading enabled ({} logical threads)", n_threads);
     }
+    let c:&'static Option<Commands>=& cli.command ;
 
-    match &cli.command {
+    match c {
         Some(Commands::Mock {
             schema,
             file,
@@ -167,7 +168,7 @@ fn main() -> Result<(), SetLoggerError> {
             let converter_instance: Box<dyn Converter> = match converter {
                 Converters::Arrow => {
                     let in_out_arrow=converters::arrow_converter::in_out_instance_factory (schema.into(),n_threads as i16);
-                    let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { file_out: _out_file, fn_line_break: find_last_nl, in_out_arrow: in_out_arrow });
+                    let s2a: Box<Slice2Arrow>  = Box::new(Slice2Arrow { file_out: _out_file, fn_line_break: find_last_nl, in_out_arrow: in_out_arrow });
                     s2a
                 },
                 Converters::Arrow2 => {
