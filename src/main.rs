@@ -35,7 +35,7 @@ use crate::converters::arrow2_builder::MasterBuilder;
 use crate::slicers::find_last_nl;
 use crate::slicers::old_slicer::old_slicer;
 use crate::converters::arrow2_converter::Slice2Arrow2chunk;
-use crate::converters::arrow_converter::Slice2Arrow;
+use crate::converters::arrow_converter::{in_out, Slice2Arrow};
 use crate::converters::self_converter::SampleSliceAggregator;
 use crate::converters::Converter;
 use crate::slicers::Slicer;
@@ -167,8 +167,9 @@ fn main() -> Result<(), SetLoggerError> {
 
             let converter_instance: Box<dyn Converter> = match converter {
                 Converters::Arrow => {
-                    let builders=converters::arrow_converter::builder_factory(schema.into());
-                    let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { file_out: _out_file, fn_line_break: find_last_nl, builders: builders });
+                    let builders=converters::arrow_converter::in_out_instance_factory (schema.into(),n_threads as i16);
+                    let in_out_arrow:Vec<Box<in_out>>=Vec::new();
+                    let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { file_out: _out_file, fn_line_break: find_last_nl, in_out_arrow: in_out_arrow });
                     s2a
                 },
                 Converters::Arrow2 => {

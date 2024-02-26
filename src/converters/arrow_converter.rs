@@ -27,27 +27,43 @@
 
 use std::fs::File;
 use std::path::PathBuf;
+use std::str::from_utf8_unchecked;
 use std::sync::Arc;
 use arrow2::datatypes::DataType;
-use arrow::array::{ArrayBuilder, Int32Builder, Int64Builder, PrimitiveArray};
+use arrow::array::{ArrayBuilder, BooleanBuilder, Int32Builder, Int64Builder, PrimitiveArray, StringBuilder};
 use arrow::datatypes::ArrowNativeType;
 use crate::converters::{ColumnBuilder, Converter};
 use crate::schema;
 use arrow::array::PrimitiveBuilder;
 use arrow::array::types::ArrowPrimitiveType;
+use arrow::ipc::Utf8Builder;
 use rayon::iter::IntoParallelRefIterator;
 use crate::converters::arrow2_builder::MasterBuilder;
 use crate::converters::arrow2_converter::Slice2Arrow2chunk;
 use crate::schema::FixedSchema;
 use crate::slicers::FnLineBreak;
+use rayon::iter::IndexedParallelIterator;
+use rayon::iter::ParallelIterator;
+use crate::slicers::old_slicer::SLICER_IN_CHUNK_SIZE;
 
 pub(crate) struct Slice2Arrow {
     pub(crate) file_out: File,
     pub(crate) fn_line_break: FnLineBreak,
 //    pub(crate) schema: FixedSchema,
-    pub(crate) builders: Vec<Box<dyn ArrayBuilder>>
-//    pub(crate) master_builder: MasterBuilder<'a>
+    pub(crate) in_out_arrow: Vec<Box<in_out>>
+//    pub(crate) master_arrow: MasterBuilder<'a>
 }
+/// Will this name win the Pulitzer Prize
+pub(crate) struct in_out {
+     in_slice:Box<[u8]>,
+     out_builders:Vec<Box<dyn ArrayBuilder>>
+//    builders: Vec<Box<dyn Sync + Send + 'a + crate::converters::arrow2_builder::ColumnBuilder>>
+}
+
+pub(crate) struct ArrowBuffers<'a> {
+    builders: Vec<Box<dyn Sync + Send + 'a + crate::converters::arrow2_builder::ColumnBuilder>>
+}
+
 
 impl Converter for Slice2Arrow {
     fn set_line_break_handler(&mut self, fnl: FnLineBreak) {
@@ -57,38 +73,75 @@ impl Converter for Slice2Arrow {
         self.fn_line_break
     }
 
-    fn process(&mut self, slices: Vec<&[u8]>) -> usize {
+    fn process<'a>(&mut self, slices: Vec<&[u8]>) -> usize {
         let mut bytes_processed: usize = 0;
+        let io:Vec<in_out> = Vec::new();
+        //let a:&[u8]=    slices.get(0).unwrap();
+        for slice in slices.iter() {
+
+        }
+
+//        let arc_builders = Arc::new(&self.builders);
 //        let chunks:Chunk<?>;
 //        let arc_masterbuilder = Arc::new(&self.master_builder);
         // TODO declare a array of chunks[slices.len]  , pass it on to the parse_slice funktion
 //        slices.par_iter().enumerate().for_each(|(i, n)| {
-//            let arc_mastbuilder_clone = Arc::clone(&arc_masterbuilder);
-//            crate::converters::arrow2_converter::parse_slice(i, n, &arc_mastbuilder_clone);
+//            let arc_builders_clone = Arc::clone(&arc_builders);
+//            parse_slice(i, n, &arc_builders_clone);
 //        });
 
         bytes_processed
     }
 }
 
-pub fn builder_factory<'a>(schema_path: &PathBuf) -> Vec<Box<dyn ArrayBuilder>> {
+
+fn parse_slice(i:usize, n: &&[u8], builders: &Arc<&Vec<Box<dyn ArrayBuilder>>>)  {
+
+
+    println!("index {} {}", i, n.len());
+//    let builders: Vec<Box<dyn ColumnBuilder>>;
+    let start_byte_pos=0;
+
+    // TODO make safe/unsafe configurable
+    let text:&str = unsafe {
+        from_utf8_unchecked(&n)
+    };
+
+    let offset=0;
+}
+/// All threads
+//pub(crate) struct in_out {
+//    in_slice:Box<[u8]>,
+//    out_builders:Vec<Box<dyn ArrayBuilder>>
+//    builders: Vec<Box<dyn Sync + Send + 'a + crate::converters::arrow2_builder::ColumnBuilder>>
+//}
+
+
+pub fn in_out_instance_factory<'a>(schema_path: &PathBuf,instances:i16) -> Vec<Box<in_out>> {
     let schema=schema::FixedSchema::from_path(schema_path.into());
     let antal_col=schema.num_columns();
 
-    let mut buildersmut: Vec<Box<dyn ArrayBuilder >>=Vec::with_capacity(antal_col);
 
+    let mut in_out_instances : Vec<Box<in_out>>=Vec::new();
 
-    for val in schema.iter() {
-        match val.dtype().as_str() {
-            "i32" => buildersmut.push(Box::new(Int32Builder::new() )),
-            "i64" => buildersmut.push(Box::new(Int64Builder::new() )),
+    for i in 1..instances {
+        let mut buildersmut: Vec<Box<dyn ArrayBuilder >>=Vec::with_capacity(antal_col);
+        for val in schema.iter() {
+            match val.dtype().as_str() {
+                "i32" => buildersmut.push(Box::new(Int32Builder::new())),
+                "i64" => buildersmut.push(Box::new(Int64Builder::new())),
+                "boolean" => buildersmut.push(Box::new(BooleanBuilder::new())),
+                "utf8" => buildersmut.push(Box::new(StringBuilder::new())),
 
-            &_ => {}
-        };
+                &_ => {}
+            };
+        }
+        let mut in_out_instance:in_out = in_out { in_slice: Box::new([]), out_builders: buildersmut };
+        in_out_instances.push(Box::new( in_out_instance));
+
     }
 
-    let builders = buildersmut;
-    builders
+    in_out_instances
 }
 
 
