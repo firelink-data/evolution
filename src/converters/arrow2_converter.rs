@@ -22,7 +22,7 @@ pub(crate) struct Slice2Arrow2<'a> {
     pub(crate) master_builder: MasterBuilder<'a>
 }
 
-impl Converter for Slice2Arrow2<'_> {
+impl Converter<'_> for Slice2Arrow2<'_> {
     fn set_line_break_handler(&mut self, fnl: FnLineBreak) {
         self.fn_line_break = fnl;
     }

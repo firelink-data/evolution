@@ -45,7 +45,7 @@ pub(crate) struct Slice2Arrow<'a>  {
 /// Will this name win the Pulitzer Prize
 pub(crate) struct in_out<'a> {
      in_slice:Box<& 'a [u8]>,
-     out_builders:Vec<Box<dyn  ArrayBuilder>>
+     out_builders:Vec<Box<dyn ArrayBuilder>>
 //    builders: Vec<Box<dyn Sync + Send + 'a + crate::converters::arrow2_builder::ColumnBuilder>>
 }
 
@@ -54,7 +54,7 @@ pub(crate) struct in_out<'a> {
 //}
 
 
-impl Converter for Slice2Arrow<'_> {
+impl Converter<'_> for Slice2Arrow<'_> {
     fn set_line_break_handler(&mut self, fnl: FnLineBreak) {
         self.fn_line_break = fnl;
     }
@@ -62,13 +62,14 @@ impl Converter for Slice2Arrow<'_> {
         self.fn_line_break
     }
 
-    fn process<'a>(&mut self, slices: Vec<&[u8]>) -> usize {
+    fn process<'a>(&'a mut self, slices: Vec<&'a[u8]>) -> usize {
         let mut bytes_processed: usize = 0;
-        let io:Vec<in_out> = Vec::new();
 
         let index = 0;
-        for mut in_out in self.in_out_arrow.iter() {
-//        in_out.in_slice= slices.get(1).unwrap();
+        for  in_out in self.in_out_arrow.iter_mut() {
+            let oo:Box<&'a[u8]>=Box::new(slices.get(1).unwrap());
+//            Box<& 'a [u8]>,
+                in_out.in_slice= oo;
 
         }
 //        slices.par_iter().enumerate().for_each(|(i, n)| {
@@ -104,14 +105,14 @@ fn parse_slice(i:usize, n: &&[u8], builders: &Arc<&Vec<Box<dyn ArrayBuilder>>>) 
 }
 
 
-pub fn in_out_instance_factory<'a>(schema_path: &PathBuf,instances:i16) -> Vec<in_out> {
+pub fn in_out_instance_factory<'a>(schema_path: PathBuf, instances:i16) -> Vec<in_out<'a>> {
     let schema=schema::FixedSchema::from_path(schema_path.into());
     let antal_col=schema.num_columns();
 
 
     let mut in_out_instances : Vec<in_out>=Vec::new();
 
-    for i in 1..instances {
+    for i in 1..=instances {
         let mut buildersmut: Vec<Box<dyn ArrayBuilder >>=Vec::with_capacity(antal_col);
         for val in schema.iter() {
             match val.dtype().as_str() {

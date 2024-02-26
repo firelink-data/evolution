@@ -60,7 +60,7 @@ struct Cli {
     debug: u8,
 
     #[command(subcommand)]
-    command: Option<Commands>,
+    command:  Option<Commands>
 }
 #[derive(clap::ValueEnum, Clone)]
 enum Converters {
@@ -114,7 +114,7 @@ enum Commands {
 ///
 fn main() -> Result<(), SetLoggerError> {
     logging::setup_log()?;
-    let cli:Cli   =  Cli::parse()   ;
+    let cli : Cli    =  Cli::parse()   ;
 
     let n_logical_threads = num_cpus::get();
     let mut n_threads: usize = cli.n_threads as usize;
@@ -131,9 +131,13 @@ fn main() -> Result<(), SetLoggerError> {
     if multithreaded {
         info!("multithreading enabled ({} logical threads)", n_threads);
     }
-    let c:&'static Option<Commands>=& cli.command ;
+    let c = &cli.command;
 
-    match c {
+//    let c:&'static Option<Commands>= &cli.command;
+
+//    let c_clone= c.clone();
+
+    match c  {
         Some(Commands::Mock {
             schema,
             file,
@@ -165,21 +169,21 @@ fn main() -> Result<(), SetLoggerError> {
 
             let mut slicer_instance: Box<dyn Slicer> = Box::new(old_slicer {});
 
-            let converter_instance: Box<dyn Converter> = match converter {
+            let converter_instance: Box<dyn Converter >  = match converter {
                 Converters::Arrow => {
-                    let in_out_arrow=converters::arrow_converter::in_out_instance_factory (schema.into(),n_threads as i16);
+                    let in_out_arrow=converters::arrow_converter::in_out_instance_factory ( schema.clone(),n_threads as i16);
                     let s2a: Box<Slice2Arrow>  = Box::new(Slice2Arrow { file_out: _out_file, fn_line_break: find_last_nl, in_out_arrow: in_out_arrow });
                     s2a
                 },
                 Converters::Arrow2 => {
-                    let master_builder = MasterBuilder::builder_factory(schema);
-                    let s2a: Box<Slice2Arrow2> = Box::new(Slice2Arrow2 { file_out: _out_file, fn_line_break: find_last_nl, master_builder });
-                    s2a
+                    let master_builder = MasterBuilder::builder_factory(&schema);
+                    let s3a: Box<Slice2Arrow2> = Box::new(Slice2Arrow2 { file_out: _out_file, fn_line_break: find_last_nl, master_builder });
+                    s3a
                 },
 
                 Converters::None => {
-                    let s3a: Box<SampleSliceAggregator> = Box::new(SampleSliceAggregator { file_out: _out_file, fn_line_break: find_last_nl });
-                    s3a
+                    let s4a: Box<SampleSliceAggregator> = Box::new(SampleSliceAggregator { file_out: _out_file, fn_line_break: find_last_nl });
+                    s4a
                 },
 
             };

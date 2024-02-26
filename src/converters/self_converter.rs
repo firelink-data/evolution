@@ -39,7 +39,7 @@ pub struct SampleSliceAggregator {
     pub(crate) fn_line_break: FnLineBreak,
 }
 
-impl Converter for SampleSliceAggregator {
+impl Converter<'_> for SampleSliceAggregator {
     fn set_line_break_handler(&mut self, fnl: FnLineBreak) {
         self.fn_line_break = fnl;
     }
