@@ -29,22 +29,11 @@ use std::fs::File;
 use std::path::PathBuf;
 use std::str::from_utf8_unchecked;
 use std::sync::Arc;
-use arrow2::datatypes::DataType;
 use arrow::array::{ArrayBuilder, BooleanBuilder, Int32Builder, Int64Builder, PrimitiveArray, StringBuilder};
-use arrow::datatypes::ArrowNativeType;
 use crate::converters::{ColumnBuilder, Converter};
 use crate::schema;
-use arrow::array::PrimitiveBuilder;
-use arrow::array::types::ArrowPrimitiveType;
-use arrow::ipc::Utf8Builder;
-use rayon::iter::IntoParallelRefIterator;
-use crate::converters::arrow2_builder::MasterBuilder;
-use crate::converters::arrow2_converter::Slice2Arrow2chunk;
-use crate::schema::FixedSchema;
 use crate::slicers::FnLineBreak;
 use rayon::iter::IndexedParallelIterator;
-use rayon::iter::ParallelIterator;
-use crate::slicers::old_slicer::SLICER_IN_CHUNK_SIZE;
 
 pub(crate) struct Slice2Arrow {
     pub(crate) file_out: File,

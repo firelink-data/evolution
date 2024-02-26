@@ -11,13 +11,13 @@ use crate::converters::{Converter};
 use crate::slicers::{find_last_nl, FnLineBreak, Slicer};
 use crate::slicers::old_slicer::{old_slicer};
 
-pub(crate) struct Slice2Arrow2chunk<'a> {
+pub(crate) struct Slice2Arrow2<'a> {
     pub(crate) file_out: File,
     pub(crate) fn_line_break: FnLineBreak,
     pub(crate) master_builder: MasterBuilder<'a>
 }
 
-impl Converter for Slice2Arrow2chunk<'_> {
+impl Converter for Slice2Arrow2<'_> {
     fn set_line_break_handler(&mut self, fnl: FnLineBreak) {
         self.fn_line_break = fnl;
     }

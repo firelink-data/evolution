@@ -34,7 +34,7 @@ use log::{info, SetLoggerError};
 use crate::converters::arrow2_builder::MasterBuilder;
 use crate::slicers::find_last_nl;
 use crate::slicers::old_slicer::old_slicer;
-use crate::converters::arrow2_converter::Slice2Arrow2chunk;
+use crate::converters::arrow2_converter::Slice2Arrow2;
 use crate::converters::arrow_converter::{in_out, Slice2Arrow};
 use crate::converters::self_converter::SampleSliceAggregator;
 use crate::converters::Converter;
@@ -174,7 +174,7 @@ fn main() -> Result<(), SetLoggerError> {
                 },
                 Converters::Arrow2 => {
                     let master_builder = MasterBuilder::builder_factory(schema);
-                    let s2a: Box<Slice2Arrow2chunk> = Box::new(Slice2Arrow2chunk { file_out: _out_file, fn_line_break: find_last_nl, master_builder });
+                    let s2a: Box<Slice2Arrow2> = Box::new(Slice2Arrow2 { file_out: _out_file, fn_line_break: find_last_nl, master_builder });
                     s2a
                 },
 
