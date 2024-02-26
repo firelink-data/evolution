@@ -166,8 +166,7 @@ fn main() -> Result<(), SetLoggerError> {
 
             let converter_instance: Box<dyn Converter> = match converter {
                 Converters::Arrow => {
-                    let builders=converters::arrow_converter::in_out_instance_factory (schema.into(),n_threads as i16);
-                    let in_out_arrow:Vec<Box<in_out>>=Vec::new();
+                    let in_out_arrow=converters::arrow_converter::in_out_instance_factory (schema.into(),n_threads as i16);
                     let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { file_out: _out_file, fn_line_break: find_last_nl, in_out_arrow: in_out_arrow });
                     s2a
                 },

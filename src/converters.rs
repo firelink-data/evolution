@@ -1,5 +1,3 @@
-use arrow2::array::MutablePrimitiveArray;
-use arrow2::types::NativeType;
 use crate::slicers::FnLineBreak;
 
 pub(crate) mod self_converter;
