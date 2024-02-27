@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2024-02-17
-* Last updated: 2024-02-18
+* Last updated: 2024-02-27
 */
 
 use crate::schema::FixedSchema;
@@ -85,8 +85,6 @@ impl Converter {
             // We know about this cus we reach EOF in the BufReader.
             if bytes_processed >= bytes_to_read { break; }
 
-            debug!("==========================================================");
-
             if remaining_bytes < DEFAULT_SLICE_BUFFER_LEN { buff_capacity = remaining_bytes; };
 
             // Read part of the file and find index of where to slice the file.
@@ -98,25 +96,18 @@ impl Converter {
                 }
             };
 
-            let line_indices: Vec<(usize, usize)> = find_line_breaks(&buffer);
+            let line_indices: Vec<(usize, usize)> = find_line_breaks_unix(&buffer);
             let (_, byte_idx_last_line_break) = line_indices.last().expect("The line index list was empty!");
             let n_bytes_left_after_line_break = buff_capacity - 1 - byte_idx_last_line_break;
-
-            debug!("bytes read:                {}", buff_capacity);
-            debug!("byte idx last ln break:    {}", byte_idx_last_line_break);
-            debug!("bytes left after ln break: {}", n_bytes_left_after_line_break); 
-            debug!("Last byte in buffer:       {:?}", buffer.last().unwrap());
-            debug!("Byte on last ln break:     {}", buffer[*byte_idx_last_line_break]);
 
             // We want to move the file descriptor cursor back N bytes so
             // that the next reed starts on a new row! Otherwise we will
             // miss data, however, this means that we are reading some
             // of the data multiple times. A little bit of an overlap but that's fine...
-            debug!("we should move cursor back: -{} bytes", n_bytes_left_after_line_break);
             match file_reader.seek_relative(-(n_bytes_left_after_line_break as i64)).is_ok() {
                 true => {},
                 false => {
-                   error!("WTFFFFFFF we could not move BufReader cursor!"); 
+                   error!("Could not move BufReader cursor back!"); 
                 }
             };
 
@@ -134,11 +125,29 @@ impl Converter {
     }
 }
 
+pub fn find_line_breaks_windows(bytes: &[u8]) -> Vec<(usize, usize)> {
+    if bytes.is_empty() { panic!("Empty bytes slice!, something went wrong..."); }
+
+    let n_bytes = bytes.len();
+    if n_bytes == 0 { panic!("No bytes in buffer!, something went wrong..."); }
+
+    let mut line_breaks: Vec<(usize, usize)> = vec![];
+    let mut last_idx: usize = 0;
+    for idx in 1..n_bytes {
+        if bytes[idx - 1] == 0x0d && bytes[idx] == 0x0a {
+            line_breaks.push((last_idx, idx));
+            last_idx = idx;
+        }
+    }
+
+    line_breaks
+}
+
 /// This only works on Unix systems!
 /// 0x0a is "\n", also known as LF (line feed)
 ///
 /// On windows this should be to look for 0x0d && 0x0a, "\r\n", CR+LF
-pub fn find_line_breaks(bytes: &[u8]) -> Vec<(usize, usize)> {
+pub fn find_line_breaks_unix(bytes: &[u8]) -> Vec<(usize, usize)> {
     if bytes.is_empty() { panic!("UUUH, empty bytes slice!, something went wrong..."); }
 
     let n_bytes = bytes.len();
@@ -146,14 +155,14 @@ pub fn find_line_breaks(bytes: &[u8]) -> Vec<(usize, usize)> {
     // and then this byte will represent EOF, most likely a "\n"?..
     if n_bytes == 0 { panic!("UUUH, bytes is length 1, not good, dont know what to do here..."); }
     
-    let mut line_break: Vec<(usize, usize)> = vec![];
+    let mut line_breaks: Vec<(usize, usize)> = vec![];
     let mut last_idx: usize = 0;
     for idx in 0..n_bytes {
         if bytes[idx] == 0x0a {
-            line_break.push((last_idx, idx));
+            line_breaks.push((last_idx, idx));
             last_idx = idx;
         }
     }
 
-    line_break
+    line_breaks
 }
