@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2024-02-05
-* Last updated: 2024-02-17
+* Last updated: 2024-02-27
 */
 
 use clap::{value_parser, ArgAction, Parser, Subcommand};
@@ -137,6 +137,11 @@ impl Cli {
         if multithreaded {
             info!("Multithreading enabled!")
         };
+
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(n_threads)
+            .build_global()
+            .expect("Could not create Rayon thread pool!");
 
         match &self.command {
             Commands::Convert {
