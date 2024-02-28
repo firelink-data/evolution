@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2023-11-21
-* Last updated: 2024-02-17
+* Last updated: 2024-02-28
 */
 
 use chrono::Local;
@@ -66,7 +66,7 @@ impl Logger {
     ///
     fn trace(&self, record: &Record) {
         println!(
-            "{}  {}\t {}",
+            "[{}]  {}\t {}",
             Local::now().format("%Y-%m-%d %H:%M:%S"),
             record.level(),
             record.args(),
@@ -76,7 +76,7 @@ impl Logger {
     ///
     fn debug(&self, record: &Record) {
         println!(
-            "{}  {}\t {}",
+            "[{}]  {}\t {}",
             Local::now().format("%Y-%m-%d %H:%M:%S"),
             record.level().as_str().blue(),
             record.args(),
@@ -86,7 +86,7 @@ impl Logger {
     ///
     fn info(&self, record: &Record) {
         println!(
-            "{}  {}\t {}",
+            "[{}]  {}\t {}",
             Local::now().format("%Y-%m-%d %H:%M:%S"),
             record.level().as_str().green(),
             record.args(),
@@ -96,7 +96,7 @@ impl Logger {
     ///
     fn warn(&self, record: &Record) {
         println!(
-            "{}  {}\t {}",
+            "[{}]  {}\t {}",
             Local::now().format("%Y-%m-%d %H:%M:%S"),
             record.level().as_str().yellow(),
             record.args(),
@@ -106,7 +106,7 @@ impl Logger {
     ///
     fn error(&self, record: &Record) {
         println!(
-            "{}  {}\t {}",
+            "[{}]  {}\t {}",
             Local::now()
                 .format("%Y-%m-%d %H:%M:%S")
                 .to_string()
