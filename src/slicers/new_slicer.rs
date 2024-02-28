@@ -42,7 +42,7 @@ pub struct new_slicer {
 }
 
 ///
-impl Slicer for new_slicer {
+impl Slicer<'_> for new_slicer {
 
     fn slice_and_convert(&mut self,
                          mut converter: Box<dyn Converter>,

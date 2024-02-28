@@ -167,17 +167,17 @@ fn main() -> Result<(), SetLoggerError> {
                 .open(out_file)
                 .expect("aaa");
 
-            let mut slicer_instance: Box<dyn Slicer> = Box::new(old_slicer {});
+            let mut slicer_instance: Box<dyn 'static + Slicer> = Box::new(old_slicer {});
 
-            let converter_instance: Box<dyn Converter >  = match converter {
+            let converter_instance: Box<dyn 'static + Converter >  = match converter {
                 Converters::Arrow => {
                     let in_out_arrow=converters::arrow_converter::in_out_instance_factory ( schema.clone(),n_threads as i16);
-                    let s2a: Box<Slice2Arrow>  = Box::new(Slice2Arrow { file_out: _out_file, fn_line_break: find_last_nl, in_out_arrow: in_out_arrow });
+                    let s2a: Box<Slice2Arrow<'static>>  = Box::new(Slice2Arrow { file_out: _out_file, fn_line_break: find_last_nl, in_out_arrow: in_out_arrow });
                     s2a
                 },
                 Converters::Arrow2 => {
                     let master_builder = MasterBuilder::builder_factory(&schema);
-                    let s3a: Box<Slice2Arrow2> = Box::new(Slice2Arrow2 { file_out: _out_file, fn_line_break: find_last_nl, master_builder });
+                    let s3a: Box<Slice2Arrow2<'static>> = Box::new(Slice2Arrow2 { file_out: _out_file, fn_line_break: find_last_nl, master_builder });
                     s3a
                 },
 

@@ -54,7 +54,7 @@ pub(crate) struct in_out<'a> {
 //}
 
 
-impl Converter<'_> for Slice2Arrow<'_> {
+impl<'a> Converter<'a> for Slice2Arrow<'a> {
     fn set_line_break_handler(&mut self, fnl: FnLineBreak) {
         self.fn_line_break = fnl;
     }
@@ -62,14 +62,14 @@ impl Converter<'_> for Slice2Arrow<'_> {
         self.fn_line_break
     }
 
-    fn process<'a>(&'a mut self, slices: Vec<&'a[u8]>) -> usize {
+    fn process(&'a mut self, slices: Vec<&'a[u8]>) -> usize {
         let mut bytes_processed: usize = 0;
 
         let index = 0;
         for  in_out in self.in_out_arrow.iter_mut() {
             let oo:Box<&'a[u8]>=Box::new(slices.get(1).unwrap());
 //            Box<& 'a [u8]>,
-                in_out.in_slice= oo;
+//                in_out.in_slice= oo;
 
         }
 //        slices.par_iter().enumerate().for_each(|(i, n)| {

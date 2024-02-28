@@ -56,9 +56,9 @@ pub(crate) const SLICER_IN_CHUNK_SIZE: usize = 1024 * 1024;
 pub(crate) struct old_slicer {
 }
 
-impl Slicer for old_slicer {
-     fn slice_and_convert(&mut self,
-                          mut converter: Box<dyn Converter>,
+impl<'a> Slicer<'a> for old_slicer {
+     fn slice_and_convert(&'a mut self,
+                          mut converter:  Box<dyn  Converter>,
                           mut file: File,
                           in_chunk_cores: usize,
     ) {
@@ -74,8 +74,9 @@ impl Slicer for old_slicer {
          ]);
 
         let mut next_chunk = 0;
-        let residue: &mut [u8] = &mut [0_u8; SLICER_IN_CHUNK_SIZE];
-        let mut residue_len = 0;
+        let mut residue:Box <[u8;SLICER_IN_CHUNK_SIZE]> =Box::new( [0_u8; SLICER_IN_CHUNK_SIZE]);
+         let mut residue_len = 0;
+         let  linebreak= converter.get_line_break_handler();
 
         loop {
             let slices: Vec<&[u8]>;
@@ -86,10 +87,11 @@ impl Slicer for old_slicer {
             }
 
             let chunk_len_effective_read: usize;
+// linebreak
 
             (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
-                converter.get_line_break_handler(),
-                residue,
+                linebreak,
+                &mut residue.as_slice(),
                 &mut chunks[next_chunk],
                 &mut file,
                 in_chunk_cores,
@@ -123,7 +125,7 @@ impl Slicer for old_slicer {
 }
 
 fn read_chunk_and_slice<'a>(
-    fn_line_break: FnLineBreak,
+    fn_line_break:FnLineBreak,
     residue: &'a mut [u8],
     chunk: &'a mut [u8],
     file: &mut File,

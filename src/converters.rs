@@ -8,8 +8,8 @@ pub mod arrow_converter;
 
 
 pub(crate) trait Converter<'a> {
-    fn set_line_break_handler(&mut self, fn_line_break: FnLineBreak);
-    fn get_line_break_handler(&self) -> FnLineBreak;
+    fn set_line_break_handler(&'a mut self, fn_line_break: FnLineBreak);
+    fn get_line_break_handler(&'a self) -> FnLineBreak;
 
     fn process(&'a mut self, slices: Vec<&'a[u8]>) -> usize;
 }
