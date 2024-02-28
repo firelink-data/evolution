@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2024-02-17
-* Last updated: 2024-02-27
+* Last updated: 2024-02-28
 */
 
 use crate::schema::FixedSchema;
@@ -123,42 +123,51 @@ impl Converter {
 
             let mut slices: Vec<&[u8]> = Vec::with_capacity(self.n_threads - 1);
 
-            let thread_workload: Vec<(usize, usize)> = self.distribute_worker_thread_workload(&line_indices);
-            for (lidx, ridx) in thread_workload.iter() {
-                slices.push(&buffer[*lidx..*ridx]);
+            let thread_workloads: Vec<&[usize]> = self.distribute_worker_thread_workloads(&line_indices);
+            debug!("Thread workload: {:?}", thread_workloads);
+            for range in thread_workloads.iter() {
+                slices.push(&buffer[range[0]..range[range.len() - 1]]);
             }
 
             spawn_convert_threads(
                 &slices,
+                &thread_workloads,
                 self.schema.to_owned(),
             );
         }
         info!("We read {} bytes two times (due to sliding window overlap).", bytes_overlapped);
     }
 
-    fn distribute_worker_thread_workload(&self, line_indices: &Vec<usize>) -> Vec<(usize, usize)> {
-        let n_rows_per_thread: usize = line_indices.len() / (self.n_threads - 1);
-        let remainder: usize = line_indices.len() % (self.n_threads - 1);
+    fn distribute_worker_thread_workloads(&self, line_indices: &Vec<usize>) -> Vec<&[usize]> {
+        let n_line_indices: usize = line_indices.len();
+        let n_rows_per_thread: usize = n_line_indices / (self.n_threads - 1);
 
-        let mut workload: Vec<(usize, usize)> = Vec::with_capacity(self.n_threads);
-        let mut last_idx: usize = 0;
-        for _ in 0..self.n_threads - 1 {
-            workload.push((last_idx, line_indices[n_rows_per_thread + last_idx]));
-            last_idx = n_rows_per_thread + last_idx;
+        let remainder: usize = line_indices.len() % (self.n_threads - 1);
+        debug!("n rows per thread: {:?}", n_rows_per_thread);
+        debug!("Last thread will get {} extra bytes to process.", remainder);
+
+        let mut workload: Vec<&[usize]> = Vec::with_capacity(self.n_threads);
+        let mut prev_idx: usize = 0;
+        for idx in 1..self.n_threads - 1 {
+            let next_idx = line_indices[n_rows_per_thread * idx];
+            workload.push(&line_indices[prev_idx..n_rows_per_thread * idx]);
+            // If this is a window system it should add 2 instead, because of CR+LF!
+            prev_idx = next_idx + 1;
         }
 
-        workload.push((last_idx, last_idx + n_rows_per_thread + remainder));
+        workload.push(&line_indices[prev_idx..n_line_indices - 1]);
         workload
     }
 }
 
 pub fn spawn_convert_threads(
     slices: &Vec<&[u8]>,
+    thread_workloads: &Vec<&[usize]>,
     schema: FixedSchema,
 ) {
     let (sender, receiver) = channel::bounded(DEFAULT_SLICER_THREAD_CHANNEL_CAPACITY);
 
-    slices.into_par_iter().enumerate().for_each_with(&sender,|s, (t, slice)| worker_thread_convert(t, *slice, &schema, s));
+    slices.into_par_iter().enumerate().for_each_with(&sender,|s, (t, slice)| worker_thread_convert(t, *slice, thread_workloads[t], &schema, s));
 
     drop(sender);
     master_thread_convert(&receiver);
@@ -183,10 +192,21 @@ pub fn master_thread_convert(
 pub fn worker_thread_convert(
     thread: usize,
     slice: &[u8],
+    line_breaks: &[usize],
     schema: &FixedSchema,
     sender: &channel::Sender<Vec<u8>>,
 ) {
-    // TODO: implement converting...
+    info!("Thread {} converting new slice...", thread);
+    let mut columns: Vec<Vec<&str>> = Vec::with_capacity(schema.num_columns());
+    let mut prev_idx: usize = 0;
+    for line_break_idx in line_breaks.into_iter() {
+        let line: Vec<char> = std::str::from_utf8(&slice[prev_idx..*line_break_idx]).unwrap().chars().collect();
+        for (col_idx, (col_offset, col_len)) in schema.column_offsets().iter().zip(schema.column_lengths()).enumerate() {
+            columns[col_idx].push(line[col_offset..col_offset+col_len]);
+        }
+        prev_idx = *line_break_idx;
+    }
+
     let _ = sender.send(vec![0u8;10]);
 }
 
@@ -206,7 +226,7 @@ pub fn find_line_breaks_windows(bytes: &[u8]) -> Vec<(usize, usize)> {
     let mut last_idx: usize = 0;
     for idx in 1..n_bytes {
         if bytes[idx - 1] == 0x0d && bytes[idx] == 0x0a {
-            line_breaks.push((last_idx, idx - 1));
+            line_breaks.push((last_idx, idx));
             last_idx = idx;
         }
     }
