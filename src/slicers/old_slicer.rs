@@ -31,7 +31,7 @@ use std::io::{BufReader, Read, Write};
 use rayon::prelude::*;
 use log::info;
 use crate::converters::Converter;
-use crate::slicers::{FnLineBreak, Slicer};
+use crate::slicers::{find_last_nl, FnLineBreak, Slicer};
 
 /**
 GOAL(s)
@@ -56,9 +56,9 @@ pub(crate) const SLICER_IN_CHUNK_SIZE: usize = 1024 * 1024;
 pub(crate) struct old_slicer {
 }
 
-impl<'a> Slicer<'a> for old_slicer {
-     fn slice_and_convert(&'a mut self,
-                          mut converter:  Box<dyn  Converter>,
+impl Slicer for old_slicer {
+     fn slice_and_convert(& mut self,
+                           mut converter: Box<dyn Converter>,
                           mut file: File,
                           in_chunk_cores: usize,
     ) {
@@ -74,12 +74,11 @@ impl<'a> Slicer<'a> for old_slicer {
          ]);
 
         let mut next_chunk = 0;
-        let mut residue:Box <[u8;SLICER_IN_CHUNK_SIZE]> =Box::new( [0_u8; SLICER_IN_CHUNK_SIZE]);
-         let mut residue_len = 0;
-         let  linebreak= converter.get_line_break_handler();
+        let mut residue: Box< [[u8;SLICER_IN_CHUNK_SIZE]]> = Box::new ( [[0_u8; SLICER_IN_CHUNK_SIZE],[0_u8; SLICER_IN_CHUNK_SIZE],[0_u8; SLICER_IN_CHUNK_SIZE]],);
+        let mut residue_len = 0;
 
         loop {
-            let slices: Vec<&[u8]>;
+            let slices: Vec<& [u8]>;
 
             let mut chunk_len_toread = SLICER_IN_CHUNK_SIZE;
             if remaining_file_length < SLICER_IN_CHUNK_SIZE {
@@ -87,12 +86,11 @@ impl<'a> Slicer<'a> for old_slicer {
             }
 
             let chunk_len_effective_read: usize;
-// linebreak
 
             (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
-                linebreak,
-                &mut residue.as_slice(),
-                &mut chunks[next_chunk],
+                find_last_nl,
+                & mut residue[next_chunk],
+                & mut chunks[next_chunk],
                 &mut file,
                 in_chunk_cores,
                 residue_len,
@@ -101,6 +99,7 @@ impl<'a> Slicer<'a> for old_slicer {
 
             remaining_file_length -= chunk_len_effective_read;
             let bytes_processed_for_slices = converter.process(slices);
+            let bytes_processed_for_slices =0;
 
             bytes_processed += bytes_processed_for_slices;
             bytes_processed += residue_len;
@@ -110,7 +109,7 @@ impl<'a> Slicer<'a> for old_slicer {
 
             if remaining_file_length == 0 {
                 if 0 != residue_len {
-                    let slice: Vec<&[u8]> = vec![&residue[0..residue_len]];
+                    let slice: Vec<& [u8]> = vec![&residue[0][0..residue_len]];
                     let bytes_processed_for_slices = converter.process(slice);
                     bytes_processed += bytes_processed_for_slices;
                 }
@@ -125,14 +124,14 @@ impl<'a> Slicer<'a> for old_slicer {
 }
 
 fn read_chunk_and_slice<'a>(
-    fn_line_break:FnLineBreak,
-    residue: &'a mut [u8],
+    fn_line_break: fn(&'a [u8]) -> (bool, usize),
+    residue: & mut [u8],
     chunk: &'a mut [u8],
     file: &mut File,
     chunk_cores: usize,
     residue_effective_len: usize,
     chunk_len_toread: usize,
-) -> (usize, usize, Vec<&'a [u8]>) {
+) -> (usize, usize, Vec<&'a[u8]>) {
     #[allow(unused_mut)]
         let mut target_chunk_residue: &mut [u8];
     #[allow(unused_mut)]

@@ -34,20 +34,20 @@ use std::io::{Write};
 use rayon::prelude::*;
 
 
-pub struct SampleSliceAggregator {
+pub struct SampleSliceAggregator<'a> {
     pub(crate) file_out: File,
-    pub(crate) fn_line_break: FnLineBreak,
+    pub(crate) fn_line_break: FnLineBreak<'a>,
 }
 
-impl Converter<'_> for SampleSliceAggregator {
-    fn set_line_break_handler(&mut self, fnl: FnLineBreak) {
+impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
+    fn set_line_break_handler(&'a mut self, fnl: FnLineBreak<'a>) {
         self.fn_line_break = fnl;
     }
-    fn get_line_break_handler(&self) -> FnLineBreak {
+    fn get_line_break_handler(&'a self) -> FnLineBreak<'a> {
         self.fn_line_break
     }
 
-    fn process(&mut self, slices: Vec<&[u8]>) -> usize {
+    fn process(&mut self, slices: Vec<& [u8]>) -> usize {
         let mut bytes_processed: usize = 0;
 
         slices.par_iter().enumerate().for_each(|(i, n)| println!("index {} {}", i, n.len()));

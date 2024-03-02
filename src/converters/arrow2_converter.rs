@@ -18,22 +18,22 @@ use crate::slicers::{find_last_nl, FnLineBreak, Slicer};
 
 pub(crate) struct Slice2Arrow2<'a> {
     pub(crate) file_out: File,
-    pub(crate) fn_line_break: FnLineBreak,
+    pub(crate) fn_line_break: FnLineBreak<'a>,
     pub(crate) master_builder: MasterBuilder<'a>
 }
 
-impl Converter<'_> for Slice2Arrow2<'_> {
-    fn set_line_break_handler(&mut self, fnl: FnLineBreak) {
+impl<'a> Converter<'a> for Slice2Arrow2<'a> {
+    fn set_line_break_handler(&'a mut self, fnl: FnLineBreak<'a>) {
         self.fn_line_break = fnl;
     }
-    fn get_line_break_handler(&self) -> FnLineBreak {
+    fn get_line_break_handler(&'a self) -> FnLineBreak<'a> {
         self.fn_line_break
     }
 
-    fn process(&mut self, slices: Vec<&[u8]>) -> usize {
+    fn process(& mut self, slices: Vec<& [u8]>) -> usize {
         let mut bytes_processed: usize = 0;
 //        let chunks:Chunk<?>;
-        let arc_masterbuilder = Arc::new(&self.master_builder);
+        let arc_masterbuilder = Arc::new(& self.master_builder);
         // TODO declare a array of chunks[slices.len]  , pass it on to the parse_slice funktion
         slices.par_iter().enumerate().for_each(|(i, n)| {
             let arc_mastbuilder_clone = Arc::clone(&arc_masterbuilder);
@@ -228,7 +228,7 @@ unsafe impl Send for MasterBuilder<'_> {}
 unsafe impl Sync for MasterBuilder<'_> {}
 
 impl MasterBuilder<'_> {
-    pub fn builder_factory<'a>(schema_path: &PathBuf) -> Self {
+    pub fn builder_factory<'a>(schema_path: PathBuf) -> Self {
 //    builders: &mut Vec<Box<dyn ColumnBuilder>>
         let schema=schema::FixedSchema::from_path(schema_path.into());
         let antal_col=schema.num_columns();
