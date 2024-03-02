@@ -34,7 +34,7 @@ use log::{info, SetLoggerError};
 use crate::slicers::find_last_nl;
 use crate::slicers::old_slicer::old_slicer;
 use crate::converters::arrow2_converter::{MasterBuilder, Slice2Arrow2};
-use crate::converters::arrow_converter::{in_out, Slice2Arrow};
+use crate::converters::arrow_converter::{InOut, Slice2Arrow};
 use crate::converters::self_converter::SampleSliceAggregator;
 use crate::converters::Converter;
 use crate::slicers::Slicer;
