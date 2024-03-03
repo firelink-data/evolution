@@ -30,7 +30,7 @@ impl<'a> Converter<'a> for Slice2Arrow2<'a> {
         self.fn_line_break
     }
 
-    fn process(& mut self, slices: Vec<& [u8]>) -> usize {
+    fn process<'b: 'a>(&'a  mut self, slices: Vec<&'b [u8]>) -> usize {
         let mut bytes_processed: usize = 0;
 //        let chunks:Chunk<?>;
         let arc_masterbuilder = Arc::new(& self.master_builder);

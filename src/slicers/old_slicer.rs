@@ -56,9 +56,14 @@ pub(crate) const SLICER_IN_CHUNK_SIZE: usize = 1024 * 1024;
 pub(crate) struct old_slicer {
 }
 
+fn ceil_amount_of_chunks (a:i64,b:i64)->usize {
+
+    (a / b + (a % b).signum() ) as usize
+}
+
 impl Slicer for old_slicer {
-     fn slice_and_convert(& mut self,
-                           mut converter: Box<dyn Converter>,
+     fn slice_and_convert<'a>(& mut self,
+                            mut converter: Box<dyn 'a+Converter<'a>>,
                           mut file: File,
                           in_chunk_cores: usize,
     ) {
@@ -72,13 +77,22 @@ impl Slicer for old_slicer {
              [0_u8; SLICER_IN_CHUNK_SIZE],
              [0_u8; SLICER_IN_CHUNK_SIZE],
          ]);
+         let mut array_of_chunks:[&mut [u8; SLICER_IN_CHUNK_SIZE];100] =todo!();
+
+        ;
+        let mut next_chunk =0 as usize;
+         for n in 1..ceil_amount_of_chunks(remaining_file_length as i64,SLICER_IN_CHUNK_SIZE as i64) {
+             array_of_chunks[n]= &mut chunks[next_chunk];
+             next_chunk %= in_max_chunks as usize
+         }
 
         let mut next_chunk = 0;
         let mut residue: Box< [[u8;SLICER_IN_CHUNK_SIZE]]> = Box::new ( [[0_u8; SLICER_IN_CHUNK_SIZE],[0_u8; SLICER_IN_CHUNK_SIZE],[0_u8; SLICER_IN_CHUNK_SIZE]],);
         let mut residue_len = 0;
+         let mut slices: Vec<&'a [u8]>;
 
-        loop {
-            let slices: Vec<& [u8]>;
+         for the_chunk in array_of_chunks.iter()
+         {
 
             let mut chunk_len_toread = SLICER_IN_CHUNK_SIZE;
             if remaining_file_length < SLICER_IN_CHUNK_SIZE {
@@ -90,7 +104,7 @@ impl Slicer for old_slicer {
             (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
                 find_last_nl,
                 & mut residue[next_chunk],
-                & mut chunks[next_chunk],
+                *the_chunk, //& mut chunks[next_chunk],
                 &mut file,
                 in_chunk_cores,
                 residue_len,
@@ -115,6 +129,7 @@ impl Slicer for old_slicer {
                 }
                 break;
             }
+
         }
 
         info!("Bytes processed {}", bytes_processed);

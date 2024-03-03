@@ -47,7 +47,7 @@ pub(crate) struct Slice2Arrow<'a> {
 }
 /// Will this name win the Pulitzer Prize
  pub struct InOut<'a> {
-     in_slice:Box<&'a[u8]>,
+    in_slice: &'a  [u8],
      out_builders:Vec<Box<dyn Send +ArrayBuilder>>
 //    builders: Vec<Box<dyn Sync + Send + 'a + crate::converters::arrow2_builder::ColumnBuilder>>
 }
@@ -77,9 +77,13 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         self.fn_line_break
     }
 
-    fn process(& mut self, slices: Vec<& [u8]>) -> usize {
+    fn process<'b: 'a>(&'a mut  self,  slices: Vec<&'b [u8]>) -> usize {
         let mut bytes_processed: usize = 0;
-        let io:Vec<& [InOut]> = Vec::new();
+        let mut i = 0;
+        for aa in & mut self.in_out_arrow {
+            aa.in_slice=slices[i];
+        }
+
 
         self.in_out_arrow.par_iter().enumerate().for_each(|(i, n)| {
 //            let arc_builders_clone = Arc::clone(&arc_builders);
@@ -146,7 +150,7 @@ pub fn in_out_instance_factory<'a>(schema_path: PathBuf,instances:i16) -> Vec<In
                 &_ => {}
             };
         }
-        let mut in_out_instance: InOut = InOut { in_slice: Box::new(&[]), out_builders: buildersmut } ;
+        let mut in_out_instance: InOut = InOut { in_slice: &mut[], out_builders: buildersmut } ;
         in_out_instances.push( in_out_instance);
 
     }

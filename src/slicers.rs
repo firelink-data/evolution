@@ -28,7 +28,7 @@ use std::fs;
 use crate::converters::Converter;
 
 pub mod old_slicer;
-mod new_slicer;
+//pub mod new_slicer;
 
 pub(crate) trait Slicer {
     fn slice_and_convert(& mut self, converter: Box<dyn  Converter>, infile: fs::File, n_threads : usize) ;
