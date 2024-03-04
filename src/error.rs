@@ -21,33 +21,9 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 * SOFTWARE.
 *
-* File created: 2023-11-21
-* Last updated: 2024-02-28
+* File created: 2024-02-05
+* Last updated: 2024-02-05
 */
 
-use clap::Parser;
-use log::{debug, error, info};
-
-mod cli;
-mod error;
-mod logger;
-mod mocker;
-mod schema;
-use cli::Cli;
-mod converters;
-mod slicers;
-///
-fn main() {
-    let cli = Cli::parse();
-
-    match logger::setup_log() {
-        Ok(_) => debug!("Logging setup, ok!"),
-        Err(e) => error!("Could not set up env logging: {:?}", e),
-    };
-/*
-    match cli.run() {
-        Ok(_) => info!("All done! Bye."),
-        Err(e) => error!("Something went wrong during execution: {:?}", e),
-    }
- */
-}
+#[derive(Debug)]
+pub struct ExecutionError {}

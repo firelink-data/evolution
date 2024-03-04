@@ -109,7 +109,8 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 }
 
 
-fn parse_slice(i:usize, n: &&[u8], builders: &Arc<&Vec<Box<dyn ArrayBuilder>>>)  {
+fn
+parse_slice(i:usize, n: &&[u8], builders: &Arc<&Vec<Box<dyn ArrayBuilder>>>)  {
 
 
     println!("index {} {}", i, n.len());

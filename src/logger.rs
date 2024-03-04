@@ -1,7 +1,7 @@
 /*
 * MIT License
 *
-* Copyright (c) 2023 Firelink Data
+* Copyright (c) 2024 Firelink Data
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2023-11-21
-* Last updated: 2023-12-01
+* Last updated: 2024-02-28
 */
 
 use chrono::Local;
@@ -36,10 +36,11 @@ pub(crate) const DEFAULT_LOG_LEVEL: Level = Level::Warn;
 ///
 fn get_log_level_from_env() -> Level {
     match env::var("RUST_LOG") {
-        Ok(val) => match val.as_str() {
+        Ok(val) => match val.to_uppercase().as_str() {
             "TRACE" => Level::Trace,
             "DEBUG" => Level::Debug,
             "INFO" => Level::Info,
+            "INFORMATION" => Level::Info,
             "WARN" => Level::Warn,
             "WARNING" => Level::Warn,
             "ERR" => Level::Error,
@@ -65,7 +66,7 @@ impl Logger {
     ///
     fn trace(&self, record: &Record) {
         println!(
-            "{} [ {} ]\t {}",
+            "[{}]  {}\t {}",
             Local::now().format("%Y-%m-%d %H:%M:%S"),
             record.level(),
             record.args(),
@@ -75,7 +76,7 @@ impl Logger {
     ///
     fn debug(&self, record: &Record) {
         println!(
-            "{} [ {} ]\t {}",
+            "[{}]  {}\t {}",
             Local::now().format("%Y-%m-%d %H:%M:%S"),
             record.level().as_str().blue(),
             record.args(),
@@ -85,7 +86,7 @@ impl Logger {
     ///
     fn info(&self, record: &Record) {
         println!(
-            "{} [ {} ]\t {}",
+            "[{}]  {}\t {}",
             Local::now().format("%Y-%m-%d %H:%M:%S"),
             record.level().as_str().green(),
             record.args(),
@@ -95,7 +96,7 @@ impl Logger {
     ///
     fn warn(&self, record: &Record) {
         println!(
-            "{} [ {} ]\t {}",
+            "[{}]  {}\t {}",
             Local::now().format("%Y-%m-%d %H:%M:%S"),
             record.level().as_str().yellow(),
             record.args(),
@@ -105,7 +106,7 @@ impl Logger {
     ///
     fn error(&self, record: &Record) {
         println!(
-            "{} [ {} ]\t {}",
+            "[{}]  {}\t {}",
             Local::now()
                 .format("%Y-%m-%d %H:%M:%S")
                 .to_string()

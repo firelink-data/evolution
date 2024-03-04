@@ -30,8 +30,8 @@ use crate::converters::Converter;
 pub mod old_slicer;
 //pub mod new_slicer;
 
-pub(crate) trait Slicer {
-    fn slice_and_convert(& mut self, converter: Box<dyn  Converter>, infile: fs::File, n_threads : usize) ;
+pub(crate) trait Slicer<'a> {
+    fn slice_and_convert(&'a mut self, converter: Box<dyn 'a + Converter<'a>>, infile: fs::File, n_threads : usize) ;
 }
 
 pub(crate) type FnLineBreak<'a> = fn(bytes: &'a[u8]) -> (bool, usize);
