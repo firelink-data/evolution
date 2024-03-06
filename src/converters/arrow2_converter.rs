@@ -23,14 +23,14 @@ pub(crate) struct Slice2Arrow2<'a> {
 }
 
 impl<'a> Converter<'a> for Slice2Arrow2<'a> {
-    fn set_line_break_handler(&'a mut self, fnl: FnLineBreak<'a>) {
+    fn set_line_break_handler(& mut self, fnl: FnLineBreak<'a>) {
         self.fn_line_break = fnl;
     }
-    fn get_line_break_handler(&'a self) -> FnLineBreak<'a> {
+    fn get_line_break_handler(& self) -> FnLineBreak<'a> {
         self.fn_line_break
     }
 
-    fn process<'b: 'a>(&'a  mut self, slices: Vec<&'b [u8]>) -> usize {
+    fn process(&  mut self, slices: Vec<&'a [u8]>) -> usize {
         let mut bytes_processed: usize = 0;
 //        let chunks:Chunk<?>;
         let arc_masterbuilder = Arc::new(& self.master_builder);

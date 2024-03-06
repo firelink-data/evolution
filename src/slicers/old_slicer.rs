@@ -51,6 +51,7 @@ in_chunk_cores (how man splits will be made)
  */
 
 pub(crate) const SLICER_IN_CHUNK_SIZE: usize = 1024 * 1024;
+pub(crate) const SLICER_MAX_RESIDUE_SIZE: usize = SLICER_IN_CHUNK_SIZE;
 
 pub(crate) const IN_MAX_CHUNKS: usize = 3;
 
@@ -90,35 +91,44 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
  //        }
 
   //      let mut next_chunk = 0;
-        let mut residue: Box< [[u8;SLICER_IN_CHUNK_SIZE]]> = Box::new ( [[0_u8; SLICER_IN_CHUNK_SIZE],[0_u8; SLICER_IN_CHUNK_SIZE],[0_u8; SLICER_IN_CHUNK_SIZE]],);
         let mut residue_len = 0;
-         let mut slices: Vec<&'a [u8]>;
+         let mut slices: Vec<& [u8]>;
 
-         loop
+//         let mut v = [10, 40, 30, 20, 60, 50];
+//         let iter = self.chunks.split_mut(|num| *num % 3 == 0);
+
+         for target_chunk in self.chunks.split_at_mut(1)
          {
 
             let mut chunk_len_toread = SLICER_IN_CHUNK_SIZE;
             if remaining_file_length < SLICER_IN_CHUNK_SIZE {
                 chunk_len_toread = remaining_file_length;
             }
-            let the_chunk= Box::new( [0_u8; SLICER_IN_CHUNK_SIZE]);
-             let the_residue= Box::new( [0_u8; SLICER_IN_CHUNK_SIZE]);
+
+//             let mut  the_chunk= Box::new( [0_u8; SLICER_IN_CHUNK_SIZE]);
+//             let & mut  the_chunk= &self.chunks[0];
+//             let mut  the_chunk2= &self.chunks[1];
+
+             let mut the_residue= Box::new( [0_u8; SLICER_MAX_RESIDUE_SIZE]);
 
             let chunk_len_effective_read: usize;
+
 //            let the_chunk:&mut Chunk=Box::new( Chunk);
-            (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
-                find_last_nl,
-                the_residue,
-                the_chunk, //& mut chunks[next_chunk],
-                &mut file,
-                in_chunk_cores,
-                residue_len,
-                chunk_len_toread,
-            );
+                 (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
+                     find_last_nl,
+                     &mut the_residue,
+//                     & mut self.chunks[0], //& mut chunks[next_chunk],
+                     target_chunk[0], //& mut chunks[next_chunk],
+
+                     &mut file,
+                     in_chunk_cores,
+                     residue_len,
+                     chunk_len_toread,
+                 );
 
             remaining_file_length -= chunk_len_effective_read;
             let bytes_processed_for_slices = converter.process(slices);
-            let bytes_processed_for_slices =0;
+//            let bytes_processed_for_slices =0;
 
             bytes_processed += bytes_processed_for_slices;
             bytes_processed += residue_len;
@@ -128,8 +138,8 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
 
             if remaining_file_length == 0 {
                 if 0 != residue_len {
-                    let slice: Vec<&'a [u8]> = vec![&the_residue[0..residue_len]];
-                    let bytes_processed_for_slices = converter.process(slice);
+                    let slice: Vec<& [u8]> = vec![&the_residue[0..residue_len]];
+//                    let bytes_processed_for_slices = converter.process(slice);
                     bytes_processed += bytes_processed_for_slices;
                 }
                 break;
@@ -145,8 +155,8 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
 
 fn read_chunk_and_slice<'a>(
     fn_line_break: fn(&'a [u8]) -> (bool, usize),
-    residue: Box<[u8; 1048576]>,
-    chunk: Box<[u8; 1048576]>,
+    residue: & mut [u8; SLICER_MAX_RESIDUE_SIZE],
+    chunk: &mut Chunk,
     file: &mut File,
     chunk_cores: usize,
     residue_effective_len: usize,

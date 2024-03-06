@@ -40,14 +40,14 @@ pub struct SampleSliceAggregator<'a> {
 }
 
 impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
-    fn set_line_break_handler(&'a mut self, fnl: FnLineBreak<'a>) {
+    fn set_line_break_handler(& mut self, fnl: FnLineBreak<'a>) {
         self.fn_line_break = fnl;
     }
-    fn get_line_break_handler(&'a self) -> FnLineBreak<'a> {
+    fn get_line_break_handler(& self) -> FnLineBreak<'a> {
         self.fn_line_break
     }
 
-    fn process<'b: 'a>(&'a mut self, slices: Vec<&'b [u8]>) -> usize {
+    fn process(& mut self, slices: Vec<&'a [u8]>) -> usize {
         let mut bytes_processed: usize = 0;
 
         slices.par_iter().enumerate().for_each(|(i, n)| println!("index {} {}", i, n.len()));
