@@ -139,9 +139,9 @@ impl Cli {
 
                 let mut slicer_instance: Box<dyn 'a + Slicer<'a>> = Box::new(old_slicer {
                     fn_line_break: find_last_nl,
-                    chunk_and_reside: [ChunkAndReside {chunk: Box::new( [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new( [0_u8; SLICER_MAX_RESIDUE_SIZE]}),
-                                       ChunkAndReside {chunk: Box::new( [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new( [0_u8; SLICER_MAX_RESIDUE_SIZE]}),
-                                       ChunkAndReside {chunk: Box::new( [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new( [0_u8; SLICER_MAX_RESIDUE_SIZE]})}  ]
+                    chunk_and_reside: [ChunkAndReside {chunk: Box::new( [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new( [0_u8; SLICER_MAX_RESIDUE_SIZE])},
+                                       ChunkAndReside {chunk: Box::new( [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new( [0_u8; SLICER_MAX_RESIDUE_SIZE])},
+                                       ChunkAndReside {chunk: Box::new( [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new( [0_u8; SLICER_MAX_RESIDUE_SIZE])}  ]
                 });
 
 
