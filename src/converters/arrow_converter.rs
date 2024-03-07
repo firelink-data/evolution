@@ -81,7 +81,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         let mut bytes_processed: usize = 0;
         let mut i = 0;
         for aa in & mut self.in_out_arrow {
-            aa.in_slice=slices[i];
+//            aa.in_slice=slices[i];
         }
 
 

@@ -81,7 +81,9 @@ enum Commands {
 }
 
 impl Cli {
-    pub fn run<'a>(&'a self) -> Result<(), error::ExecutionError> {
+
+    pub fn run(& self,in_out_buffers: & mut [ChunkAndReside; 3]) -> Result<(), error::ExecutionError> {
+
         let n_logical_threads = num_cpus::get();
         let mut n_threads: usize = self.n_threads as usize;
 
@@ -137,16 +139,10 @@ impl Cli {
                     .open(out_file)
                     .expect("aaa");
 
-                let mut slicer_instance: Box<dyn 'a + Slicer<'a>> = Box::new(old_slicer {
-                    fn_line_break: find_last_nl,
-                    chunk_and_reside:  [ ChunkAndReside {chunk: Box::new(   [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])},
-                                       ChunkAndReside {chunk: Box::new(  [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])},
-                                       ChunkAndReside {chunk: Box::new(  [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])}  ]
-                });
+                let mut slicer_instance: Box<dyn  Slicer> = Box::new(old_slicer {
+                    fn_line_break: find_last_nl});
 
-
-
-                let converter_instance: Box<dyn Converter> = match converter {
+                let converter_instance: Box<dyn  Converter> = match converter {
                     Converters::Arrow => {
                         let in_out_arrow = converters::arrow_converter::in_out_instance_factory(schema.to_path_buf(), n_threads as i16);
                         let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { file_out: _out_file, fn_line_break: find_last_nl, in_out_arrow: in_out_arrow });
@@ -165,7 +161,7 @@ impl Cli {
                 };
 
 
-                slicer_instance.slice_and_convert(converter_instance, _in_file, n_threads as usize);
+                slicer_instance.slice_and_convert(converter_instance,in_out_buffers, _in_file, n_threads as usize);
             }
 
             None => {}

@@ -25,7 +25,7 @@
 * Last updated: 2023-12-14
 */
 
-use std::cmp;
+use std::{cmp, fs};
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
 use rayon::prelude::*;
@@ -62,8 +62,6 @@ pub(crate) type Chunk =[u8; SLICER_IN_CHUNK_SIZE];
 
 pub(crate) struct old_slicer<'a> {
     pub(crate) fn_line_break: FnLineBreak<'a>,
-//    pub chunks:Box<[Chunk;IN_MAX_CHUNKS]>,
-    pub(crate) chunk_and_reside: [ChunkAndReside;IN_MAX_CHUNKS],
 }
 
 
@@ -74,31 +72,21 @@ fn ceil_amount_of_chunks (a:i64,b:i64)->usize {
 
 impl<'a> Slicer<'a> for old_slicer<'a> {
      fn slice_and_convert(& mut self,
-                            mut converter: Box<dyn 'a + Converter<'a>>,
-                          mut file: File,
-                          in_chunk_cores: usize,
-    ) {
+                          mut converter: Box<dyn  'a+ Converter<'a>>,
+                          in_out_buffers: &'a mut [ChunkAndReside; 3],
+                          mut infile: fs::File,
+                          n_threads: usize,
+     ) {
         let mut bytes_processed = 0;
 
-        let mut remaining_file_length = file.metadata().unwrap().len() as usize;
+        let mut remaining_file_length = infile.metadata().unwrap().len() as usize;
 
 
-         let mut vector_of_chunks:Vec<&'a [u8; SLICER_IN_CHUNK_SIZE]>
-        ;
-//        let mut next_chunk =0 as usize;
-//         for n in 1..ceil_amount_of_chunks(remaining_file_length as i64,SLICER_IN_CHUNK_SIZE as i64) {
-//             vector_of_chunks.push(& mut self.chunks[next_chunk]);
-//             next_chunk %= IN_MAX_CHUNKS as usize
- //        }
-
-  //      let mut next_chunk = 0;
-        let mut residue_len = 0;
+         let mut residue_len = 0;
          let mut slices: Vec<& [u8]>;
 
-//         let mut v = [10, 40, 30, 20, 60, 50];
-//         let iter = self.chunks.split_mut(|num| *num % 3 == 0);
 
-         for  cr in &mut self.chunk_and_reside
+         for  cr in &mut *in_out_buffers
          {
 
             let mut chunk_len_toread = SLICER_IN_CHUNK_SIZE;
@@ -114,15 +102,12 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
 
             let chunk_len_effective_read: usize;
 
-//            let the_chunk:&mut Chunk=Box::new( Chunk);
                  (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
                      find_last_nl,
                      &mut the_residue,
-//                     & mut self.chunks[0], //& mut chunks[next_chunk],
-                      & mut cr.chunk,
-//                     hunk[0], //& mut chunks[next_chunk],
-                     &mut file,
-                     in_chunk_cores,
+                     &mut cr.chunk,
+                     &mut infile,
+                     n_threads,
                      residue_len,
                      chunk_len_toread,
                  );

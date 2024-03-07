@@ -37,7 +37,7 @@ pub(crate) struct ChunkAndReside {
      pub(crate) residue:Box< [u8; SLICER_MAX_RESIDUE_SIZE]>
 }
 pub(crate) trait Slicer<'a> {
-    fn slice_and_convert(& mut self, converter: Box<dyn 'a + Converter<'a>>, infile: fs::File, n_threads : usize) ;
+    fn slice_and_convert(& mut self, converter: Box<dyn  'a+Converter<'a>>, in_out_buffers: &'a mut [ChunkAndReside; 3], infile: fs::File, n_threads : usize) ;
 }
 
 pub(crate) type FnLineBreak<'a> = fn(bytes: &'a[u8]) -> (bool, usize);

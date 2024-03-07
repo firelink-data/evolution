@@ -34,6 +34,9 @@ mod logger;
 mod mocker;
 mod schema;
 use cli::Cli;
+use crate::slicers::ChunkAndReside;
+use crate::slicers::old_slicer::{SLICER_IN_CHUNK_SIZE, SLICER_MAX_RESIDUE_SIZE};
+
 mod converters;
 mod slicers;
 ///
@@ -44,10 +47,14 @@ fn main() {
         Ok(_) => debug!("Logging setup, ok!"),
         Err(e) => error!("Could not set up env logging: {:?}", e),
     };
-/*
-    match cli.run() {
+
+    let  in_out_buffers:  & mut [ChunkAndReside; 3] = & mut [  ChunkAndReside {chunk: Box::new(   [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])},
+        ChunkAndReside {chunk: Box::new(  [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])},
+        ChunkAndReside {chunk: Box::new(  [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])}  ];
+
+    match cli.run(in_out_buffers) {
         Ok(_) => info!("All done! Bye."),
         Err(e) => error!("Something went wrong during execution: {:?}", e),
     }
- */
+
 }
