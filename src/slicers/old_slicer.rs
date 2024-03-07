@@ -98,7 +98,7 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
 //         let mut v = [10, 40, 30, 20, 60, 50];
 //         let iter = self.chunks.split_mut(|num| *num % 3 == 0);
 
-         for  cr in &self.chunk_and_reside
+         for  cr in &mut self.chunk_and_reside
          {
 
             let mut chunk_len_toread = SLICER_IN_CHUNK_SIZE;
@@ -130,7 +130,7 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
             remaining_file_length -= chunk_len_effective_read;
 
 
-            let bytes_processed_for_slices = converter.process(slices);
+             let bytes_processed_for_slices = converter.process(slices);
 //            let bytes_processed_for_slices =0;
 
             bytes_processed += bytes_processed_for_slices;
@@ -159,7 +159,7 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
 fn read_chunk_and_slice<'a>(
     fn_line_break: fn(&'a [u8]) -> (bool, usize),
     residue: & mut [u8; SLICER_MAX_RESIDUE_SIZE],
-    chunk: &mut Chunk,
+    chunk: &'a mut [u8; SLICER_IN_CHUNK_SIZE],
     file: &mut File,
     chunk_cores: usize,
     residue_effective_len: usize,
