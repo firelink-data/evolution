@@ -124,13 +124,7 @@ impl Cli {
                      in_file,
                      out_file
                  }) => {
-                /*
-                            let mut chunks:Box<[[u8;SLICER_IN_CHUNK_SIZE];3]>= Box::new([
-                                [0_u8; SLICER_IN_CHUNK_SIZE],
-                                [0_u8; SLICER_IN_CHUNK_SIZE],
-                                [0_u8; SLICER_IN_CHUNK_SIZE],
-                            ]);
-                */
+
                 let _in_file = fs::File::open(&in_file).expect("bbb");
 
                 let _out_file = fs::OpenOptions::new()

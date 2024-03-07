@@ -94,9 +94,6 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
                 chunk_len_toread = remaining_file_length;
             }
 
-//             let mut  the_chunk= Box::new( [0_u8; SLICER_IN_CHUNK_SIZE]);
-//             let & mut  the_chunk= &self.chunks[0];
-//             let mut  the_chunk2= &self.chunks[1];
 
              let mut the_residue= Box::new( [0_u8; SLICER_MAX_RESIDUE_SIZE]);
 
