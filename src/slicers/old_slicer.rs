@@ -98,7 +98,7 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
 //         let mut v = [10, 40, 30, 20, 60, 50];
 //         let iter = self.chunks.split_mut(|num| *num % 3 == 0);
 
-         for  cr in self.chunk_and_reside
+         for  cr in &self.chunk_and_reside
          {
 
             let mut chunk_len_toread = SLICER_IN_CHUNK_SIZE;
@@ -119,7 +119,7 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
                      find_last_nl,
                      &mut the_residue,
 //                     & mut self.chunks[0], //& mut chunks[next_chunk],
-                      cr.chunk,
+                      & mut cr.chunk,
 //                     hunk[0], //& mut chunks[next_chunk],
                      &mut file,
                      in_chunk_cores,
