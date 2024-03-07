@@ -35,7 +35,7 @@ mod mocker;
 mod schema;
 use cli::Cli;
 use crate::slicers::ChunkAndReside;
-use crate::slicers::old_slicer::{SLICER_IN_CHUNK_SIZE, SLICER_MAX_RESIDUE_SIZE};
+use crate::slicers::old_slicer::{IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE, SLICER_MAX_RESIDUE_SIZE};
 
 mod converters;
 mod slicers;
@@ -48,7 +48,8 @@ fn main() {
         Err(e) => error!("Could not set up env logging: {:?}", e),
     };
 
-    let  in_out_buffers:  & mut [ChunkAndReside; 3] = & mut [  ChunkAndReside {chunk: Box::new(   [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])},
+    /// Effektiv med fixa buffrar men fult att allokeringen ligger här ...känns banalt.
+    let  in_out_buffers:  & mut [ChunkAndReside; IN_MAX_CHUNKS] = & mut [  ChunkAndReside {chunk: Box::new(   [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])},
         ChunkAndReside {chunk: Box::new(  [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])},
         ChunkAndReside {chunk: Box::new(  [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])}  ];
 

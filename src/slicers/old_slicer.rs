@@ -95,13 +95,13 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
             }
 
 
-             let mut the_residue= Box::new( [0_u8; SLICER_MAX_RESIDUE_SIZE]);
+//             let mut the_residue= Box::new( [0_u8; SLICER_MAX_RESIDUE_SIZE]);
 
             let chunk_len_effective_read: usize;
 
                  (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
                      find_last_nl,
-                     &mut the_residue,
+                     &mut cr.residue,
                      &mut cr.chunk,
                      & infile,
                      n_threads,
@@ -123,8 +123,8 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
 
             if remaining_file_length == 0 {
                 if 0 != residue_len {
-                    let slice: Vec<& [u8]> = vec![&the_residue[0..residue_len]];
-//                    let bytes_processed_for_slices = converter.process(slice);
+                    let slice: Vec<& [u8]> = vec![&cr.residue[0..residue_len]];
+                    let bytes_processed_for_slices = converter.process(slice);
                     bytes_processed += bytes_processed_for_slices;
                 }
                 break;
