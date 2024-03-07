@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use log::{info, SetLoggerError};
 use rand::rngs::mock;
-use crate::slicers::find_last_nl;
-use crate::slicers::old_slicer::{old_slicer, SLICER_IN_CHUNK_SIZE};
+use crate::slicers::{ChunkAndReside, find_last_nl};
+use crate::slicers::old_slicer::{IN_MAX_CHUNKS, old_slicer, SLICER_IN_CHUNK_SIZE, SLICER_MAX_RESIDUE_SIZE};
 use crate::converters::arrow2_converter::{MasterBuilder, Slice2Arrow2};
 use crate::converters::arrow_converter::{InOut, Slice2Arrow};
 use crate::converters::self_converter::SampleSliceAggregator;
@@ -139,12 +139,12 @@ impl Cli {
 
                 let mut slicer_instance: Box<dyn 'a + Slicer<'a>> = Box::new(old_slicer {
                     fn_line_break: find_last_nl,
-                    chunks: Box::new([
-                        [0_u8; SLICER_IN_CHUNK_SIZE],
-                        [0_u8; SLICER_IN_CHUNK_SIZE],
-                        [0_u8; SLICER_IN_CHUNK_SIZE],
-                    ])
+                    chunk_and_reside: [ChunkAndReside {chunk: Box::new( [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new( [0_u8; SLICER_MAX_RESIDUE_SIZE]}),
+                                       ChunkAndReside {chunk: Box::new( [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new( [0_u8; SLICER_MAX_RESIDUE_SIZE]}),
+                                       ChunkAndReside {chunk: Box::new( [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new( [0_u8; SLICER_MAX_RESIDUE_SIZE]})}  ]
                 });
+
+
 
                 let converter_instance: Box<dyn Converter> = match converter {
                     Converters::Arrow => {

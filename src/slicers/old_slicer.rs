@@ -31,7 +31,7 @@ use std::io::{BufReader, Read, Write};
 use rayon::prelude::*;
 use log::info;
 use crate::converters::Converter;
-use crate::slicers::{find_last_nl, FnLineBreak, Slicer};
+use crate::slicers::{ChunkAndReside, find_last_nl, FnLineBreak, Slicer};
 use chrono::format::Item;
 
 /**
@@ -62,7 +62,8 @@ pub(crate) type Chunk =[u8; SLICER_IN_CHUNK_SIZE];
 
 pub(crate) struct old_slicer<'a> {
     pub(crate) fn_line_break: FnLineBreak<'a>,
-    pub chunks:Box<[Chunk;IN_MAX_CHUNKS]>
+//    pub chunks:Box<[Chunk;IN_MAX_CHUNKS]>,
+    pub(crate) chunk_and_reside: [ChunkAndReside;IN_MAX_CHUNKS],
 }
 
 
@@ -97,7 +98,7 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
 //         let mut v = [10, 40, 30, 20, 60, 50];
 //         let iter = self.chunks.split_mut(|num| *num % 3 == 0);
 
-         for target_chunk in self.chunks.split_at_mut(1)
+         for  cr in self.chunk_and_reside
          {
 
             let mut chunk_len_toread = SLICER_IN_CHUNK_SIZE;
@@ -118,8 +119,8 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
                      find_last_nl,
                      &mut the_residue,
 //                     & mut self.chunks[0], //& mut chunks[next_chunk],
-                     target_chunk[0], //& mut chunks[next_chunk],
-
+                      cr.chunk,
+//                     hunk[0], //& mut chunks[next_chunk],
                      &mut file,
                      in_chunk_cores,
                      residue_len,
@@ -127,6 +128,8 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
                  );
 
             remaining_file_length -= chunk_len_effective_read;
+
+
             let bytes_processed_for_slices = converter.process(slices);
 //            let bytes_processed_for_slices =0;
 

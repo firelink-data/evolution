@@ -26,10 +26,16 @@
 */
 use std::fs;
 use crate::converters::Converter;
+use crate::slicers::old_slicer::SLICER_IN_CHUNK_SIZE;
+use crate::slicers::old_slicer::SLICER_MAX_RESIDUE_SIZE;
 
 pub mod old_slicer;
 //pub mod new_slicer;
 
+pub(crate) struct ChunkAndReside {
+     pub(crate) chunk: Box<[u8; SLICER_IN_CHUNK_SIZE]>,
+     pub(crate) residue:Box<[u8; SLICER_MAX_RESIDUE_SIZE]>
+}
 pub(crate) trait Slicer<'a> {
     fn slice_and_convert(& mut self, converter: Box<dyn 'a + Converter<'a>>, infile: fs::File, n_threads : usize) ;
 }
