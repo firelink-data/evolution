@@ -1,7 +1,7 @@
 /*
 * MIT License
 *
-* Copyright (c) 2023 Firelink Data
+* Copyright (c) 2024 Firelink Data
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -31,7 +31,7 @@ use std::io::{BufReader, Read, Write};
 use rayon::prelude::*;
 use log::info;
 use crate::converters::Converter;
-use crate::slicers::{ChunkAndReside, find_last_nl, FnLineBreak, Slicer};
+use crate::slicers::{ChunkAndResidue, find_last_nl, FnLineBreak, Slicer};
 use chrono::format::Item;
 
 /**
@@ -72,9 +72,9 @@ fn ceil_amount_of_chunks (a:i64,b:i64)->usize {
 
 impl<'a> Slicer<'a> for old_slicer<'a> {
      fn slice_and_convert(& mut self,
-                          mut converter: Box<dyn  'a+ Converter<'a>>,
-                          in_out_buffers: &'a mut [ChunkAndReside; 3],
-                          mut infile: fs::File,
+                          mut converter:  Box<dyn  'a+Converter<'a>>,
+                          in_out_buffers: &'a mut [ChunkAndResidue; 3],
+                          infile: fs::File,
                           n_threads: usize,
      ) {
         let mut bytes_processed = 0;
@@ -103,7 +103,7 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
                      find_last_nl,
                      &mut cr.residue,
                      &mut cr.chunk,
-                     & infile,
+                     &infile,
                      n_threads,
                      residue_len,
                      chunk_len_toread,

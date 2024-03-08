@@ -30,35 +30,42 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
 use crate::converters::Converter;
-use crate::slicers::Slicer;
+use std::{cmp, fs};
+use rayon::prelude::*;
+use crate::slicers::{ChunkAndResidue, find_last_nl, FnLineBreak, Slicer};
+use chrono::format::Item;
+use crate::slicers::old_slicer::SLICER_IN_CHUNK_SIZE;
+
 
 pub(crate) static DEFAULT_SLICE_BUFFER_LEN: usize = 1024 * 1024;
 
 ///
-pub struct new_slicer {
+pub struct new_slicer<'a> {
+    pub(crate) fn_line_break: FnLineBreak<'a>,
     file: File,
     n_threads: usize,
     multithreaded: bool,
+
 }
 
-///
-impl Slicer for new_slicer {
 
-    fn slice_and_convert(&mut self,
-                         mut converter: Box<dyn Converter>,
-                         mut file: File,
-                         in_chunk_cores: usize,
-    ) {
-        let bytes_to_read = file.metadata().expect("Could not read file metadata").len() as usize;
+impl<'a> Slicer<'a> for new_slicer<'a> {
+     fn slice_and_convert(& mut self,
+                          mut converter: Box<dyn  'a+Converter<'a>>,
+                          in_out_buffers: &'a mut [ChunkAndResidue; 3],
+                          infile: fs::File,
+                          n_threads: usize,
+     ) {
+        let bytes_to_read = infile.metadata().expect("Could not read file metadata").len() as usize;
         info!("File is {} bytes total!", bytes_to_read);
         let mut remaining_bytes = bytes_to_read;
         let mut bytes_processed: usize = 0;
         let mut bytes_overlapped: usize = 0;
 
         let mut buff_capacity = DEFAULT_SLICE_BUFFER_LEN;
-        let mut file_reader = BufReader::new(file);
+        let mut file_reader = BufReader::new(infile);
 
-        loop {
+         for  cr in &mut *in_out_buffers {
             // When we have read all the bytes we break.
             // We know about this cus we reach EOF in the BufReader.
             if bytes_processed >= bytes_to_read { break; }
@@ -69,21 +76,22 @@ impl Slicer for new_slicer {
 
             // Read part of the file and find index of where to slice the file.
             let mut buffer = vec![0u8; buff_capacity];
-            match file_reader.read_exact(&mut buffer).is_ok() {
+//            &mut target_chunk_read[0..cmp::min(target_chunk_read_len, chunk_len_toread)];
+            match file_reader.read_exact( & mut cr.chunk[0..SLICER_IN_CHUNK_SIZE]).is_ok() {
                 true => {},
                 false => {
                     debug!("EOF, this is the last time reading to buffer...");
                 }
             };
 
-            let slices: Vec<&[u8]> = find_worker_borders_aligned_to_linebreak(&buffer, in_chunk_cores as i16);
+            let slices: Vec<&'a [u8]> = find_worker_borders_aligned_to_linebreak(& mut cr.chunk[0..SLICER_IN_CHUNK_SIZE], n_threads as i16);
             let  byte_idx_last_line_break = 0 ;// TODO calculate this !
             let n_bytes_left_after_line_break = buff_capacity - 1 - byte_idx_last_line_break;
 
             debug!("bytes read:                {}", buff_capacity);
             debug!("byte idx last ln break:    {}", byte_idx_last_line_break);
             debug!("bytes left after ln break: {}", n_bytes_left_after_line_break);
-            debug!("Last byte in buffer:       {:?}", buffer.last().unwrap());
+//            debug!("Last byte in buffer:       {:?}", & mut cr.chunk .last().unwrap());
 //            debug!("Byte on last ln break:     {}", buffer[*byte_idx_last_line_break]);
 
             // We want to move the file descriptor cursor back N bytes so

@@ -47,7 +47,7 @@ impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
         self.fn_line_break
     }
 
-    fn process(& mut self, slices: Vec<& [u8]>) -> usize {
+    fn process(& mut self, slices: Vec<&'a [u8]>) -> usize {
         let mut bytes_processed: usize = 0;
 
         slices.par_iter().enumerate().for_each(|(i, n)| println!("index {} {}", i, n.len()));

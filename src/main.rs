@@ -34,7 +34,7 @@ mod logger;
 mod mocker;
 mod schema;
 use cli::Cli;
-use crate::slicers::ChunkAndReside;
+use crate::slicers::ChunkAndResidue;
 use crate::slicers::old_slicer::{IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE, SLICER_MAX_RESIDUE_SIZE};
 
 mod converters;
@@ -49,9 +49,10 @@ fn main() {
     };
 
     /// Effektiv med fixa buffrar men fult att allokeringen ligger här ...känns banalt.
-    let  in_out_buffers:  & mut [ChunkAndReside; IN_MAX_CHUNKS] = & mut [  ChunkAndReside {chunk: Box::new(   [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])},
-        ChunkAndReside {chunk: Box::new(  [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])},
-        ChunkAndReside {chunk: Box::new(  [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])}  ];
+    let  in_out_buffers:  & mut [ChunkAndResidue; IN_MAX_CHUNKS] = & mut [  ChunkAndResidue {chunk: Box::new(   [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])},
+        ChunkAndResidue {chunk: Box::new(  [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])},
+        ChunkAndResidue {chunk: Box::new(  [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])}  ];
+
 
     match cli.run(in_out_buffers) {
         Ok(_) => info!("All done! Bye."),

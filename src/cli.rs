@@ -1,13 +1,40 @@
+/*
+* MIT License
+*
+* Copyright (c) 2024 Firelink Data
+*
+* Permission is hereby granted, free of charge, to any person obtaining a copy
+* of this software and associated documentation files (the "Software"), to deal
+* in the Software without restriction, including without limitation the rights
+* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+* copies of the Software, and to permit persons to whom the Software is
+* furnished to do so, subject to the following conditions:
+*
+* The above copyright notice and this permission notice shall be included in all
+* copies or substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+* SOFTWARE.
+*
+* File created: 2023-11-21
+* Last updated: 2023-11-21
+*/
+
 use std::fs;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use log::{info, SetLoggerError};
 use rand::rngs::mock;
-use crate::slicers::{ChunkAndReside, find_last_nl};
+use crate::slicers::{ChunkAndResidue, find_last_nl};
 use crate::slicers::old_slicer::{IN_MAX_CHUNKS, old_slicer, SLICER_IN_CHUNK_SIZE, SLICER_MAX_RESIDUE_SIZE};
 use crate::converters::arrow2_converter::{MasterBuilder, Slice2Arrow2};
-use crate::converters::arrow_converter::{InOut, Slice2Arrow};
+use crate::converters::arrow_converter::{MasterBuilders, Slice2Arrow};
 use crate::converters::self_converter::SampleSliceAggregator;
 use crate::converters::Converter;
 use crate::{converters, error, mocker, schema};
@@ -82,7 +109,7 @@ enum Commands {
 
 impl Cli {
 
-    pub fn run(& self,in_out_buffers: & mut [ChunkAndReside; 3]) -> Result<(), error::ExecutionError> {
+    pub fn run<'a>(& self, in_out_buffers: & mut [ChunkAndResidue; 3] ) -> Result<(), error::ExecutionError> {
 
         let n_logical_threads = num_cpus::get();
         let mut n_threads: usize = self.n_threads as usize;
@@ -136,15 +163,20 @@ impl Cli {
                 let mut slicer_instance: Box<dyn  Slicer> = Box::new(old_slicer {
                     fn_line_break: find_last_nl});
 
+
                 let converter_instance: Box<dyn  Converter> = match converter {
+
                     Converters::Arrow => {
-                        let in_out_arrow = converters::arrow_converter::in_out_instance_factory(schema.to_path_buf(), n_threads as i16);
-                        let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { file_out: _out_file, fn_line_break: find_last_nl, in_out_arrow: in_out_arrow });
+                        let master_builders=MasterBuilders::in_out_instance_factory(schema.to_path_buf(), n_threads as i16,);
+
+                        let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { file_out: _out_file, fn_line_break: find_last_nl,masterbuilders: master_builders});
+
                         s2a
                     },
                     Converters::Arrow2 => {
                         let master_builder = MasterBuilder::builder_factory(schema.to_path_buf());
                         let s2a: Box<Slice2Arrow2> = Box::new(Slice2Arrow2 { file_out: _out_file, fn_line_break: find_last_nl, master_builder });
+
                         s2a
                     },
 

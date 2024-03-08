@@ -1,7 +1,7 @@
 /*
 * MIT License
 *
-* Copyright (c) 2023 Firelink Data
+* Copyright (c) 2024 Firelink Data
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -30,14 +30,15 @@ use crate::slicers::old_slicer::SLICER_IN_CHUNK_SIZE;
 use crate::slicers::old_slicer::SLICER_MAX_RESIDUE_SIZE;
 
 pub mod old_slicer;
+pub mod new_slicer;
 //pub mod new_slicer;
 
-pub(crate) struct ChunkAndReside {
+pub(crate) struct ChunkAndResidue {
      pub(crate) chunk: Box< [u8; SLICER_IN_CHUNK_SIZE]>,
      pub(crate) residue:Box< [u8; SLICER_MAX_RESIDUE_SIZE]>
 }
 pub(crate) trait Slicer<'a> {
-    fn slice_and_convert(& mut self, converter: Box<dyn  'a+Converter<'a>>, in_out_buffers: &'a mut [ChunkAndReside; 3], infile: fs::File, n_threads : usize) ;
+    fn slice_and_convert(& mut self, converter: Box<dyn  'a+Converter<'a>>, in_out_buffers: &'a mut [ChunkAndResidue; 3], infile: fs::File, n_threads : usize) ;
 }
 
 pub(crate) type FnLineBreak<'a> = fn(bytes: &'a[u8]) -> (bool, usize);

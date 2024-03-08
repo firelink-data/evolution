@@ -1,7 +1,7 @@
 /*
 * MIT License
 *
-* Copyright (c) 2023 Firelink Data
+* Copyright (c) 2024 Firelink Data
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -35,39 +35,54 @@ use std::sync::Arc;
 use arrow::array::{ArrayBuilder, BooleanBuilder, Int32Builder, Int64Builder, PrimitiveArray, StringBuilder};
 use rayon::iter::plumbing::{bridge, Producer};
 use crate::converters::{ColumnBuilder, Converter};
+use crate::converters::arrow2_converter::MasterBuilder;
 use crate::schema;
 use crate::slicers::FnLineBreak;
 
 pub(crate) struct Slice2Arrow<'a> {
     pub(crate) file_out: File,
     pub(crate) fn_line_break: FnLineBreak<'a>,
-//    pub(crate) schema: FixedSchema,
-    pub(crate) in_out_arrow: Vec<InOut<'a>>
-//    pub(crate) master_arrow: MasterBuilder<'a>
-}
-/// Will this name win the Pulitzer Prize
- pub struct InOut<'a> {
-    in_slice: &'a  [u8],
-     out_builders:Vec<Box<dyn Send +ArrayBuilder>>
-//    builders: Vec<Box<dyn Sync + Send + 'a + crate::converters::arrow2_builder::ColumnBuilder>>
+    pub(crate) masterbuilders:  MasterBuilders
 }
 
-unsafe impl<'a> Send for InOut<'a> {}
-unsafe impl<'a> Sync for InOut<'a> {}
+pub(crate) struct MasterBuilders {
+     builders: Vec<Vec<Box<dyn  Send   + ArrayBuilder>>>
+}
 
+unsafe impl Send for MasterBuilders {}
+unsafe impl Sync for MasterBuilders {}
 
+impl MasterBuilders {
 
-/*
-impl<'data, in_out: Sync + 'data> IntoParallelRefIterator<'data> for [in_out] {
-    type Item = in_out;
-    type Iter = rayon::slice:: SliceIter<'data, in_out>;
+    pub fn in_out_instance_factory<'a>(schema_path: PathBuf, instances: i16) -> Self {
+        let schema = schema::FixedSchema::from_path(schema_path.into());
+        let antal_col = schema.num_columns();
+//    let in_out_instances:&'a mut Vec<InOut<'a>>=    let  in_out_arrow:& mut Vec<InOut> = &mut vec![];
+//    ;
+        let mut builders:Vec<Vec<Box<dyn ArrayBuilder + Send>>>=Vec::new();
 
-    fn par_iter(&'data self) -> Self::Iter {
-        self.into_par_iter()
+//    let mut in_out_instances : Vec<InOut<'a>>=Vec::new();
+
+        for i in 1..instances {
+            let mut buildersmut:  Vec<Box<dyn ArrayBuilder + Send>> =  Vec::with_capacity(antal_col);
+            for val in schema.iter() {
+                match val.dtype().as_str() {
+                    "i32" => buildersmut.push(Box::new(Int32Builder::new())),
+                    "i64" => buildersmut.push(Box::new(Int64Builder::new())),
+                    "boolean" => buildersmut.push(Box::new(BooleanBuilder::new())),
+                    "utf8" => buildersmut.push(Box::new(StringBuilder::new())),
+
+                    &_ => {}
+                };
+            }
+            builders.push(buildersmut);
+//            let in_out_instance: InOut = InOut { /*in_slice: &mut [],*/ out_builders:  buildersmut };
+//            in_out_instances.push(in_out_instance);
+        }
+        MasterBuilders { builders }
     }
 }
 
-*/
 
 impl<'a> Converter<'a> for Slice2Arrow<'a> {
     fn set_line_break_handler(& mut self, fnl: FnLineBreak<'a>) {
@@ -79,16 +94,14 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 
     fn process(& mut  self,  slices: Vec<&'a [u8]>) -> usize {
         let mut bytes_processed: usize = 0;
-        let mut i = 0;
-        for aa in & mut self.in_out_arrow {
-//            aa.in_slice=slices[i];
-        }
+
+//        let  in_out_arrow: Vec<slice<'a>> = vec![];
 
 
-        self.in_out_arrow.par_iter().enumerate().for_each(|(i, n)| {
+//        self.masterbuilders.par_iter().enumerate().for_each(|(i, n)| {
 //            let arc_builders_clone = Arc::clone(&arc_builders);
 //            parse_slice(i, n, &arc_builders_clone);
-        });
+//        });
 
         //let a:&[u8]=    slices.get(0).unwrap();
 //        for slice in slices.iter() {
@@ -123,40 +136,6 @@ parse_slice(i:usize, n: &&[u8], builders: &Arc<&Vec<Box<dyn ArrayBuilder>>>)  {
     };
 
     let offset=0;
-}
-/// All threads
-//pub(crate) struct in_out {
-//    in_slice:Box<[u8]>,
-//    out_builders:Vec<Box<dyn ArrayBuilder>>
-//    builders: Vec<Box<dyn Sync + Send + 'a + crate::converters::arrow2_builder::ColumnBuilder>>
-//}
-
-
-pub fn in_out_instance_factory<'a>(schema_path: PathBuf,instances:i16) -> Vec<InOut<'a>> {
-    let schema=schema::FixedSchema::from_path(schema_path.into());
-    let antal_col=schema.num_columns();
-
-
-    let mut in_out_instances : Vec<InOut<'a>>=Vec::new();
-
-    for i in 1..instances {
-        let mut buildersmut: Vec<Box<dyn ArrayBuilder +Send >>=Vec::with_capacity(antal_col);
-        for val in schema.iter() {
-            match val.dtype().as_str() {
-                "i32" => buildersmut.push(Box::new(Int32Builder::new())),
-                "i64" => buildersmut.push(Box::new(Int64Builder::new())),
-                "boolean" => buildersmut.push(Box::new(BooleanBuilder::new())),
-                "utf8" => buildersmut.push(Box::new(StringBuilder::new())),
-
-                &_ => {}
-            };
-        }
-        let mut in_out_instance: InOut = InOut { in_slice: &mut[], out_builders: buildersmut } ;
-        in_out_instances.push( in_out_instance);
-
-    }
-
-    in_out_instances
 }
 
 
