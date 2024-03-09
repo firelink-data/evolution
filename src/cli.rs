@@ -109,7 +109,7 @@ enum Commands {
 
 impl Cli {
 
-    pub fn run<'a>(& self, in_out_buffers: & mut [ChunkAndResidue; 3] ) -> Result<(), error::ExecutionError> {
+    pub fn run<'a>(& self, in_buffers: & mut [ChunkAndResidue; 3] ) -> Result<(), error::ExecutionError> {
 
         let n_logical_threads = num_cpus::get();
         let mut n_threads: usize = self.n_threads as usize;
@@ -187,7 +187,7 @@ impl Cli {
                 };
 
 
-                slicer_instance.slice_and_convert(converter_instance,in_out_buffers, _in_file, n_threads as usize);
+                slicer_instance.slice_and_convert(converter_instance, in_buffers, _in_file, n_threads as usize);
             }
 
             None => {}

@@ -52,7 +52,7 @@ pub struct new_slicer<'a> {
 impl<'a> Slicer<'a> for new_slicer<'a> {
      fn slice_and_convert(& mut self,
                           mut converter: Box<dyn  'a+Converter<'a>>,
-                          in_out_buffers: &'a mut [ChunkAndResidue; 3],
+                          in_buffers: &'a mut [ChunkAndResidue; 3],
                           infile: fs::File,
                           n_threads: usize,
      ) {
@@ -65,7 +65,7 @@ impl<'a> Slicer<'a> for new_slicer<'a> {
         let mut buff_capacity = DEFAULT_SLICE_BUFFER_LEN;
         let mut file_reader = BufReader::new(infile);
 
-         for  cr in &mut *in_out_buffers {
+         for  cr in &mut *in_buffers {
             // When we have read all the bytes we break.
             // We know about this cus we reach EOF in the BufReader.
             if bytes_processed >= bytes_to_read { break; }

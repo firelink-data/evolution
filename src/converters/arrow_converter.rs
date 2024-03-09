@@ -38,6 +38,8 @@ use crate::converters::{ColumnBuilder, Converter};
 use crate::converters::arrow2_converter::MasterBuilder;
 use crate::schema;
 use crate::slicers::FnLineBreak;
+use rayon::iter::IntoParallelRefIterator;
+use rayon::prelude::*;
 
 pub(crate) struct Slice2Arrow<'a> {
     pub(crate) file_out: File,
@@ -46,7 +48,7 @@ pub(crate) struct Slice2Arrow<'a> {
 }
 
 pub(crate) struct MasterBuilders {
-     builders: Vec<Vec<Box<dyn  Send   + ArrayBuilder>>>
+     builders: Vec<Vec<Box<dyn  Sync + Send   + ArrayBuilder>>>
 }
 
 unsafe impl Send for MasterBuilders {}
@@ -59,12 +61,12 @@ impl MasterBuilders {
         let antal_col = schema.num_columns();
 //    let in_out_instances:&'a mut Vec<InOut<'a>>=    let  in_out_arrow:& mut Vec<InOut> = &mut vec![];
 //    ;
-        let mut builders:Vec<Vec<Box<dyn ArrayBuilder + Send>>>=Vec::new();
+        let mut builders:Vec<Vec<Box<dyn ArrayBuilder + Sync + Send>>>=Vec::new();
 
 //    let mut in_out_instances : Vec<InOut<'a>>=Vec::new();
 
         for i in 1..instances {
-            let mut buildersmut:  Vec<Box<dyn ArrayBuilder + Send>> =  Vec::with_capacity(antal_col);
+            let mut buildersmut:  Vec<Box<dyn ArrayBuilder + Sync + Send>> =  Vec::with_capacity(antal_col);
             for val in schema.iter() {
                 match val.dtype().as_str() {
                     "i32" => buildersmut.push(Box::new(Int32Builder::new())),
@@ -98,10 +100,10 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 //        let  in_out_arrow: Vec<slice<'a>> = vec![];
 
 
-//        self.masterbuilders.par_iter().enumerate().for_each(|(i, n)| {
+        self.masterbuilders.builders.par_iter().enumerate().for_each(|(i, n)| {
 //            let arc_builders_clone = Arc::clone(&arc_builders);
 //            parse_slice(i, n, &arc_builders_clone);
-//        });
+        });
 
         //let a:&[u8]=    slices.get(0).unwrap();
 //        for slice in slices.iter() {

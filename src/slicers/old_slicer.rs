@@ -73,7 +73,7 @@ fn ceil_amount_of_chunks (a:i64,b:i64)->usize {
 impl<'a> Slicer<'a> for old_slicer<'a> {
      fn slice_and_convert(& mut self,
                           mut converter:  Box<dyn  'a+Converter<'a>>,
-                          in_out_buffers: &'a mut [ChunkAndResidue; 3],
+                          in_buffers: &'a mut [ChunkAndResidue; 3],
                           infile: fs::File,
                           n_threads: usize,
      ) {
@@ -86,7 +86,9 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
          let mut slices: Vec<& [u8]>;
 
 
-         for  cr in &mut *in_out_buffers
+//         for  cr in &mut *in_buffers
+         for  cr in &mut *in_buffers
+
          {
 
             let mut chunk_len_toread = SLICER_IN_CHUNK_SIZE;
