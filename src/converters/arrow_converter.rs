@@ -56,7 +56,7 @@ unsafe impl Sync for MasterBuilders {}
 
 impl MasterBuilders {
 
-    pub fn in_out_instance_factory<'a>(schema_path: PathBuf, instances: i16) -> Self {
+    pub fn builders_factory<'a>(schema_path: PathBuf, instances: i16) -> Self {
         let schema = schema::FixedSchema::from_path(schema_path.into());
         let antal_col = schema.num_columns();
 //    let in_out_instances:&'a mut Vec<InOut<'a>>=    let  in_out_arrow:& mut Vec<InOut> = &mut vec![];
@@ -99,8 +99,13 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 
 //        let  in_out_arrow: Vec<slice<'a>> = vec![];
 
-
+        let arc_slices = Arc::new(& slices);
         self.masterbuilders.builders.par_iter().enumerate().for_each(|(i, n)| {
+
+            let arc_slice_clone = Arc::clone(&arc_slices);
+
+            parse_slice(i, arc_slice_clone.get(i).unwrap(),n);
+
 //            let arc_builders_clone = Arc::clone(&arc_builders);
 //            parse_slice(i, n, &arc_builders_clone);
         });
@@ -125,7 +130,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 
 
 fn
-parse_slice(i:usize, n: &&[u8], builders: &Arc<&Vec<Box<dyn ArrayBuilder>>>)  {
+parse_slice(i:usize, n: &&[u8], builders: &Vec<Box<dyn ArrayBuilder +Send + Sync>>)  {
 
 
     println!("index {} {}", i, n.len());

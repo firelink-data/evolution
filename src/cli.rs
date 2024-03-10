@@ -167,7 +167,7 @@ impl Cli {
                 let converter_instance: Box<dyn  Converter> = match converter {
 
                     Converters::Arrow => {
-                        let master_builders=MasterBuilders::in_out_instance_factory(schema.to_path_buf(), n_threads as i16,);
+                        let master_builders=MasterBuilders::builders_factory(schema.to_path_buf(), n_threads as i16,);
 
                         let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { file_out: _out_file, fn_line_break: find_last_nl,masterbuilders: master_builders});
 
