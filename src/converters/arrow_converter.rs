@@ -103,26 +103,9 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         self.masterbuilders.builders.par_iter().enumerate().for_each(|(i, n)| {
 
             let arc_slice_clone = Arc::clone(&arc_slices);
-
             parse_slice(i, arc_slice_clone.get(i).unwrap(),n);
 
-//            let arc_builders_clone = Arc::clone(&arc_builders);
-//            parse_slice(i, n, &arc_builders_clone);
         });
-
-        //let a:&[u8]=    slices.get(0).unwrap();
-//        for slice in slices.iter() {
-
-//        }
-
-//        let arc_builders = Arc::new(&self.builders);
-//        let chunks:Chunk<?>;
-//        let arc_masterbuilder = Arc::new(&self.master_builder);
-        // TODO declare a array of chunks[slices.len]  , pass it on to the parse_slice funktion
-//        slices.par_iter().enumerate().for_each(|(i, n)| {
-//            let arc_builders_clone = Arc::clone(&arc_builders);
-//            parse_slice(i, n, &arc_builders_clone);
-//        });
 
         bytes_processed
     }
