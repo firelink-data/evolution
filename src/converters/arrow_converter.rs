@@ -25,7 +25,7 @@
 * Last updated: 2023-11-21
 */
 
-use std::fmt::Debug;
+use std::fmt::{Debug, Pointer};
 use std::fs::File;
 use std::path::PathBuf;
 use std::str::from_utf8_unchecked;
@@ -65,7 +65,7 @@ impl MasterBuilders {
 
 //    let mut in_out_instances : Vec<InOut<'a>>=Vec::new();
 
-        for i in 1..instances {
+        for i in 1..=instances {
             let mut buildersmut:  Vec<Box<dyn ArrayBuilder + Sync + Send>> =  Vec::with_capacity(antal_col);
             for val in schema.iter() {
                 match val.dtype().as_str() {
@@ -113,7 +113,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 
 
 fn
-parse_slice(i:usize, n: &&[u8], builders: &Vec<Box<dyn ArrayBuilder +Send + Sync>>)  {
+parse_slice(i:usize, n: &&[u8], mut builders: &Vec<Box<dyn ArrayBuilder +Send + Sync>>)  {
 
 
     println!("index {} {}", i, n.len());
@@ -124,7 +124,10 @@ parse_slice(i:usize, n: &&[u8], builders: &Vec<Box<dyn ArrayBuilder +Send + Sync
     let text:&str = unsafe {
         from_utf8_unchecked(&n)
     };
+    for cb in builders {
 
+    }
+//    println!("texten={}",text);
     let offset=0;
 }
 
