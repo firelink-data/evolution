@@ -25,14 +25,16 @@
 * Last updated: 2023-12-14
 */
 
+use crate::slicers::IterRevolver;
 use std::{cmp, fs};
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
 use rayon::prelude::*;
 use log::info;
 use crate::converters::Converter;
-use crate::slicers::{ChunkAndResidue, find_last_nl, FnLineBreak, Slicer};
+use crate::slicers::{ChunkAndResidue, find_last_nl, FnLineBreak,  Slicer};
 use chrono::format::Item;
+use crate::slicers;
 
 /**
 GOAL(s)
@@ -63,12 +65,12 @@ pub(crate) type Chunk =[u8; SLICER_IN_CHUNK_SIZE];
 pub(crate) struct old_slicer<'a> {
     pub(crate) fn_line_break: FnLineBreak<'a>,
 }
-
-
+ 
 fn ceil_amount_of_chunks (a:i64,b:i64)->usize {
 
     (a / b + (a % b).signum() ) as usize
 }
+
 
 impl<'a> Slicer<'a> for old_slicer<'a> {
      fn slice_and_convert(& mut self,
@@ -77,6 +79,8 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
                           infile: fs::File,
                           n_threads: usize,
      ) {
+
+
         let mut bytes_processed = 0;
 
         let mut remaining_file_length = infile.metadata().unwrap().len() as usize;
@@ -85,19 +89,21 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
          let mut residue_len = 0;
          let mut slices: Vec<& [u8]>;
 
+        let mut ir=IterRevolver {
+            shards:  in_buffers.as_mut_ptr(),
+            next: 0,
+            len: in_buffers.len(),
+            phantom:  std::marker::PhantomData,
+        };
 
-//         for  cr in &mut *in_buffers
-         for  cr in &mut *in_buffers
 
+        loop
          {
-
+            let mut cr=ir.next().unwrap();
             let mut chunk_len_toread = SLICER_IN_CHUNK_SIZE;
             if remaining_file_length < SLICER_IN_CHUNK_SIZE {
                 chunk_len_toread = remaining_file_length;
             }
-
-
-//             let mut the_residue= Box::new( [0_u8; SLICER_MAX_RESIDUE_SIZE]);
 
             let chunk_len_effective_read: usize;
 
@@ -115,13 +121,10 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
 
 
              let bytes_processed_for_slices = converter.process(slices);
-//            let bytes_processed_for_slices =0;
 
             bytes_processed += bytes_processed_for_slices;
             bytes_processed += residue_len;
 
-//            next_chunk += 1;
- //           next_chunk %= IN_MAX_CHUNKS as usize;
 
             if remaining_file_length == 0 {
                 if 0 != residue_len {

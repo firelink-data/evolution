@@ -103,7 +103,11 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         self.masterbuilders.builders.par_iter().enumerate().for_each(|(i, n)| {
 
             let arc_slice_clone = Arc::clone(&arc_slices);
-            parse_slice(i, arc_slice_clone.get(i).unwrap(),n);
+            match arc_slice_clone.get(i) {
+                None => {}
+                Some(_) => {            parse_slice(i, arc_slice_clone.get(i).unwrap(),n);}
+            }
+
 
         });
 
@@ -125,7 +129,7 @@ parse_slice(i:usize, n: &&[u8], mut builders: &Vec<Box<dyn ArrayBuilder +Send + 
         from_utf8_unchecked(&n)
     };
     for cb in builders {
-
+//        cb.
     }
 //    println!("texten={}",text);
     let offset=0;
