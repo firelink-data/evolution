@@ -50,8 +50,7 @@ fn main() {
 
     /// Effektiv med fixa buffrar men fult att allokeringen ligger här ...känns banalt.
     let  in_out_buffers:  & mut [ChunkAndResidue; IN_MAX_CHUNKS] = & mut [  ChunkAndResidue {chunk: Box::new(   [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])},
-        ChunkAndResidue {chunk: Box::new(  [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])},
-        ChunkAndResidue {chunk: Box::new(  [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])}  ];
+        ChunkAndResidue {chunk: Box::new(  [0_u8; SLICER_IN_CHUNK_SIZE]),residue: Box::new(  [0_u8; SLICER_MAX_RESIDUE_SIZE])} ];
 
 
     match cli.run(in_out_buffers) {

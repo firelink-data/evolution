@@ -109,7 +109,7 @@ enum Commands {
 
 impl Cli {
 
-    pub fn run<'a>(& self, in_buffers: & mut [ChunkAndResidue; 3] ) -> Result<(), error::ExecutionError> {
+    pub fn run<'a>(& self, in_buffers: & mut [ChunkAndResidue; IN_MAX_CHUNKS] ) -> Result<(), error::ExecutionError> {
 
         let n_logical_threads = num_cpus::get();
         let mut n_threads: usize = self.n_threads as usize;

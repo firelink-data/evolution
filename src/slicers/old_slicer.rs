@@ -55,7 +55,7 @@ in_chunk_cores (how man splits will be made)
 pub(crate) const SLICER_IN_CHUNK_SIZE: usize = 1024 * 1024;
 pub(crate) const SLICER_MAX_RESIDUE_SIZE: usize = SLICER_IN_CHUNK_SIZE;
 
-pub(crate) const IN_MAX_CHUNKS: usize = 3;
+pub(crate) const IN_MAX_CHUNKS: usize = 2;
 
 //struct Chunk {
 //    chunk: [u8;SLICER_IN_CHUNK_SIZE]
@@ -75,7 +75,7 @@ fn ceil_amount_of_chunks (a:i64,b:i64)->usize {
 impl<'a> Slicer<'a> for old_slicer<'a> {
      fn slice_and_convert(& mut self,
                           mut converter:  Box<dyn  'a+Converter<'a>>,
-                          in_buffers: &'a mut [ChunkAndResidue; 3],
+                          in_buffers: &'a mut [ChunkAndResidue; IN_MAX_CHUNKS],
                           infile: fs::File,
                           n_threads: usize,
      ) {

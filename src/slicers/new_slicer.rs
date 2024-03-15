@@ -34,7 +34,7 @@ use std::{cmp, fs};
 use rayon::prelude::*;
 use crate::slicers::{ChunkAndResidue, find_last_nl, FnLineBreak, Slicer};
 use chrono::format::Item;
-use crate::slicers::old_slicer::SLICER_IN_CHUNK_SIZE;
+use crate::slicers::old_slicer::{IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE};
 
 
 pub(crate) static DEFAULT_SLICE_BUFFER_LEN: usize = 1024 * 1024;
@@ -52,7 +52,7 @@ pub struct new_slicer<'a> {
 impl<'a> Slicer<'a> for new_slicer<'a> {
      fn slice_and_convert(& mut self,
                           mut converter: Box<dyn  'a+Converter<'a>>,
-                          in_buffers: &'a mut [ChunkAndResidue; 3],
+                          in_buffers: &'a mut [ChunkAndResidue; IN_MAX_CHUNKS],
                           infile: fs::File,
                           n_threads: usize,
      ) {

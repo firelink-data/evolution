@@ -32,7 +32,8 @@ use std::str::from_utf8_unchecked;
 use rayon::prelude::*;
 use rayon::iter::IndexedParallelIterator;
 use std::sync::Arc;
-use arrow::array::{ArrayBuilder, BooleanBuilder, Int32Builder, Int64Builder, PrimitiveArray, StringBuilder};
+use arrow::array::{ArrayBuilder, BooleanBuilder, Int32Builder, Int64Builder, PrimitiveArray, PrimitiveBuilder, StringBuilder};
+use arrow::datatypes::Int32Type;
 use rayon::iter::plumbing::{bridge, Producer};
 use crate::converters::{ColumnBuilder, Converter};
 use crate::converters::arrow2_converter::MasterBuilder;
@@ -116,6 +117,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 }
 
 
+
 fn
 parse_slice(i:usize, n: &&[u8], mut builders: &Vec<Box<dyn ArrayBuilder +Send + Sync>>)  {
 
@@ -128,14 +130,24 @@ parse_slice(i:usize, n: &&[u8], mut builders: &Vec<Box<dyn ArrayBuilder +Send + 
     let text:&str = unsafe {
         from_utf8_unchecked(&n)
     };
-    for cb in builders {
-//        cb.
+    for mut cb in builders {
+//        cb.parse_value("asdasd");
     }
 //    println!("texten={}",text);
     let offset=0;
 }
 
+//impl<T: ArrayBuilder> ColumnBuilder for PrimitiveBuilder<Int32Type>
+impl ColumnBuilder for dyn ArrayBuilder
+{
+    fn parse_value(&mut self, name: &str) {
+        todo!()
+    }
 
+    fn lenght_in_chars(&mut self) -> i16 {
+        todo!()
+    }
+}
 impl ColumnBuilder for Int32Builder {
     fn parse_value(&mut self, name: &str)
         where
@@ -175,6 +187,27 @@ impl ColumnBuilder for Int64Builder {
             }
         };
     }
+
+    fn lenght_in_chars(&mut self) -> i16 {
+        todo!()
+    }
+}
+
+impl ColumnBuilder for StringBuilder {
+    fn parse_value(&mut self, name: &str)
+        where
+            Self: Sized,
+    {
+        match name.is_empty() {
+            false => {
+                self.append_value(name);
+            }
+            true => {
+                self.append_null();
+            }
+        };
+    }
+
 
     fn lenght_in_chars(&mut self) -> i16 {
         todo!()
