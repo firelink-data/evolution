@@ -42,6 +42,7 @@ use crate::schema;
 use crate::slicers::FnLineBreak;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::prelude::*;
+use substring::Substring;
 
 pub(crate) struct Slice2Arrow<'a> {
     pub(crate) file_out: File,
@@ -132,8 +133,12 @@ parse_slice(i:usize, n: &&[u8], mut builders: &mut Vec<Box<dyn ColumnBuilder +Se
     let text:&str = unsafe {
         from_utf8_unchecked(&n)
     };
+    let mut start=0;
+    let mut end:usize = 0;
+
     for mut cb in builders {
-        cb.parse_value("asdasd");
+        end=end+cb.lenght_in_chars();
+        cb.parse_value(text.substring(start,end));
     }
 //    println!("texten={}",text);
     let offset=0;
@@ -161,7 +166,7 @@ impl ColumnBuilder for HandlerInt32Builder {
     }
 
 
-    fn lenght_in_chars(&mut self) -> i16 {
+    fn lenght_in_chars(&mut self) -> usize {
         todo!()
     }
 
@@ -186,7 +191,7 @@ impl ColumnBuilder for HandlerInt64Builder {
         };
     }
 
-    fn lenght_in_chars(&mut self) -> i16 {
+    fn lenght_in_chars(&mut self) -> usize {
         todo!()
     }
 
@@ -210,7 +215,7 @@ impl ColumnBuilder for HandlerStringBuilder {
     }
 
 
-    fn lenght_in_chars(&mut self) -> i16 {
+    fn lenght_in_chars(&mut self) -> usize {
         todo!()
     }
 
@@ -239,7 +244,7 @@ impl ColumnBuilder for HandlerBooleanBuilder {
 
 
 
-    fn lenght_in_chars(&mut self) -> i16 {
+    fn lenght_in_chars(&mut self) -> usize {
         todo!()
     }
 

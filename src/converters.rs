@@ -44,6 +44,6 @@ pub(crate) trait Converter<'a> {
 
 pub trait ColumnBuilder {
     fn parse_value(&mut self, name: &str);
-    fn lenght_in_chars(&mut self) -> i16;
+    fn lenght_in_chars(&mut self) -> usize;
 }
 
