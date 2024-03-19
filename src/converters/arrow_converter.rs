@@ -74,8 +74,8 @@ impl MasterBuilders {
                 match val.dtype().as_str() {
                     "i32" => buildersmut.push(Box::new(HandlerInt32Builder { int32builder: Int32Builder::new() }   )),
                     "i64" => buildersmut.push(Box::new(HandlerInt64Builder { int64builder: Int64Builder::new() }   )),
-                    "boolean" => buildersmut.push(Box::new( HandlerBooleanBuilder  { BooleanBuilder: BooleanBuilder::new()  })),
-                    "utf8" => buildersmut.push(Box::new( HandlerStringBuilder {StringBuilder: StringBuilder::new()})),
+                    "boolean" => buildersmut.push(Box::new( HandlerBooleanBuilder  { boolean_builder: BooleanBuilder::new()  })),
+                    "utf8" => buildersmut.push(Box::new( HandlerStringBuilder {string_builder: StringBuilder::new()})),
 
                     &_ => {}
                 };
@@ -192,7 +192,7 @@ impl ColumnBuilder for HandlerInt64Builder {
 
 }
 struct HandlerStringBuilder {
-    StringBuilder: StringBuilder
+    string_builder: StringBuilder
 }
 impl ColumnBuilder for HandlerStringBuilder {
     fn parse_value(&mut self, name: &str)
@@ -201,10 +201,10 @@ impl ColumnBuilder for HandlerStringBuilder {
     {
         match name.is_empty() {
             false => {
-                self.StringBuilder.append_value(name);
+                self.string_builder.append_value(name);
             }
             true => {
-                self.StringBuilder.append_null();
+                self.string_builder.append_null();
             }
         };
     }
@@ -217,7 +217,7 @@ impl ColumnBuilder for HandlerStringBuilder {
 }
 
 struct HandlerBooleanBuilder {
-    BooleanBuilder: BooleanBuilder
+    boolean_builder: BooleanBuilder
 }
 
 
@@ -228,10 +228,10 @@ impl ColumnBuilder for HandlerBooleanBuilder {
     {
         match name.parse::<bool>() {
             Ok(n) => {
-                self.BooleanBuilder.append_value(n);
+                self.boolean_builder.append_value(n);
             }
             Err(_e) => {
-                self.BooleanBuilder.append_null();
+                self.boolean_builder.append_null();
             }
         };
     }
