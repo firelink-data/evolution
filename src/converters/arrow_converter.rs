@@ -25,6 +25,7 @@
 * Last updated: 2023-11-21
 */
 
+use std::any::Any;
 use std::fmt::{Debug, Pointer};
 use std::fs::File;
 use std::path::PathBuf;
@@ -49,7 +50,7 @@ pub(crate) struct Slice2Arrow<'a> {
 }
 
 pub(crate) struct MasterBuilders {
-     builders: Vec<Vec<Box<dyn  Sync + Send   + ArrayBuilder>>>
+     builders: Vec<Vec<Box<dyn  Sync + Send   + ColumnBuilder>>>
 }
 
 unsafe impl Send for MasterBuilders {}
@@ -62,18 +63,19 @@ impl MasterBuilders {
         let antal_col = schema.num_columns();
 //    let in_out_instances:&'a mut Vec<InOut<'a>>=    let  in_out_arrow:& mut Vec<InOut> = &mut vec![];
 //    ;
-        let mut builders:Vec<Vec<Box<dyn ArrayBuilder + Sync + Send>>>=Vec::new();
+//        let mut builders:Vec<Vec<Box<dyn ArrayBuilder + Sync + Send>>>=Vec::new();
+        let mut builders:Vec<Vec<Box<dyn ColumnBuilder + Sync + Send>>>=Vec::new();
 
 //    let mut in_out_instances : Vec<InOut<'a>>=Vec::new();
 
         for i in 1..=instances {
-            let mut buildersmut:  Vec<Box<dyn ArrayBuilder + Sync + Send>> =  Vec::with_capacity(antal_col);
+            let mut buildersmut:  Vec<Box<dyn ColumnBuilder + Sync + Send>> =  Vec::with_capacity(antal_col);
             for val in schema.iter() {
                 match val.dtype().as_str() {
-                    "i32" => buildersmut.push(Box::new(Int32Builder::new())),
-                    "i64" => buildersmut.push(Box::new(Int64Builder::new())),
-                    "boolean" => buildersmut.push(Box::new(BooleanBuilder::new())),
-                    "utf8" => buildersmut.push(Box::new(StringBuilder::new())),
+                    "i32" => buildersmut.push(Box::new(HandlerInt32Builder { int32builder: Int32Builder::new() }   )),
+                    "i64" => buildersmut.push(Box::new(HandlerInt64Builder { int64builder: Int64Builder::new() }   )),
+                    "boolean" => buildersmut.push(Box::new( HandlerBooleanBuilder  { BooleanBuilder: BooleanBuilder::new()  })),
+                    "utf8" => buildersmut.push(Box::new( HandlerStringBuilder {StringBuilder: StringBuilder::new()})),
 
                     &_ => {}
                 };
@@ -119,7 +121,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 
 
 fn
-parse_slice(i:usize, n: &&[u8], mut builders: &Vec<Box<dyn ArrayBuilder +Send + Sync>>)  {
+parse_slice(i:usize, n: &&[u8], mut builders: &Vec<Box<dyn ColumnBuilder +Send + Sync>>)  {
 
 
     println!("index {} {}", i, n.len());
@@ -137,25 +139,18 @@ parse_slice(i:usize, n: &&[u8], mut builders: &Vec<Box<dyn ArrayBuilder +Send + 
     let offset=0;
 }
 
-//impl<T: ArrayBuilder> ColumnBuilder for PrimitiveBuilder<Int32Type>
-impl ColumnBuilder for dyn ArrayBuilder
-{
-    fn parse_value(&mut self, name: &str) {
-        todo!()
-    }
-
-    fn lenght_in_chars(&mut self) -> i16 {
-        todo!()
-    }
+struct HandlerInt32Builder {
+    int32builder: Int32Builder
 }
-impl ColumnBuilder for Int32Builder {
+
+impl ColumnBuilder for HandlerInt32Builder {
     fn parse_value(&mut self, name: &str)
         where
             Self: Sized,
     {
         match name.parse::<i32>() {
             Ok(n) => {
-                self.append_value(n);
+                self.int32builder.append_value(n);
                 n
             }
             Err(_e) => {
@@ -169,16 +164,19 @@ impl ColumnBuilder for Int32Builder {
     fn lenght_in_chars(&mut self) -> i16 {
         todo!()
     }
-}
 
-impl ColumnBuilder for Int64Builder {
+}
+struct HandlerInt64Builder {
+    int64builder: Int64Builder
+}
+impl ColumnBuilder for HandlerInt64Builder {
     fn parse_value(&mut self, name: &str)
         where
             Self: Sized,
     {
         match name.parse::<i64>() {
             Ok(n) => {
-                self.append_value(n);
+                self.int64builder.append_value(n);
                 n
             }
             Err(_e) => {
@@ -191,19 +189,22 @@ impl ColumnBuilder for Int64Builder {
     fn lenght_in_chars(&mut self) -> i16 {
         todo!()
     }
-}
 
-impl ColumnBuilder for StringBuilder {
+}
+struct HandlerStringBuilder {
+    StringBuilder: StringBuilder
+}
+impl ColumnBuilder for HandlerStringBuilder {
     fn parse_value(&mut self, name: &str)
         where
             Self: Sized,
     {
         match name.is_empty() {
             false => {
-                self.append_value(name);
+                self.StringBuilder.append_value(name);
             }
             true => {
-                self.append_null();
+                self.StringBuilder.append_null();
             }
         };
     }
@@ -212,8 +213,36 @@ impl ColumnBuilder for StringBuilder {
     fn lenght_in_chars(&mut self) -> i16 {
         todo!()
     }
+
+}
+
+struct HandlerBooleanBuilder {
+    BooleanBuilder: BooleanBuilder
 }
 
 
+impl ColumnBuilder for HandlerBooleanBuilder {
+    fn parse_value(&mut self, name: &str)
+        where
+            Self: Sized,
+    {
+        match name.parse::<bool>() {
+            Ok(n) => {
+                self.BooleanBuilder.append_value(n);
+            }
+            Err(_e) => {
+                self.BooleanBuilder.append_null();
+            }
+        };
+    }
+
+
+
+
+    fn lenght_in_chars(&mut self) -> i16 {
+        todo!()
+    }
+
+}
 
 

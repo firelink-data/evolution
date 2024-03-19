@@ -25,6 +25,7 @@
 * Last updated: 2023-11-21
 */
 
+use std::any::Any;
 use crate::slicers::FnLineBreak;
 
 pub(crate) mod self_converter;
@@ -44,6 +45,5 @@ pub(crate) trait Converter<'a> {
 pub trait ColumnBuilder {
     fn parse_value(&mut self, name: &str);
     fn lenght_in_chars(&mut self) -> i16;
-
 }
 
