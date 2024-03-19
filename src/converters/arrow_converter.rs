@@ -50,7 +50,7 @@ pub(crate) struct Slice2Arrow<'a> {
 }
 
 pub(crate) struct MasterBuilders {
-     builders: Vec<Vec<Box<dyn  Sync + Send   + ColumnBuilder>>>
+      builders:  Vec<Vec<Box<dyn  Sync + Send   + ColumnBuilder>>>
 }
 
 unsafe impl Send for MasterBuilders {}
@@ -103,7 +103,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 //        let  in_out_arrow: Vec<slice<'a>> = vec![];
 
         let arc_slices = Arc::new(& slices);
-        self.masterbuilders.builders.par_iter().enumerate().for_each(|(i, n)| {
+        self.masterbuilders.builders.par_iter_mut().enumerate().for_each(|(i, mut n)| {
 
             let arc_slice_clone = Arc::clone(&arc_slices);
             match arc_slice_clone.get(i) {
@@ -121,7 +121,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 
 
 fn
-parse_slice(i:usize, n: &&[u8], mut builders: &Vec<Box<dyn ColumnBuilder +Send + Sync>>)  {
+parse_slice(i:usize, n: &&[u8], mut builders: &mut Vec<Box<dyn ColumnBuilder +Send + Sync>>)  {
 
 
     println!("index {} {}", i, n.len());
@@ -133,7 +133,7 @@ parse_slice(i:usize, n: &&[u8], mut builders: &Vec<Box<dyn ColumnBuilder +Send +
         from_utf8_unchecked(&n)
     };
     for mut cb in builders {
-//        cb.parse_value("asdasd");
+        cb.parse_value("asdasd");
     }
 //    println!("texten={}",text);
     let offset=0;
