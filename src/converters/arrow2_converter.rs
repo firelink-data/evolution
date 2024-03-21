@@ -119,9 +119,7 @@ impl ColumnBuilder for ColumnBuilderType<i32> {
         self.rows.push(None);
     }
 
-    fn lenght_in_chars(&mut self) -> i16 {
-        todo!()
-    }
+
 }
 
 impl ColumnBuilder for ColumnBuilderType<i64> {
@@ -155,9 +153,6 @@ impl ColumnBuilder for ColumnBuilderType<i64> {
         self.rows.push(None);
     }
 
-    fn lenght_in_chars(&mut self) -> i16 {
-        todo!()
-    }
 }
 
 
@@ -241,8 +236,6 @@ pub trait ColumnBuilder {
     /// I think this function won't be necessary.
     /// `[arrow2]` supports bitmap nulling out-of-the-box.
     fn nullify(&mut self);
-
-    fn lenght_in_chars(&mut self) -> i16;
 
 }
 

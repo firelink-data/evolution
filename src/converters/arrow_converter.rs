@@ -73,10 +73,10 @@ impl MasterBuilders {
             let mut buildersmut:  Vec<Box<dyn ColumnBuilder + Sync + Send>> =  Vec::with_capacity(antal_col);
             for val in schema.iter() {
                 match val.dtype().as_str() {
-                    "i32" => buildersmut.push(Box::new(HandlerInt32Builder { int32builder: Int32Builder::new() }   )),
-                    "i64" => buildersmut.push(Box::new(HandlerInt64Builder { int64builder: Int64Builder::new() }   )),
-                    "boolean" => buildersmut.push(Box::new( HandlerBooleanBuilder  { boolean_builder: BooleanBuilder::new()  })),
-                    "utf8" => buildersmut.push(Box::new( HandlerStringBuilder {string_builder: StringBuilder::new()})),
+                    "i32" => buildersmut.push(Box::new(HandlerInt32Builder { int32builder: Int32Builder::new(), runes_in_column: val.length() }   )),
+                    "i64" => buildersmut.push(Box::new(HandlerInt64Builder { int64builder: Int64Builder::new(), runes_in_column: val.length() }   )),
+                    "boolean" => buildersmut.push(Box::new( HandlerBooleanBuilder  { boolean_builder: BooleanBuilder::new(), runes_in_column: val.length() })),
+                    "utf8" => buildersmut.push(Box::new( HandlerStringBuilder {string_builder: StringBuilder::new(), runes_in_column: val.length() })),
 
                     &_ => {}
                 };
@@ -130,26 +130,27 @@ parse_slice(i:usize, n: &&[u8], mut builders: &mut Vec<Box<dyn ColumnBuilder +Se
     let start_byte_pos=0;
 
     // TODO make safe/unsafe configurable
-    let text:&str = unsafe {
+    let mut text:&str = unsafe {
         from_utf8_unchecked(&n)
     };
-    let mut start=0;
-    let mut end:usize = 0;
+    let mut cursor:usize = 0;
 
+    let bytelen:usize=0;
     for mut cb in builders {
-        end=end+cb.lenght_in_chars();
-        cb.parse_value(text.substring(start,end));
+         cursor=cb.parse_value(&text[cursor..]);
+        cursor=cursor-bytelen;
     }
 //    println!("texten={}",text);
     let offset=0;
 }
 
 struct HandlerInt32Builder {
-    int32builder: Int32Builder
+    int32builder: Int32Builder,
+    runes_in_column: usize
 }
 
 impl ColumnBuilder for HandlerInt32Builder {
-    fn parse_value(&mut self, name: &str)
+    fn parse_value(&mut self, name: &str )->usize
         where
             Self: Sized,
     {
@@ -163,19 +164,19 @@ impl ColumnBuilder for HandlerInt32Builder {
                 0
             }
         };
+        0
     }
+    // todo fix below
 
-
-    fn lenght_in_chars(&mut self) -> usize {
-        todo!()
-    }
 
 }
 struct HandlerInt64Builder {
-    int64builder: Int64Builder
+    int64builder: Int64Builder,
+    runes_in_column: usize
+
 }
 impl ColumnBuilder for HandlerInt64Builder {
-    fn parse_value(&mut self, name: &str)
+    fn parse_value(&mut self, name: &str ) -> usize
         where
             Self: Sized,
     {
@@ -189,21 +190,20 @@ impl ColumnBuilder for HandlerInt64Builder {
                 0
             }
         };
+        // todo fix below
+    0
     }
-
-    fn lenght_in_chars(&mut self) -> usize {
-        todo!()
-    }
-
 }
 struct HandlerStringBuilder {
-    string_builder: StringBuilder
+    string_builder: StringBuilder,
+    runes_in_column: usize
 }
 impl ColumnBuilder for HandlerStringBuilder {
-    fn parse_value(&mut self, name: &str)
+    fn parse_value(&mut self, name: &str ) -> usize
         where
             Self: Sized,
     {
+
         match name.is_empty() {
             false => {
                 self.string_builder.append_value(name);
@@ -212,22 +212,20 @@ impl ColumnBuilder for HandlerStringBuilder {
                 self.string_builder.append_null();
             }
         };
-    }
-
-
-    fn lenght_in_chars(&mut self) -> usize {
-        todo!()
+        // todo fix below
+    0
     }
 
 }
 
 struct HandlerBooleanBuilder {
-    boolean_builder: BooleanBuilder
+    boolean_builder: BooleanBuilder,
+    runes_in_column: usize
 }
 
 
 impl ColumnBuilder for HandlerBooleanBuilder {
-    fn parse_value(&mut self, name: &str)
+    fn parse_value(&mut self, name: &str ) -> usize
         where
             Self: Sized,
     {
@@ -239,14 +237,11 @@ impl ColumnBuilder for HandlerBooleanBuilder {
                 self.boolean_builder.append_null();
             }
         };
+        // todo fix below
+    0
     }
 
 
-
-
-    fn lenght_in_chars(&mut self) -> usize {
-        todo!()
-    }
 
 }
 
