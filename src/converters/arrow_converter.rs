@@ -122,7 +122,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 
 
 fn
-parse_slice(i:usize, n: &&[u8], mut builders: &mut Vec<Box<dyn ColumnBuilder +Send + Sync>>)  {
+parse_slice(i:usize, n: &[u8], mut builders: &mut Vec<Box<dyn ColumnBuilder +Send + Sync>>)  {
 
 
     println!("index {} {}", i, n.len());
@@ -133,6 +133,7 @@ parse_slice(i:usize, n: &&[u8], mut builders: &mut Vec<Box<dyn ColumnBuilder +Se
     let mut text:&str = unsafe {
         from_utf8_unchecked(&n)
     };
+    print!("hhahah {}",&n[1]);
     let mut cursor:usize = 0;
 
     let bytelen:usize=0;
@@ -150,11 +151,13 @@ struct HandlerInt32Builder {
 }
 
 impl ColumnBuilder for HandlerInt32Builder {
-    fn parse_value(&mut self, name: &str )->usize
+    fn parse_value(&mut self, data: &str ) ->usize
         where
             Self: Sized,
     {
-        match name.parse::<i32>() {
+        let columnLength:usize=columnLenght(self.runes_in_column);
+
+        match data.parse::<i32>() {
             Ok(n) => {
                 self.int32builder.append_value(n);
                 n
@@ -164,7 +167,7 @@ impl ColumnBuilder for HandlerInt32Builder {
                 0
             }
         };
-        0
+        columnLength
     }
     // todo fix below
 
@@ -173,14 +176,14 @@ impl ColumnBuilder for HandlerInt32Builder {
 struct HandlerInt64Builder {
     int64builder: Int64Builder,
     runes_in_column: usize
-
 }
 impl ColumnBuilder for HandlerInt64Builder {
-    fn parse_value(&mut self, name: &str ) -> usize
+    fn parse_value(&mut self, data: &str ) -> usize
         where
             Self: Sized,
     {
-        match name.parse::<i64>() {
+        let columnLength:usize=columnLenght(self.runes_in_column);
+        match data[..columnLength].parse::<i64>() {
             Ok(n) => {
                 self.int64builder.append_value(n);
                 n
@@ -191,29 +194,35 @@ impl ColumnBuilder for HandlerInt64Builder {
             }
         };
         // todo fix below
-    0
+    columnLength
     }
 }
+
+fn columnLenght(p0: usize) -> usize {
+    todo!()
+}
+
 struct HandlerStringBuilder {
     string_builder: StringBuilder,
     runes_in_column: usize
 }
 impl ColumnBuilder for HandlerStringBuilder {
-    fn parse_value(&mut self, name: &str ) -> usize
+    fn parse_value(&mut self, data: &str ) -> usize
         where
             Self: Sized,
     {
+        let columnLength:usize=columnLenght(self.runes_in_column);
 
-        match name.is_empty() {
+        match data.is_empty() {
             false => {
-                self.string_builder.append_value(name);
+                self.string_builder.append_value(data);
             }
             true => {
                 self.string_builder.append_null();
             }
         };
         // todo fix below
-    0
+    columnLength
     }
 
 }
@@ -225,11 +234,13 @@ struct HandlerBooleanBuilder {
 
 
 impl ColumnBuilder for HandlerBooleanBuilder {
-    fn parse_value(&mut self, name: &str ) -> usize
+    fn parse_value(&mut self, data: &str ) -> usize
         where
             Self: Sized,
     {
-        match name.parse::<bool>() {
+        let columnLength:usize=columnLenght(self.runes_in_column);
+
+        match data.parse::<bool>() {
             Ok(n) => {
                 self.boolean_builder.append_value(n);
             }
@@ -238,7 +249,7 @@ impl ColumnBuilder for HandlerBooleanBuilder {
             }
         };
         // todo fix below
-    0
+    columnLength
     }
 
 
