@@ -43,6 +43,7 @@ pub(crate) trait Converter<'a> {
 }
 
 pub trait ColumnBuilder {
-    fn parse_value(&mut self, name: &str)->usize;
+    fn parse_value(&mut self, name: &[u8]) ->usize;
+
 }
 

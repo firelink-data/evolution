@@ -138,7 +138,7 @@ parse_slice(i:usize, n: &[u8], mut builders: &mut Vec<Box<dyn ColumnBuilder +Sen
 
     let bytelen:usize=0;
     for mut cb in builders {
-         cursor=cb.parse_value(&text[cursor..]);
+         cursor=cb.parse_value(n);
         cursor=cursor-bytelen;
     }
 //    println!("texten={}",text);
@@ -151,20 +151,18 @@ struct HandlerInt32Builder {
 }
 
 impl ColumnBuilder for HandlerInt32Builder {
-    fn parse_value(&mut self, data: &str ) ->usize
+    fn parse_value(&mut self, data: &[u8]) ->usize
         where
             Self: Sized,
     {
         let columnLength:usize=columnLenght(self.runes_in_column);
 
-        match data.parse::<i32>() {
+        match atoi_simd::parse(&data[..columnLength]) {
             Ok(n) => {
                 self.int32builder.append_value(n);
-                n
             }
             Err(_e) => {
-//                self.nullify();
-                0
+                self.int32builder.append_null();
             }
         };
         columnLength
@@ -178,19 +176,17 @@ struct HandlerInt64Builder {
     runes_in_column: usize
 }
 impl ColumnBuilder for HandlerInt64Builder {
-    fn parse_value(&mut self, data: &str ) -> usize
+    fn parse_value(&mut self, data: &[u8]) -> usize
         where
             Self: Sized,
     {
         let columnLength:usize=columnLenght(self.runes_in_column);
-        match data[..columnLength].parse::<i64>() {
+        match atoi_simd::parse(&data[..columnLength]) {
             Ok(n) => {
                 self.int64builder.append_value(n);
-                n
             }
             Err(_e) => {
-//                self.nullify();
-                0
+                self.int64builder.append_null();
             }
         };
         // todo fix below
@@ -207,15 +203,19 @@ struct HandlerStringBuilder {
     runes_in_column: usize
 }
 impl ColumnBuilder for HandlerStringBuilder {
-    fn parse_value(&mut self, data: &str ) -> usize
+    fn parse_value(&mut self, data: &[u8]) -> usize
         where
             Self: Sized,
     {
         let columnLength:usize=columnLenght(self.runes_in_column);
+// Me dont like ... what is the cost ? Could it be done once for the whole chunk ?
+        let mut text:&str = unsafe {
+            from_utf8_unchecked(&data)
+        };
 
-        match data.is_empty() {
+        match text[..columnLength].is_empty() {
             false => {
-                self.string_builder.append_value(data);
+                self.string_builder.append_value(&text[..columnLength]);
             }
             true => {
                 self.string_builder.append_null();
@@ -234,13 +234,17 @@ struct HandlerBooleanBuilder {
 
 
 impl ColumnBuilder for HandlerBooleanBuilder {
-    fn parse_value(&mut self, data: &str ) -> usize
+    fn parse_value(&mut self, data: &[u8]) -> usize
         where
             Self: Sized,
     {
         let columnLength:usize=columnLenght(self.runes_in_column);
 
-        match data.parse::<bool>() {
+        let mut text:&str = unsafe {
+            from_utf8_unchecked(&data)
+        };
+
+        match text[..columnLength]. parse::<bool>() {
             Ok(n) => {
                 self.boolean_builder.append_value(n);
             }

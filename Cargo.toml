@@ -6,8 +6,6 @@ description = "🦖 Evolve your fixed length data files into Apache Arrow tables
 authors = [
     "Wilhelm Ågren <wilhelmagren98@gmail.com>",
 ]
-[build]
-rustflags = ["-C", "target-cpu=native"]
 
 readme = "README.md"
 license-file = "LICENSE"
@@ -18,6 +16,8 @@ keywords = [ "cli", "arrow", "data-engineering",
 "apache-parquet", "apache-arrow" ]
 include = [ "**/*.rs", "Cargo.toml", "LICENSE", "README.md" ]
 default-run = "evolution"
+# This is nom nom nom for SIMD
+
 
 [dependencies]
 arrow2 = { version = "0.18.0", features = ["io_ipc"] }
