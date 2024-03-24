@@ -155,7 +155,7 @@ impl ColumnBuilder for HandlerInt32Builder {
         where
             Self: Sized,
     {
-        let columnLength:usize=columnLenght(self.runes_in_column);
+        let columnLength:usize=columnLenght(self.runes_in_column,data );
 
         match atoi_simd::parse(&data[..columnLength]) {
             Ok(n) => {
@@ -180,7 +180,7 @@ impl ColumnBuilder for HandlerInt64Builder {
         where
             Self: Sized,
     {
-        let columnLength:usize=columnLenght(self.runes_in_column);
+        let columnLength:usize=columnLenght(self.runes_in_column,data);
         match atoi_simd::parse(&data[..columnLength]) {
             Ok(n) => {
                 self.int64builder.append_value(n);
@@ -194,8 +194,39 @@ impl ColumnBuilder for HandlerInt64Builder {
     }
 }
 
-fn columnLenght(p0: usize) -> usize {
-    todo!()
+fn columnLenght(p0: usize, data: &[u8]) -> usize {
+    let mut eat=data.iter().peekable();
+    let mut len:usize =0;
+    
+//    for b in data {
+    loop {
+            if  eat.peek().is_none() {
+                len
+            }
+                if *eat.next().unwrap() >> 7 == 0 {
+                {
+                    if eat.peek().is_none() {
+                       len
+                    }
+
+                    if *eat.next().unwrap() >> 5 == 0b110 {
+                        if eat.peek().is_none() {
+                           len
+                        }
+                     if {
+                            *eat.next().unwrap() >> 4 == 0b1110
+                         {
+                            if eat.peek().is_some() if { *eat.next().unwrap() >> 3 == 0b11110 {}
+
+                        }
+                    }
+                }
+
+            }
+
+    }
+
+    0
 }
 
 struct HandlerStringBuilder {
@@ -207,7 +238,7 @@ impl ColumnBuilder for HandlerStringBuilder {
         where
             Self: Sized,
     {
-        let columnLength:usize=columnLenght(self.runes_in_column);
+        let columnLength:usize=columnLenght(self.runes_in_column, data);
 // Me dont like ... what is the cost ? Could it be done once for the whole chunk ?
         let mut text:&str = unsafe {
             from_utf8_unchecked(&data)
@@ -238,7 +269,7 @@ impl ColumnBuilder for HandlerBooleanBuilder {
         where
             Self: Sized,
     {
-        let columnLength:usize=columnLenght(self.runes_in_column);
+        let columnLength:usize=columnLenght(self.runes_in_column, data);
 
         let mut text:&str = unsafe {
             from_utf8_unchecked(&data)
