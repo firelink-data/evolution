@@ -196,15 +196,9 @@ impl ColumnBuilder for HandlerInt64Builder {
     columnLength
     }
 }
-fn next_byte() -> Option<std::io::Result<u8>> {
-    let byte = self.bytes.next()?;
-    self.offset += 1;
-
-    Some(byte)
-}
 // Might be better of to copy the actual data to array<str>[colnr]
 
-fn columnLenght(cursor: usize, data: &[u8]) -> Option<Self::Item> {
+fn columnLenght(cursor: usize, data: &[u8]) -> usize {
 //    let mut eat=data.iter().peekable();
     let mut eat=data.iter();
 
@@ -216,24 +210,24 @@ fn columnLenght(cursor: usize, data: &[u8]) -> Option<Self::Item> {
 //       while eat.nth(units)? {
         let byten=    eat.nth(units);
 
-    let b:u8=match byten {
+    let bb:u8=match byten {
         None => {
-            return None;
+            return len;
         }
-        Some(bb) => {
-            return bb
+        Some(b) => {
+            *b
         }
-    }
+    };
 
         loop {
-        units = match eat.nth(units)? {
-            Ok(byte) if byte >> 7 == 0 => 1,
-            Ok(byte) if byte >> 5 == 0b110 =>  2,
-            Ok(byte) if byte >> 4 == 0b1110 =>  3,
-            Ok(byte) if byte >> 3 == 0b11110 => 4,
-            Ok(byte) => {
+        units = match bb {
+            bb if bb >> 7 == 0 => 1,
+            bb if bb >> 5 == 0b110 =>  2,
+            bb if bb >> 4 == 0b1110 =>  3,
+            bb if bb >> 3 == 0b11110 => 4,
+            bb => {
 // TODO BAD ERROR HANDL
-                return 0;
+                0
             }
         };
 
