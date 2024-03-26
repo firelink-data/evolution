@@ -25,10 +25,13 @@
 * Last updated: 2023-11-21
 */
 
+use arrow2::error::Error;
 use std::any::Any;
 use std::fmt::{Debug, Pointer};
 use std::fs::File;
+use std::os::unix::raw::uid_t;
 use std::path::PathBuf;
+use std::slice::Iter;
 use std::str::from_utf8_unchecked;
 use rayon::prelude::*;
 use rayon::iter::IndexedParallelIterator;
@@ -193,16 +196,51 @@ impl ColumnBuilder for HandlerInt64Builder {
     columnLength
     }
 }
+fn next_byte() -> Option<std::io::Result<u8>> {
+    let byte = self.bytes.next()?;
+    self.offset += 1;
 
-fn columnLenght(p0: usize, data: &[u8]) -> usize {
-    let mut eat=data.iter().peekable();
+    Some(byte)
+}
+// Might be better of to copy the actual data to array<str>[colnr]
+
+fn columnLenght(cursor: usize, data: &[u8]) -> Option<Self::Item> {
+//    let mut eat=data.iter().peekable();
+    let mut eat=data.iter();
+
     let mut len:usize =0;
-    
+    let mut units=1;
+
 //    for b in data {
-    loop {
-            if  eat.peek().is_none() {
-                len
+//    while eat.peek().is_some() {
+//       while eat.nth(units)? {
+        let byten=    eat.nth(units);
+
+    let b:u8=match byten {
+        None => {
+            return None;
+        }
+        Some(bb) => {
+            return bb
+        }
+    }
+
+        loop {
+        units = match eat.nth(units)? {
+            Ok(byte) if byte >> 7 == 0 => 1,
+            Ok(byte) if byte >> 5 == 0b110 =>  2,
+            Ok(byte) if byte >> 4 == 0b1110 =>  3,
+            Ok(byte) if byte >> 3 == 0b11110 => 4,
+            Ok(byte) => {
+// TODO BAD ERROR HANDL
+                return 0;
             }
+        };
+
+        len+=units;
+    }
+/*
+
                 if *eat.next().unwrap() >> 7 == 0 {
                 {
                     if eat.peek().is_none() {
@@ -225,9 +263,10 @@ fn columnLenght(p0: usize, data: &[u8]) -> usize {
             }
 
     }
-
-    0
+*/
+    len
 }
+
 
 struct HandlerStringBuilder {
     string_builder: StringBuilder,
