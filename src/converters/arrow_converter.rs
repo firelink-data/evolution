@@ -160,6 +160,10 @@ impl ColumnBuilder for HandlerInt32Builder {
     {
         let columnLength:usize=columnLenght(self.runes_in_column, data, self.runes_in_column as i16);
 
+        let column_string = unsafe {
+            String::from_utf8_unchecked((&data[..columnLength]).to_vec())
+        };
+        print!("column= {}",column_string);
         match atoi_simd::parse(&data[..columnLength]) {
             Ok(n) => {
                 self.int32builder.append_value(n);
@@ -198,67 +202,72 @@ impl ColumnBuilder for HandlerInt64Builder {
 }
 // Might be better of to copy the actual data to array<str>[colnr]
 
-fn columnLenght(cursor: usize, data: &[u8], runes: i16) -> usize {
-//    let mut eat=data.iter().peekable();
-    let mut eat=data.iter();
+    fn columnLenght(cursor: usize, data: &[u8], runes: i16) -> usize {
+        let mut eat=data.iter();
+        let mut counted_runes=0;
+        let mut len:usize =0;
+        let mut units=1;
 
-    let mut len:usize =0;
+            while counted_runes< runes as usize {
+
+                let byten=    eat.nth(units-1);
+
+                let bb:u8=match byten {
+                    None => {
+                        return len;
+                    }
+                    Some(b) => {
+                        *b
+                    }
+                };
+
+            units = match bb {
+                bb if bb >> 7 == 0 => 1,
+                bb if bb >> 5 == 0b110 =>  2,
+                bb if bb >> 4 == 0b1110 =>  3,
+                bb if bb >> 3 == 0b11110 => 4,
+                bb => {
+    // TODO BAD ERROR HANDL
+                    panic!("Incorrect UTF-8 sequence");
+                }
+            };
+
+            len+=units;
+            counted_runes+=1;
+        }
+
+        len
+    }
+
+fn columnLenght_num_rightaligned(cursor: usize, data: &[u8], runes: i16) -> (usize,usize) {
+    let mut eat=data.iter();
+    let mut counted_runes=0;
+    let mut start:usize =0;
+    let mut stop:usize =0;
+    let mut whitespace=true;
     let mut units=1;
 
-//    for b in data {
-//    while eat.peek().is_some() {
-//       while eat.nth(units)? {
-        let byten=    eat.nth(units);
-
-    let bb:u8=match byten {
-        None => {
-            return len;
-        }
-        Some(b) => {
-            *b
-        }
-    };
-
-        while len< runes as usize {
-        units = match bb {
-            bb if bb >> 7 == 0 => 1,
-            bb if bb >> 5 == 0b110 =>  2,
-            bb if bb >> 4 == 0b1110 =>  3,
-            bb if bb >> 3 == 0b11110 => 4,
-            bb => {
-// TODO BAD ERROR HANDL
-                0
+    while counted_runes< runes as usize {
+        let byten=    eat.nth(units-1);
+        let bb:u8=match byten {
+            None => {
+//TODO  we ran out of data,this isn an error.
+                return (start,stop);
+            }
+            Some(b) => {
+                *b
             }
         };
 
-        len+=units;
+            match bb {
+                bb if whitespace && bb >=48 && bb <=57 => {whitespace=false;start=stop;},
+                _ => {}
+            };
+        stop+=1;
+        counted_runes+=1;
     }
-/*
 
-                if *eat.next().unwrap() >> 7 == 0 {
-                {
-                    if eat.peek().is_none() {
-                       len
-                    }
-
-                    if *eat.next().unwrap() >> 5 == 0b110 {
-                        if eat.peek().is_none() {
-                           len
-                        }
-                     if {
-                            *eat.next().unwrap() >> 4 == 0b1110
-                         {
-                            if eat.peek().is_some() if { *eat.next().unwrap() >> 3 == 0b11110 {}
-
-                        }
-                    }
-                }
-
-            }
-
-    }
-*/
-    len
+    (start,stop)
 }
 
 
