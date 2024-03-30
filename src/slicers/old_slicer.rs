@@ -27,6 +27,7 @@
 
 use crate::slicers::IterRevolver;
 use std::{cmp, fs};
+use std::ffi::c_float;
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
 use rayon::prelude::*;
@@ -96,6 +97,7 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
             phantom:  std::marker::PhantomData,
         };
 
+         rayon::ThreadPoolBuilder::new().stack_size(((SLICER_IN_CHUNK_SIZE as f32)  *2f32) as usize).build_global().unwrap();
 
         loop
          {

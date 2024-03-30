@@ -48,7 +48,7 @@ pub struct Cli {
     name: Option<String>,
 
     /// Threads
-    #[arg(short, long, action = clap::ArgAction::Count,default_value = "4" )]
+    #[arg(short, long, action = clap::ArgAction::Count,default_value = "12" )]
     n_threads: u8,
     //    value_parser(value_parser!(usize))
     /// Turn debugging information on
@@ -185,7 +185,6 @@ impl Cli {
                         s3a
                     },
                 };
-
 
                 slicer_instance.slice_and_convert(converter_instance, in_buffers, _in_file, n_threads as usize);
             }

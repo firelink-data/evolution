@@ -27,6 +27,7 @@
 
 use arrow2::error::Error;
 use std::any::Any;
+use std::cmp::min;
 use std::fmt::{Debug, Pointer};
 use std::fs::File;
 use std::os::unix::raw::uid_t;
@@ -158,13 +159,14 @@ impl ColumnBuilder for HandlerInt32Builder {
         where
             Self: Sized,
     {
-        let columnLength:usize=columnLenght(self.runes_in_column, data, self.runes_in_column as i16);
+        let (start,stop)=columnLenght_num_rightaligned (self.runes_in_column, data, self.runes_in_column as i16);
 
         let column_string = unsafe {
-            String::from_utf8_unchecked((&data[..columnLength]).to_vec())
+            String::from_utf8_unchecked((&data[start..stop]).to_vec())
         };
+
         print!("column= {}",column_string);
-        match atoi_simd::parse(&data[..columnLength]) {
+        match atoi_simd::parse(&data[start..stop]) {
             Ok(n) => {
                 self.int32builder.append_value(n);
             }
@@ -172,10 +174,8 @@ impl ColumnBuilder for HandlerInt32Builder {
                 self.int32builder.append_null();
             }
         };
-        columnLength
+        stop-start
     }
-    // todo fix below
-
 
 }
 struct HandlerInt64Builder {
@@ -187,8 +187,8 @@ impl ColumnBuilder for HandlerInt64Builder {
         where
             Self: Sized,
     {
-        let columnLength:usize=columnLenght(self.runes_in_column, data,self.runes_in_column as i16 );
-        match atoi_simd::parse(&data[..columnLength]) {
+        let (start,stop)=columnLenght_num_rightaligned (self.runes_in_column, data, self.runes_in_column as i16);
+        match atoi_simd::parse(&data[start..stop]) {
             Ok(n) => {
                 self.int64builder.append_value(n);
             }
@@ -197,7 +197,7 @@ impl ColumnBuilder for HandlerInt64Builder {
             }
         };
         // todo fix below
-    columnLength
+    stop-start
     }
 }
 // Might be better of to copy the actual data to array<str>[colnr]
@@ -243,15 +243,13 @@ fn columnLenght_num_rightaligned(cursor: usize, data: &[u8], runes: i16) -> (usi
     let mut eat=data.iter();
     let mut counted_runes=0;
     let mut start:usize =0;
-    let mut stop:usize =0;
-    let mut whitespace=true;
-    let mut units=1;
+    let mut stop:usize =min (data.len(), runes as usize);
 
     while counted_runes< runes as usize {
-        let byten=    eat.nth(units-1);
+        let byten=    eat.nth(0);
         let bb:u8=match byten {
             None => {
-//TODO  we ran out of data,this isn an error.
+//TODO  we ran out of data,this is an error, fix later.
                 return (start,stop);
             }
             Some(b) => {
@@ -260,10 +258,10 @@ fn columnLenght_num_rightaligned(cursor: usize, data: &[u8], runes: i16) -> (usi
         };
 
             match bb {
-                bb if whitespace && bb >=48 && bb <=57 => {whitespace=false;start=stop;},
+                48..=57 =>{ return (start,stop)},
                 _ => {}
             };
-        stop+=1;
+        start+=1;
         counted_runes+=1;
     }
 
