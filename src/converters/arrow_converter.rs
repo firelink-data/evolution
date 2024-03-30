@@ -125,9 +125,8 @@ parse_slice(i:usize, n: &[u8], mut builders: &mut Vec<Box<dyn ColumnBuilder +Sen
 
     let mut cursor:usize = 0;
 
-    let bytelen:usize=0;
     for mut cb in builders {
-        cursor=cb.parse_value(n);
+        let mut bytelen=cb.parse_value(n);
         cursor=cursor-bytelen;
     }
 }
