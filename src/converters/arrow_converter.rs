@@ -158,7 +158,7 @@ impl ColumnBuilder for HandlerInt32Builder {
         where
             Self: Sized,
     {
-        let columnLength:usize=columnLenght(self.runes_in_column,data );
+        let columnLength:usize=columnLenght(self.runes_in_column, data, self.runes_in_column as i16);
 
         match atoi_simd::parse(&data[..columnLength]) {
             Ok(n) => {
@@ -183,7 +183,7 @@ impl ColumnBuilder for HandlerInt64Builder {
         where
             Self: Sized,
     {
-        let columnLength:usize=columnLenght(self.runes_in_column,data);
+        let columnLength:usize=columnLenght(self.runes_in_column, data,self.runes_in_column as i16 );
         match atoi_simd::parse(&data[..columnLength]) {
             Ok(n) => {
                 self.int64builder.append_value(n);
@@ -198,7 +198,7 @@ impl ColumnBuilder for HandlerInt64Builder {
 }
 // Might be better of to copy the actual data to array<str>[colnr]
 
-fn columnLenght(cursor: usize, data: &[u8]) -> usize {
+fn columnLenght(cursor: usize, data: &[u8], runes: i16) -> usize {
 //    let mut eat=data.iter().peekable();
     let mut eat=data.iter();
 
@@ -219,7 +219,7 @@ fn columnLenght(cursor: usize, data: &[u8]) -> usize {
         }
     };
 
-        loop {
+        while len< runes as usize {
         units = match bb {
             bb if bb >> 7 == 0 => 1,
             bb if bb >> 5 == 0b110 =>  2,
@@ -271,7 +271,7 @@ impl ColumnBuilder for HandlerStringBuilder {
         where
             Self: Sized,
     {
-        let columnLength:usize=columnLenght(self.runes_in_column, data);
+        let columnLength:usize=columnLenght(self.runes_in_column, data,self.runes_in_column as i16 );
 // Me dont like ... what is the cost ? Could it be done once for the whole chunk ?
         let mut text:&str = unsafe {
             from_utf8_unchecked(&data)
@@ -302,7 +302,7 @@ impl ColumnBuilder for HandlerBooleanBuilder {
         where
             Self: Sized,
     {
-        let columnLength:usize=columnLenght(self.runes_in_column, data);
+        let columnLength:usize=columnLenght(self.runes_in_column, data,self.runes_in_column as i16 );
 
         let mut text:&str = unsafe {
             from_utf8_unchecked(&data)
