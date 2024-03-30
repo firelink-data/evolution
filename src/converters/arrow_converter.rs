@@ -25,28 +25,18 @@
 * Last updated: 2023-11-21
 */
 
-use arrow2::error::Error;
-use std::any::Any;
-use std::cmp::min;
 use std::fmt::{Debug, Pointer};
 use std::fs::File;
-use std::os::unix::raw::uid_t;
 use std::path::PathBuf;
-use std::slice::Iter;
 use std::str::from_utf8_unchecked;
 use rayon::prelude::*;
 use rayon::iter::IndexedParallelIterator;
 use std::sync::Arc;
-use arrow::array::{ArrayBuilder, BooleanBuilder, Int32Builder, Int64Builder, PrimitiveArray, PrimitiveBuilder, StringBuilder};
-use arrow::datatypes::Int32Type;
-use rayon::iter::plumbing::{bridge, Producer};
+use arrow::array::{ArrayBuilder, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
 use crate::converters::{ColumnBuilder, Converter};
-use crate::converters::arrow2_converter::MasterBuilder;
-use crate::schema;
+use crate::{converters, schema};
 use crate::slicers::FnLineBreak;
-use rayon::iter::IntoParallelRefIterator;
 use rayon::prelude::*;
-use substring::Substring;
 
 pub(crate) struct Slice2Arrow<'a> {
     pub(crate) file_out: File,
@@ -133,20 +123,13 @@ parse_slice(i:usize, n: &[u8], mut builders: &mut Vec<Box<dyn ColumnBuilder +Sen
 //    let builders: Vec<Box<dyn ColumnBuilder>>;
     let start_byte_pos=0;
 
-    // TODO make safe/unsafe configurable
-    let mut text:&str = unsafe {
-        from_utf8_unchecked(&n)
-    };
-    print!("hhahah {}",&n[1]);
     let mut cursor:usize = 0;
 
     let bytelen:usize=0;
     for mut cb in builders {
-         cursor=cb.parse_value(n);
+        cursor=cb.parse_value(n);
         cursor=cursor-bytelen;
     }
-//    println!("texten={}",text);
-    let offset=0;
 }
 
 struct HandlerInt32Builder {
@@ -159,13 +142,15 @@ impl ColumnBuilder for HandlerInt32Builder {
         where
             Self: Sized,
     {
-        let (start,stop)=columnLenght_num_rightaligned (self.runes_in_column, data, self.runes_in_column as i16);
+        let (start,stop)= converters::column_lenght_num_rightaligned(self.runes_in_column, data, self.runes_in_column as i16);
 
+        /*
         let column_string = unsafe {
             String::from_utf8_unchecked((&data[start..stop]).to_vec())
         };
 
         print!("column= {}",column_string);
+*/
         match atoi_simd::parse(&data[start..stop]) {
             Ok(n) => {
                 self.int32builder.append_value(n);
@@ -187,7 +172,7 @@ impl ColumnBuilder for HandlerInt64Builder {
         where
             Self: Sized,
     {
-        let (start,stop)=columnLenght_num_rightaligned (self.runes_in_column, data, self.runes_in_column as i16);
+        let (start,stop)= converters::column_lenght_num_rightaligned(self.runes_in_column, data, self.runes_in_column as i16);
         match atoi_simd::parse(&data[start..stop]) {
             Ok(n) => {
                 self.int64builder.append_value(n);
@@ -202,72 +187,6 @@ impl ColumnBuilder for HandlerInt64Builder {
 }
 // Might be better of to copy the actual data to array<str>[colnr]
 
-    fn columnLenght(cursor: usize, data: &[u8], runes: i16) -> usize {
-        let mut eat=data.iter();
-        let mut counted_runes=0;
-        let mut len:usize =0;
-        let mut units=1;
-
-            while counted_runes< runes as usize {
-
-                let byten=    eat.nth(units-1);
-
-                let bb:u8=match byten {
-                    None => {
-                        return len;
-                    }
-                    Some(b) => {
-                        *b
-                    }
-                };
-
-            units = match bb {
-                bb if bb >> 7 == 0 => 1,
-                bb if bb >> 5 == 0b110 =>  2,
-                bb if bb >> 4 == 0b1110 =>  3,
-                bb if bb >> 3 == 0b11110 => 4,
-                bb => {
-    // TODO BAD ERROR HANDL
-                    panic!("Incorrect UTF-8 sequence");
-                }
-            };
-
-            len+=units;
-            counted_runes+=1;
-        }
-
-        len
-    }
-
-fn columnLenght_num_rightaligned(cursor: usize, data: &[u8], runes: i16) -> (usize,usize) {
-    let mut eat=data.iter();
-    let mut counted_runes=0;
-    let mut start:usize =0;
-    let mut stop:usize =min (data.len(), runes as usize);
-
-    while counted_runes< runes as usize {
-        let byten=    eat.nth(0);
-        let bb:u8=match byten {
-            None => {
-//TODO  we ran out of data,this is an error, fix later.
-                return (start,stop);
-            }
-            Some(b) => {
-                *b
-            }
-        };
-
-            match bb {
-                48..=57 =>{ return (start,stop)},
-                _ => {}
-            };
-        start+=1;
-        counted_runes+=1;
-    }
-
-    (start,stop)
-}
-
 
 struct HandlerStringBuilder {
     string_builder: StringBuilder,
@@ -278,22 +197,22 @@ impl ColumnBuilder for HandlerStringBuilder {
         where
             Self: Sized,
     {
-        let columnLength:usize=columnLenght(self.runes_in_column, data,self.runes_in_column as i16 );
+        let column_length:usize= converters::column_lenght(self.runes_in_column, data, self.runes_in_column as i16 );
 // Me dont like ... what is the cost ? Could it be done once for the whole chunk ?
         let mut text:&str = unsafe {
             from_utf8_unchecked(&data)
         };
 
-        match text[..columnLength].is_empty() {
+        match text[..column_length].is_empty() {
             false => {
-                self.string_builder.append_value(&text[..columnLength]);
+                self.string_builder.append_value(&text[..column_length]);
             }
             true => {
                 self.string_builder.append_null();
             }
         };
         // todo fix below
-    columnLength
+    column_length
     }
 
 }
@@ -309,13 +228,13 @@ impl ColumnBuilder for HandlerBooleanBuilder {
         where
             Self: Sized,
     {
-        let columnLength:usize=columnLenght(self.runes_in_column, data,self.runes_in_column as i16 );
+        let column_length:usize= converters::column_lenght(self.runes_in_column, data, self.runes_in_column as i16 );
 
         let mut text:&str = unsafe {
             from_utf8_unchecked(&data)
         };
 
-        match text[..columnLength]. parse::<bool>() {
+        match text[..column_length]. parse::<bool>() {
             Ok(n) => {
                 self.boolean_builder.append_value(n);
             }
@@ -324,7 +243,7 @@ impl ColumnBuilder for HandlerBooleanBuilder {
             }
         };
         // todo fix below
-    columnLength
+    column_length
     }
 
 
