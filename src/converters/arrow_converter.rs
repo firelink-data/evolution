@@ -126,8 +126,8 @@ parse_slice(i:usize, n: &[u8], mut builders: &mut Vec<Box<dyn ColumnBuilder +Sen
     let mut cursor:usize = 0;
 
     for mut cb in builders {
-        let mut bytelen=cb.parse_value(n);
-        cursor=cursor-bytelen;
+        let mut bytelen=cb.parse_value(&n[cursor..]);
+        cursor+=bytelen;
     }
 }
 
@@ -158,7 +158,7 @@ impl ColumnBuilder for HandlerInt32Builder {
                 self.int32builder.append_null();
             }
         };
-        stop-start
+        stop
     }
 
 }
@@ -181,7 +181,7 @@ impl ColumnBuilder for HandlerInt64Builder {
             }
         };
         // todo fix below
-    stop-start
+    stop
     }
 }
 // Might be better of to copy the actual data to array<str>[colnr]
