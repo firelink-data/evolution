@@ -48,7 +48,7 @@ pub trait ColumnBuilder {
 
 }
 
-fn column_length_num_rightaligned(cursor: usize, data: &[u8], runes: i16) -> (usize, usize) {
+fn column_length_num_rightaligned(data: &[u8], runes: i16) -> (usize, usize) {
     let mut eat=data.iter();
     let mut counted_runes=0;
     let mut start:usize =0;
@@ -77,7 +77,39 @@ fn column_length_num_rightaligned(cursor: usize, data: &[u8], runes: i16) -> (us
     (start,stop)
 }
 
-fn column_length(cursor: usize, data: &[u8], runes: i16) -> usize {
+fn column_length_char_rightaligned(data: &[u8], runes: i16) -> (usize, usize) {
+    let mut eat=data.iter();
+    let mut counted_runes=0;
+    let mut start:usize =0;
+    let mut stop:usize =min (data.len(), runes as usize);
+
+    while counted_runes< runes as usize {
+        let byten=    eat.nth(0);
+        let bb:u8=match byten {
+            None => {
+//TODO  we ran out of data,this is an error, fix later.
+                return (start,stop);
+            }
+            Some(b) => {
+                *b
+            }
+        };
+
+        match bb {
+            101..=132 =>{ return (start,stop)},
+            141..=172 =>{ return (start,stop)},
+            _ => {}
+
+        };
+        start+=1;
+        counted_runes+=1;
+    }
+
+    (start,stop)
+}
+
+
+fn column_length(data: &[u8], runes: i16) -> usize {
     let mut eat=data.iter();
     let mut counted_runes=0;
     let mut len:usize =0;
@@ -121,13 +153,16 @@ mod tests {
 
     #[test]
     fn test_column_length() {
-        let data=b"abcd";
-        assert_eq!(column_length(0, data, 4), 4);
-        assert_ne!(column_length(0, b"\xE5abc", 4), 3);
-        assert_eq!(column_length(0, b"\xE5abc", 4), 4);
-        assert_ne!(column_length(0, b"\xE5abc", 4), 5);
+        let data = b"abcd";
+        assert_eq!(column_length(data, 4), 4);
+        assert_ne!(column_length(b"\xE5abc", 4), 3);
+        assert_eq!(column_length(b"\xE5abc", 4), 4);
+        assert_ne!(column_length(b"\xE5abc", 4), 5);
     }
 
 
-
+    #[test]
+    fn test_column_length_num_rightaligned() {
+        assert_eq!(column_length_num_rightaligned(b"123", 3), (0, 2));
+    }
 }
