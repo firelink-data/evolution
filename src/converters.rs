@@ -48,7 +48,7 @@ pub trait ColumnBuilder {
 
 }
 
-fn column_lenght_num_rightaligned(cursor: usize, data: &[u8], runes: i16) -> (usize, usize) {
+fn column_length_num_rightaligned(cursor: usize, data: &[u8], runes: i16) -> (usize, usize) {
     let mut eat=data.iter();
     let mut counted_runes=0;
     let mut start:usize =0;
@@ -77,7 +77,7 @@ fn column_lenght_num_rightaligned(cursor: usize, data: &[u8], runes: i16) -> (us
     (start,stop)
 }
 
-fn column_lenght(cursor: usize, data: &[u8], runes: i16) -> usize {
+fn column_length(cursor: usize, data: &[u8], runes: i16) -> usize {
     let mut eat=data.iter();
     let mut counted_runes=0;
     let mut len:usize =0;
@@ -114,3 +114,20 @@ fn column_lenght(cursor: usize, data: &[u8], runes: i16) -> usize {
     len
 }
 
+#[cfg(test)]
+mod tests {
+    // this brings everything from parent's scope into this scope
+    use super::*;
+
+    #[test]
+    fn test_column_length() {
+        let data=b"abcd";
+        assert_eq!(column_length(0, data, 4), 4);
+        assert_ne!(column_length(0, b"\xE5abc", 4), 3);
+        assert_eq!(column_length(0, b"\xE5abc", 4), 4);
+        assert_ne!(column_length(0, b"\xE5abc", 4), 5);
+    }
+
+
+
+}

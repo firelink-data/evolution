@@ -124,10 +124,11 @@ parse_slice(i:usize, n: &[u8], mut builders: &mut Vec<Box<dyn ColumnBuilder +Sen
     let start_byte_pos=0;
 
     let mut cursor:usize = 0;
-
-    for mut cb in builders {
-        let mut bytelen=cb.parse_value(&n[cursor..]);
-        cursor+=bytelen;
+    while cursor < n.len() {
+        for mut cb in &mut *builders {
+            let mut bytelen = cb.parse_value(&n[cursor..]);
+            cursor += bytelen;
+        }
     }
 }
 
@@ -141,7 +142,7 @@ impl ColumnBuilder for HandlerInt32Builder {
         where
             Self: Sized,
     {
-        let (start,stop)= converters::column_lenght_num_rightaligned(self.runes_in_column, data, self.runes_in_column as i16);
+        let (start,stop)= converters::column_length_num_rightaligned(self.runes_in_column, data, self.runes_in_column as i16);
 
         /*
         let column_string = unsafe {
@@ -171,7 +172,7 @@ impl ColumnBuilder for HandlerInt64Builder {
         where
             Self: Sized,
     {
-        let (start,stop)= converters::column_lenght_num_rightaligned(self.runes_in_column, data, self.runes_in_column as i16);
+        let (start,stop)= converters::column_length_num_rightaligned(self.runes_in_column, data, self.runes_in_column as i16);
         match atoi_simd::parse(&data[start..stop]) {
             Ok(n) => {
                 self.int64builder.append_value(n);
@@ -196,15 +197,15 @@ impl ColumnBuilder for HandlerStringBuilder {
         where
             Self: Sized,
     {
-        let column_length:usize= converters::column_lenght(self.runes_in_column, data, self.runes_in_column as i16 );
+        let column_length:usize= converters::column_length(self.runes_in_column, data, self.runes_in_column as i16 );
 // Me dont like ... what is the cost ? Could it be done once for the whole chunk ?
         let mut text:&str = unsafe {
-            from_utf8_unchecked(&data)
+            from_utf8_unchecked(&data[..column_length])
         };
 
         match text[..column_length].is_empty() {
             false => {
-                self.string_builder.append_value(&text[..column_length]);
+                self.string_builder.append_value(text);
             }
             true => {
                 self.string_builder.append_null();
@@ -227,7 +228,7 @@ impl ColumnBuilder for HandlerBooleanBuilder {
         where
             Self: Sized,
     {
-        let column_length:usize= converters::column_lenght(self.runes_in_column, data, self.runes_in_column as i16 );
+        let column_length:usize= converters::column_length(self.runes_in_column, data, self.runes_in_column as i16 );
 
         let mut text:&str = unsafe {
             from_utf8_unchecked(&data)
