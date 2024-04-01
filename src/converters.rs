@@ -135,7 +135,7 @@ fn column_length(data: &[u8], runes: i16) -> usize {
             bb if bb >> 3 == 0b11110 => 4,
             bb => {
 // TODO BAD ERROR HANDL
-                panic!("Incorrect UTF-8 sequence");
+                 panic!("Incorrect UTF-8 sequence");
             }
         };
 
