@@ -98,7 +98,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 //        let  in_out_arrow: Vec<slice<'a>> = vec![];
 
         let arc_slices = Arc::new(& slices);
-        self.masterbuilders.builders.par_iter_mut().enumerate().for_each(|(i, mut n)| {
+        self.masterbuilders.builders.iter_mut().enumerate().for_each(|(i, mut n)| {
 
             let arc_slice_clone = Arc::clone(&arc_slices);
             match arc_slice_clone.get(i) {
@@ -108,7 +108,6 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 
 
         });
-
         bytes_processed
     }
 }
