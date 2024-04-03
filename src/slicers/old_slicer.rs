@@ -86,7 +86,7 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
 
         let mut remaining_file_length = infile.metadata().unwrap().len() as usize;
 
-
+         let mut residue= [0_u8; SLICER_MAX_RESIDUE_SIZE];
          let mut residue_len = 0;
          let mut slices: Vec<& [u8]>;
 
@@ -111,7 +111,8 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
 
                  (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
                      find_last_nl,
-                     &mut cr.residue,
+//                     &mut cr.residue,
+                     &mut residue,
                      &mut cr.chunk,
                      &infile,
                      n_threads,
@@ -211,6 +212,8 @@ fn read_chunk_and_slice<'a>(
         (0, chunk_len_was_read, r)
     } else {
         let residual = &chunk[p1..=data_to_split_len - 1].to_vec();
+//        let residual = &chunk[p1..=data_to_split_len].to_vec();
+
         residue[0..residual.len()].copy_from_slice(residual);
         (residual.len(), chunk_len_was_read, r)
     }
