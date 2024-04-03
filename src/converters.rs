@@ -40,7 +40,9 @@ pub(crate) trait Converter<'a> {
     fn set_line_break_handler(& mut self, fn_line_break: FnLineBreak<'a>);
     fn get_line_break_handler(& self) -> FnLineBreak<'a>;
 
+//    fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
     fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
+
 }
 
 pub trait ColumnBuilder {

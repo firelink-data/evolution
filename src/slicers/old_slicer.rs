@@ -89,6 +89,7 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
          let mut residue= [0_u8; SLICER_MAX_RESIDUE_SIZE];
          let mut residue_len = 0;
          let mut slices: Vec<& [u8]>;
+         let mut bytes_processed_for_slices=0;
 
         let mut ir=IterRevolver {
             shards:  in_buffers.as_mut_ptr(),
@@ -99,9 +100,11 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
 
          rayon::ThreadPoolBuilder::new().stack_size(((SLICER_IN_CHUNK_SIZE as f32)  *2f32) as usize).build_global().unwrap();
 
-        loop
+
+         loop
          {
-            let mut cr=ir.next().unwrap();
+             let mut cr=ir.next().unwrap();
+
             let mut chunk_len_toread = SLICER_IN_CHUNK_SIZE;
             if remaining_file_length < SLICER_IN_CHUNK_SIZE {
                 chunk_len_toread = remaining_file_length;
@@ -121,28 +124,55 @@ impl<'a> Slicer<'a> for old_slicer<'a> {
                  );
 
             remaining_file_length -= chunk_len_effective_read;
-
-
-             let bytes_processed_for_slices = converter.process(slices);
-
+            bytes_processed_for_slices = converter.process(slices);
             bytes_processed += bytes_processed_for_slices;
             bytes_processed += residue_len;
 
-
             if remaining_file_length == 0 {
-                if 0 != residue_len {
-                    let slice: Vec<& [u8]> = vec![&cr.residue[0..residue_len]];
-                    let bytes_processed_for_slices = converter.process(slice);
-                    bytes_processed += bytes_processed_for_slices;
-                }
                 break;
             }
 
         }
 
-        info!("Bytes processed {}", bytes_processed);
+         let mut cr=ir.next().unwrap();
+         cr=ir.next().unwrap();
+         if 0 != residue_len {
+             slices = residual_to_slice(
+                 & residue,
+                 &mut cr.chunk,
+                 residue_len,
+             );
+
+         let bytes_processed_for_slices = converter.process(slices);
+             bytes_processed += bytes_processed_for_slices;
+         }
+
+
+         info!("Bytes processed {}", bytes_processed);
     }
 
+
+}
+
+
+fn residual_to_slice<'a>(
+    residue: &[u8; 1048576],
+    chunk: &'a mut [u8; SLICER_IN_CHUNK_SIZE],
+    residue_effective_len: usize
+) -> Vec<&'a[u8]> {
+    #[allow(unused_mut)]
+        let mut target_chunk_residue: &mut [u8];
+    #[allow(unused_mut)]
+        let mut target_chunk_read: &mut [u8];
+
+    (target_chunk_residue, target_chunk_read) = chunk.split_at_mut(residue_effective_len);
+    if 0 != residue_effective_len {
+        target_chunk_residue.copy_from_slice(&residue[0..residue_effective_len]);
+    }
+    let mut r: Vec<&[u8]> = vec![];
+
+    r.push(target_chunk_residue);
+    r
 
 }
 
