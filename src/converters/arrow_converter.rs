@@ -56,12 +56,8 @@ impl MasterBuilders {
     pub fn builders_factory<'a>(schema_path: PathBuf, instances: i16) -> Self {
         let schema = schema::FixedSchema::from_path(schema_path.into());
         let antal_col = schema.num_columns();
-//    let in_out_instances:&'a mut Vec<InOut<'a>>=    let  in_out_arrow:& mut Vec<InOut> = &mut vec![];
-//    ;
-//        let mut builders:Vec<Vec<Box<dyn ArrayBuilder + Sync + Send>>>=Vec::new();
         let mut builders:Vec<Vec<Box<dyn ColumnBuilder + Sync + Send>>>=Vec::new();
 
-//    let mut in_out_instances : Vec<InOut<'a>>=Vec::new();
 
         for i in 1..=instances {
             let mut buildersmut:  Vec<Box<dyn ColumnBuilder + Sync + Send>> =  Vec::with_capacity(antal_col);
@@ -76,8 +72,6 @@ impl MasterBuilders {
                 };
             }
             builders.push(buildersmut);
-//            let in_out_instance: InOut = InOut { /*in_slice: &mut [],*/ out_builders:  buildersmut };
-//            in_out_instances.push(in_out_instance);
         }
         MasterBuilders { builders }
     }
@@ -144,13 +138,6 @@ impl ColumnBuilder for HandlerInt32Builder {
     {
         let (start,stop)= converters::column_length_num_rightaligned(data, self.runes_in_column as i16);
 
-        /*
-        let column_string = unsafe {
-            String::from_utf8_unchecked((&data[start..stop]).to_vec())
-        };
-
-        print!("column= {}",column_string);
-*/
         match atoi_simd::parse(&data[start..stop]) {
             Ok(n) => {
                 self.int32builder.append_value(n);
