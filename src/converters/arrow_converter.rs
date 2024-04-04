@@ -24,6 +24,7 @@
 * File created: 2023-11-21
 * Last updated: 2023-11-21
 */
+use parquet::file::properties::WriterProperties;
 use tempfile::tempfile;
 use std::io::{self, Write};
 use std::fmt::{Debug, Pointer};
@@ -35,6 +36,8 @@ use rayon::iter::IndexedParallelIterator;
 use std::sync::Arc;
 use arrow::array::{ArrayBuilder, ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
+use parquet::arrow::ArrowWriter;
+use parquet::basic::Compression;
 use crate::converters::{ColumnBuilder, Converter};
 use crate::{converters, schema};
 use crate::slicers::FnLineBreak;
@@ -67,10 +70,10 @@ impl MasterBuilders {
             let mut buildersmut:  Vec<Box<dyn ColumnBuilder + Sync + Send>> =  Vec::with_capacity(antal_col);
             for val in schema.iter() {
                 match val.dtype().as_str() {
-                    "i32" => buildersmut.push(Box::new(HandlerInt32Builder { int32builder: Int32Builder::new(), runes_in_column: val.length(), name: val.name().to_string()  }   )),
-                    "i64" => buildersmut.push(Box::new(HandlerInt64Builder { int64builder: Int64Builder::new(), runes_in_column: val.length(), name: val.name().to_string() }   )),
-                    "boolean" => buildersmut.push(Box::new( HandlerBooleanBuilder  { boolean_builder: BooleanBuilder::new(), runes_in_column: val.length(), name: val.name().to_string() })),
-                    "utf8" => buildersmut.push(Box::new( HandlerStringBuilder {string_builder: StringBuilder::new(), runes_in_column: val.length(), name: val.name().to_string() })),
+                    "i32" => buildersmut.push(Box::new(HandlerInt32Builder { int32builder: Int32Builder::new(), runes_in_column: val.length(), name: val.name().clone()  }   )),
+                    "i64" => buildersmut.push(Box::new(HandlerInt64Builder { int64builder: Int64Builder::new(), runes_in_column: val.length(), name: val.name().clone() }   )),
+                    "boolean" => buildersmut.push(Box::new( HandlerBooleanBuilder  { boolean_builder: BooleanBuilder::new(), runes_in_column: val.length(), name: val.name().clone() })),
+                    "utf8" => buildersmut.push(Box::new( HandlerStringBuilder {string_builder: StringBuilder::new(), runes_in_column: val.length(), name: val.name().clone() })),
 
                     &_ => {}
                 };
@@ -104,17 +107,33 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
                 Some(_) => {            parse_slice(i, arc_slice_clone.get(i).unwrap(),n);}
             }
         });
+        let file = tempfile().unwrap();
+        let props = WriterProperties::builder()
+            .set_compression(Compression::SNAPPY)
+            .build();
+
+//        let mut writer:ArrowWriter<&File>;
 
         for b in self.masterbuilders.builders.iter_mut() {
             let mut br:Vec<(&str, ArrayRef)> = vec![];
 
             for mut bb in b.iter_mut() {
-                br.push(  ("aa", bb.finish()));
+                br.push(  bb.finish());
             }
 
             let batch = RecordBatch::try_from_iter(br).unwrap();
+            let mut writer = ArrowWriter::try_new(&file, batch.schema(), Some(props.clone())).unwrap();
+            writer.write(&batch).expect("Writing batch");
+            writer.close().unwrap();
 
         }
+
+
+
+        // WriterProperties can be used to set Parquet file options
+
+
+        // writer must be closed to write footer
 
 
 
@@ -141,24 +160,6 @@ parse_slice(i:usize, n: &[u8], mut builders: &mut Vec<Box<dyn ColumnBuilder +Sen
         cursor+=1; // TODO adjust to CR/LF mode
     }
 
-// ok dump the data to file.as
-/*
-    let batch = RecordBatch::try_from_iter(vec![
-        ("id", Arc::new(ids) as ArrayRef),
-        ("val", Arc::new(vals) as ArrayRef),
-    ]).unwrap();
-
-    let file = tempfile().unwrap();
-
-    // WriterProperties can be used to set Parquet file options
-    let props = WriterProperties::builder()
-        .set_compression(Compression::SNAPPY)
-        .build();
-
-    let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props)).unwrap();
-
-    writer.write(&batch).expect("Writing batch");
-*/
 }
 
 struct HandlerInt32Builder {
@@ -185,13 +186,11 @@ impl ColumnBuilder for HandlerInt32Builder {
         self.runes_in_column
     }
 
-    fn finish(& mut self) -> ArrayRef {
-        Arc::new(self.int32builder.finish()) as ArrayRef
+    fn finish(& mut self) -> (&str,ArrayRef) {
+        (self.name.as_str(), Arc::new(self.int32builder.finish()) as ArrayRef)
+
     }
 
-    fn name(&self) -> &String {
-        &self.name
-    }
 }
 struct HandlerInt64Builder {
     int64builder: Int64Builder,
@@ -216,13 +215,10 @@ impl ColumnBuilder for HandlerInt64Builder {
     self.runes_in_column
     }
 
-    fn finish(& mut self) -> ArrayRef {
-        Arc::new(self.int64builder.finish()) as ArrayRef
+    fn finish(& mut self) -> (&str,ArrayRef) {
+        (self.name.as_str(), Arc::new(self.int64builder.finish()) as ArrayRef)
     }
 
-    fn name(&self) -> &String {
-        &self.name
-    }
 }
 // Might be better of to copy the actual data to array<str>[colnr]
 
@@ -255,12 +251,8 @@ impl ColumnBuilder for HandlerStringBuilder {
     column_length
     }
 
-    fn finish(& mut self) -> ArrayRef {
-        Arc::new(self.string_builder.finish()) as ArrayRef
-    }
-
-    fn name(&self) -> &String {
-        &self.name
+    fn finish(& mut self) -> (&str,ArrayRef) {
+        (self.name.as_str(), Arc::new(self.string_builder.finish()) as ArrayRef)
     }
 }
 
@@ -269,7 +261,6 @@ struct HandlerBooleanBuilder {
     runes_in_column: usize,
     name: String
 }
-
 
 impl ColumnBuilder for HandlerBooleanBuilder {
     fn parse_value(&mut self, data: &[u8]) -> usize
@@ -294,13 +285,10 @@ impl ColumnBuilder for HandlerBooleanBuilder {
     self.runes_in_column
     }
 
-    fn finish(& mut self) -> ArrayRef {
-        Arc::new(self.boolean_builder.finish()) as ArrayRef
+    fn finish(& mut self) -> (&str,ArrayRef) {
+        (self.name.as_str() ,Arc::new(self.boolean_builder.finish()) as ArrayRef)
     }
 
-    fn name(&self) -> &String {
-        &self.name
-    }
 }
 
 

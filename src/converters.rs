@@ -48,9 +48,8 @@ pub(crate) trait Converter<'a> {
 
 pub trait ColumnBuilder {
     fn parse_value(&mut self, name: &[u8]) ->usize;
-    fn finish(& mut self) -> ArrayRef;
-    fn name(&  self) -> &String;
-
+    fn finish(& mut self) -> (&str, ArrayRef);
+//    fn name(&  self) -> &String;
 
 }
 

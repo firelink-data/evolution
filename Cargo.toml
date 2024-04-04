@@ -23,6 +23,8 @@ default-run = "evolution"
 arrow2 = { version = "0.18.0", features = ["io_ipc"] }
 arrow = { version = "51.0.0", features = ["ipc"] }
 arrow-schema = "51.0.0"
+arrow-array = "51.0.0"
+parquet = "51.0.0"
 atoi_simd = "0.15.6"
 chrono = "0.4.35"
 clap = { version = "4.5.3", features = ["default", "derive"] }
