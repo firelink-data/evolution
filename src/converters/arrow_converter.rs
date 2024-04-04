@@ -24,7 +24,8 @@
 * File created: 2023-11-21
 * Last updated: 2023-11-21
 */
-
+use tempfile::tempfile;
+use std::io::{self, Write};
 use std::fmt::{Debug, Pointer};
 use std::fs::File;
 use std::path::PathBuf;
@@ -32,7 +33,8 @@ use std::str::from_utf8_unchecked;
 use rayon::prelude::*;
 use rayon::iter::IndexedParallelIterator;
 use std::sync::Arc;
-use arrow::array::{ArrayBuilder, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
+use arrow::array::{ArrayBuilder, ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
+use arrow::record_batch::RecordBatch;
 use crate::converters::{ColumnBuilder, Converter};
 use crate::{converters, schema};
 use crate::slicers::FnLineBreak;
@@ -45,7 +47,9 @@ pub(crate) struct Slice2Arrow<'a> {
 }
 
 pub(crate) struct MasterBuilders {
-      builders:  Vec<Vec<Box<dyn  Sync + Send   + ColumnBuilder>>>
+      builders:  Vec<Vec<Box<dyn  Sync + Send   + ColumnBuilder>>>,
+//      schema: arrow_schema::SchemaRef
+
 }
 
 unsafe impl Send for MasterBuilders {}
@@ -63,10 +67,10 @@ impl MasterBuilders {
             let mut buildersmut:  Vec<Box<dyn ColumnBuilder + Sync + Send>> =  Vec::with_capacity(antal_col);
             for val in schema.iter() {
                 match val.dtype().as_str() {
-                    "i32" => buildersmut.push(Box::new(HandlerInt32Builder { int32builder: Int32Builder::new(), runes_in_column: val.length() }   )),
-                    "i64" => buildersmut.push(Box::new(HandlerInt64Builder { int64builder: Int64Builder::new(), runes_in_column: val.length() }   )),
-                    "boolean" => buildersmut.push(Box::new( HandlerBooleanBuilder  { boolean_builder: BooleanBuilder::new(), runes_in_column: val.length() })),
-                    "utf8" => buildersmut.push(Box::new( HandlerStringBuilder {string_builder: StringBuilder::new(), runes_in_column: val.length() })),
+                    "i32" => buildersmut.push(Box::new(HandlerInt32Builder { int32builder: Int32Builder::new(), runes_in_column: val.length(), name: val.name().to_string()  }   )),
+                    "i64" => buildersmut.push(Box::new(HandlerInt64Builder { int64builder: Int64Builder::new(), runes_in_column: val.length(), name: val.name().to_string() }   )),
+                    "boolean" => buildersmut.push(Box::new( HandlerBooleanBuilder  { boolean_builder: BooleanBuilder::new(), runes_in_column: val.length(), name: val.name().to_string() })),
+                    "utf8" => buildersmut.push(Box::new( HandlerStringBuilder {string_builder: StringBuilder::new(), runes_in_column: val.length(), name: val.name().to_string() })),
 
                     &_ => {}
                 };
@@ -89,19 +93,31 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
     fn process(& mut  self,  slices: Vec<&'a [u8]>) -> usize {
         let mut bytes_processed: usize = 0;
 
-//        let  in_out_arrow: Vec<slice<'a>> = vec![];
+
 
         let arc_slices = Arc::new(& slices);
-        self.masterbuilders.builders.iter_mut().enumerate().for_each(|(i, mut n)| {
+        self.masterbuilders.builders.par_iter_mut().enumerate().for_each(|(i, mut n)| {
 
             let arc_slice_clone = Arc::clone(&arc_slices);
             match arc_slice_clone.get(i) {
                 None => {}
                 Some(_) => {            parse_slice(i, arc_slice_clone.get(i).unwrap(),n);}
             }
-
-
         });
+
+        for b in self.masterbuilders.builders.iter_mut() {
+            let mut br:Vec<(&str, ArrayRef)> = vec![];
+
+            for mut bb in b.iter_mut() {
+                br.push(  ("aa", bb.finish()));
+            }
+
+            let batch = RecordBatch::try_from_iter(br).unwrap();
+
+        }
+
+
+
         bytes_processed
     }
 }
@@ -124,11 +140,31 @@ parse_slice(i:usize, n: &[u8], mut builders: &mut Vec<Box<dyn ColumnBuilder +Sen
         }
         cursor+=1; // TODO adjust to CR/LF mode
     }
+
+// ok dump the data to file.as
+/*
+    let batch = RecordBatch::try_from_iter(vec![
+        ("id", Arc::new(ids) as ArrayRef),
+        ("val", Arc::new(vals) as ArrayRef),
+    ]).unwrap();
+
+    let file = tempfile().unwrap();
+
+    // WriterProperties can be used to set Parquet file options
+    let props = WriterProperties::builder()
+        .set_compression(Compression::SNAPPY)
+        .build();
+
+    let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props)).unwrap();
+
+    writer.write(&batch).expect("Writing batch");
+*/
 }
 
 struct HandlerInt32Builder {
     int32builder: Int32Builder,
-    runes_in_column: usize
+    runes_in_column: usize,
+    name: String
 }
 
 impl ColumnBuilder for HandlerInt32Builder {
@@ -149,10 +185,18 @@ impl ColumnBuilder for HandlerInt32Builder {
         self.runes_in_column
     }
 
+    fn finish(& mut self) -> ArrayRef {
+        Arc::new(self.int32builder.finish()) as ArrayRef
+    }
+
+    fn name(&self) -> &String {
+        &self.name
+    }
 }
 struct HandlerInt64Builder {
     int64builder: Int64Builder,
-    runes_in_column: usize
+    runes_in_column: usize,
+    name: String
 }
 impl ColumnBuilder for HandlerInt64Builder {
     fn parse_value(&mut self, data: &[u8]) -> usize
@@ -171,13 +215,22 @@ impl ColumnBuilder for HandlerInt64Builder {
         // todo fix below
     self.runes_in_column
     }
+
+    fn finish(& mut self) -> ArrayRef {
+        Arc::new(self.int64builder.finish()) as ArrayRef
+    }
+
+    fn name(&self) -> &String {
+        &self.name
+    }
 }
 // Might be better of to copy the actual data to array<str>[colnr]
 
 
 struct HandlerStringBuilder {
     string_builder: StringBuilder,
-    runes_in_column: usize
+    runes_in_column: usize,
+    name: String
 }
 impl ColumnBuilder for HandlerStringBuilder {
     fn parse_value(&mut self, data: &[u8]) -> usize
@@ -202,11 +255,19 @@ impl ColumnBuilder for HandlerStringBuilder {
     column_length
     }
 
+    fn finish(& mut self) -> ArrayRef {
+        Arc::new(self.string_builder.finish()) as ArrayRef
+    }
+
+    fn name(&self) -> &String {
+        &self.name
+    }
 }
 
 struct HandlerBooleanBuilder {
     boolean_builder: BooleanBuilder,
-    runes_in_column: usize
+    runes_in_column: usize,
+    name: String
 }
 
 
@@ -233,6 +294,13 @@ impl ColumnBuilder for HandlerBooleanBuilder {
     self.runes_in_column
     }
 
+    fn finish(& mut self) -> ArrayRef {
+        Arc::new(self.boolean_builder.finish()) as ArrayRef
+    }
+
+    fn name(&self) -> &String {
+        &self.name
+    }
 }
 
 
