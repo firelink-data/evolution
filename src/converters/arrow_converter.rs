@@ -107,7 +107,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
                 Some(_) => {            parse_slice(i, arc_slice_clone.get(i).unwrap(),n);}
             }
         });
-        let file = tempfile().unwrap();
+
         let props = WriterProperties::builder()
             .set_compression(Compression::SNAPPY)
             .build();
@@ -122,7 +122,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
             }
 
             let batch = RecordBatch::try_from_iter(br).unwrap();
-            let mut writer = ArrowWriter::try_new(&file, batch.schema(), Some(props.clone())).unwrap();
+            let mut writer = ArrowWriter::try_new(&self.file_out, batch.schema(), Some(props.clone())).unwrap();
             writer.write(&batch).expect("Writing batch");
             writer.close().unwrap();
 
