@@ -112,7 +112,15 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
             .set_compression(Compression::SNAPPY)
             .build();
 
-//        let mut writer:ArrowWriter<&File>;
+        let b: &mut Vec<Box<dyn Sync+Send+ColumnBuilder>>=self.masterbuilders.builders.get_mut(0).unwrap();
+        let mut br:Vec<(&str, ArrayRef)> = vec![];
+        for mut bb in b.iter_mut() {
+            br.push(  bb.finish());
+        }
+
+        let batch = RecordBatch::try_from_iter(br).unwrap();
+        let mut writer:ArrowWriter<&File>=ArrowWriter::try_new(&self.file_out, batch.schema(), Some(props.clone())).unwrap();
+
 
         for b in self.masterbuilders.builders.iter_mut() {
             let mut br:Vec<(&str, ArrayRef)> = vec![];
@@ -120,22 +128,12 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
             for mut bb in b.iter_mut() {
                 br.push(  bb.finish());
             }
-
             let batch = RecordBatch::try_from_iter(br).unwrap();
-            let mut writer = ArrowWriter::try_new(&self.file_out, batch.schema(), Some(props.clone())).unwrap();
-            writer.write(&batch).expect("Writing batch");
-            writer.close().unwrap();
 
+            writer.write(&batch).expect("Writing batch");
         }
 
-
-
-        // WriterProperties can be used to set Parquet file options
-
-
-        // writer must be closed to write footer
-
-
+        writer.close().unwrap();
 
         bytes_processed
     }
