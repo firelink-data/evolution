@@ -25,7 +25,7 @@
     * Last updated: 2023-12-14
     */
 
-    use crate::slicers::IterRevolver;
+    use crate::slicers::{IterRevolver, Stats};
     use std::{cmp, fs};
     use std::ffi::c_float;
     use std::fs::File;
@@ -79,7 +79,7 @@
                               in_buffers: &'a mut [ChunkAndResidue; IN_MAX_CHUNKS],
                               infile: fs::File,
                               n_threads: usize,
-         ) {
+         ) -> Result<Stats, &str> {
 
 
             let mut bytes_processed = 0;
@@ -146,9 +146,16 @@
                  bytes_processed += bytes_processed_for_slices;
              }
 
-             converter.finish();
              info!("Bytes processed {}", bytes_processed);
-        }
+
+
+             match converter.finish() {
+                 Ok(x) => {Result::Ok(Stats{ bytes_in: 0, bytes_out: 0 })}
+                 Err(x) => {Result::Err("Could not produce Parquet")}
+             }
+
+
+         }
 
 
     }

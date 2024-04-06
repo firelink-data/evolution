@@ -24,25 +24,27 @@
 * File created: 2023-11-21
 * Last updated: 2023-11-21
 */
-use parquet::file::properties::WriterProperties;
-use tempfile::tempfile;
-use std::io::{self, Write};
 use std::fmt::{Debug, Pointer};
 use std::fs;
 use std::fs::File;
+use std::io::Write;
 use std::path::PathBuf;
 use std::str::from_utf8_unchecked;
-use rayon::prelude::*;
-use rayon::iter::IndexedParallelIterator;
 use std::sync::Arc;
+
 use arrow::array::{ArrayBuilder, ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
-use crate::converters::{ColumnBuilder, Converter};
-use crate::{converters, schema};
-use crate::slicers::FnLineBreak;
+use parquet::file::properties::WriterProperties;
+use parquet::format;
+use rayon::iter::IndexedParallelIterator;
 use rayon::prelude::*;
+use rayon::prelude::*;
+
+use crate::{converters, schema};
+use crate::converters::{ColumnBuilder, Converter};
+use crate::slicers::FnLineBreak;
 
 pub(crate) struct Slice2Arrow<'a> {
 //    pub(crate) file_out: File,
@@ -152,8 +154,8 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         bytes_processed
     }
 
-    fn finish(&mut self) {
-        self.writer.finish();
+    fn finish(&mut self)-> parquet::errors::Result<format::FileMetaData> {
+        self.writer.finish()
     }
 }
 

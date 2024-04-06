@@ -28,6 +28,7 @@
 use std::any::Any;
 use std::cmp::min;
 use arrow::array::ArrayRef;
+use parquet::format;
 use crate::slicers::FnLineBreak;
 
 pub(crate) mod self_converter;
@@ -43,7 +44,7 @@ pub(crate) trait Converter<'a> {
 
 //    fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
     fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
-    fn finish(& mut self);
+    fn finish(& mut self)->parquet::errors::Result<format::FileMetaData>;
 
 }
 

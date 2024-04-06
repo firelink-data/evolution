@@ -25,6 +25,8 @@
 * Last updated: 2023-12-14
 */
 use std::fs;
+use parquet::format;
+use serde::de::value::I64Deserializer;
 use crate::converters::Converter;
 use crate::slicers::old_slicer::{IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE};
 use crate::slicers::old_slicer::SLICER_MAX_RESIDUE_SIZE;
@@ -38,7 +40,11 @@ pub(crate) struct ChunkAndResidue {
      pub(crate) residue:Box< [u8; SLICER_MAX_RESIDUE_SIZE]>
 }
 pub(crate) trait Slicer<'a> {
-    fn slice_and_convert(& mut self, converter: Box<dyn  'a+Converter<'a>>, in_buffers: &'a mut [ChunkAndResidue; IN_MAX_CHUNKS], infile: fs::File, n_threads : usize) ;
+    fn slice_and_convert(& mut self, converter: Box<dyn  'a+Converter<'a>>, in_buffers: &'a mut [ChunkAndResidue; IN_MAX_CHUNKS], infile: fs::File, n_threads : usize) -> Result<Stats,& str>;
+}
+pub(crate) struct Stats {
+    bytes_in: i64,
+    bytes_out:i64,
 }
 
 pub(crate) type FnLineBreak<'a> = fn(bytes: &'a[u8]) -> (bool, usize);

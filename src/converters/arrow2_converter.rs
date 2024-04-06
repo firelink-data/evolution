@@ -38,6 +38,7 @@ use arrow2::array::{Array, MutablePrimitiveArray};
 use rayon::prelude::*;
 use std::sync::Arc;
 use arrow2::types::NativeType;
+use parquet::format;
 use crate::converters::{Converter};
 use crate::slicers::{find_last_nl, FnLineBreak, Slicer};
 
@@ -69,7 +70,7 @@ impl<'a> Converter<'a> for Slice2Arrow2<'a> {
         bytes_processed
     }
 
-    fn finish(&mut self) {
+    fn finish(&mut self) -> parquet::errors::Result<format::FileMetaData> {
         todo!()
     }
 }

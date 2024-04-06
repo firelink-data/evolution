@@ -32,7 +32,7 @@ use std::path::PathBuf;
 use crate::converters::Converter;
 use std::{cmp, fs};
 use rayon::prelude::*;
-use crate::slicers::{ChunkAndResidue, find_last_nl, FnLineBreak, Slicer};
+use crate::slicers::{ChunkAndResidue, find_last_nl, FnLineBreak, Slicer, Stats};
 use chrono::format::Item;
 use crate::slicers::old_slicer::{IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE};
 
@@ -55,7 +55,7 @@ impl<'a> Slicer<'a> for new_slicer<'a> {
                           in_buffers: &'a mut [ChunkAndResidue; IN_MAX_CHUNKS],
                           infile: fs::File,
                           n_threads: usize,
-     ) {
+     ) -> Result<Stats, &str> {
         let bytes_to_read = infile.metadata().expect("Could not read file metadata").len() as usize;
         info!("File is {} bytes total!", bytes_to_read);
         let mut remaining_bytes = bytes_to_read;
@@ -119,7 +119,9 @@ impl<'a> Slicer<'a> for new_slicer<'a> {
             debug!("We have {} bytes left to read!", remaining_bytes);
         }
         info!("We read {} bytes two times (due to sliding window overlap).", bytes_overlapped);
-    }
+        Result::Ok(Stats{ bytes_in: 0, bytes_out: 0 })
+
+     }
 }
 
 /// For 5 worker , split the buffer in 5 simply size. Adjust these 5 line index to not break an lines.

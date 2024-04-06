@@ -195,7 +195,7 @@ impl Cli {
                     },
                 };
 
-                slicer_instance.slice_and_convert(converter_instance, in_buffers, _in_file, n_threads as usize);
+                let _ = slicer_instance.slice_and_convert(converter_instance, in_buffers, _in_file, n_threads as usize);
             }
 
             None => {}
