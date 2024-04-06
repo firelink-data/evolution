@@ -24,22 +24,19 @@
 * File created: 2023-11-21
 * Last updated: 2023-11-21
 */
-use std::fmt::{Debug, Pointer};
 use std::fs;
 use std::fs::File;
-use std::io::Write;
 use std::path::PathBuf;
 use std::str::from_utf8_unchecked;
 use std::sync::Arc;
 
-use arrow::array::{ArrayBuilder, ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
+use arrow::array::{ ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
 use parquet::format;
 use rayon::iter::IndexedParallelIterator;
-use rayon::prelude::*;
 use rayon::prelude::*;
 
 use crate::{converters, schema};
@@ -80,12 +77,12 @@ impl MasterBuilders {
 
         let b: &mut Vec<Box<dyn Sync+Send+ColumnBuilder>>=self.builders.get_mut(0).unwrap();
         let mut br:Vec<(&str, ArrayRef)> = vec![];
-        for mut bb in b.iter_mut() {
+        for bb in b.iter_mut() {
             br.push(  bb.finish());
         }
 
         let batch = RecordBatch::try_from_iter(br).unwrap();
-        let mut writer:ArrowWriter<File>=ArrowWriter::try_new(_out_file, batch.schema(), Some(props.clone())).unwrap();
+        let writer:ArrowWriter<File>=ArrowWriter::try_new(_out_file, batch.schema(), Some(props.clone())).unwrap();
         writer
 
     }
@@ -96,7 +93,7 @@ impl MasterBuilders {
         let mut builders:Vec<Vec<Box<dyn ColumnBuilder + Sync + Send>>>=Vec::new();
 
 
-        for i in 1..=instances {
+        for _i in 1..=instances {
             let mut buildersmut:  Vec<Box<dyn ColumnBuilder + Sync + Send>> =  Vec::with_capacity(antal_col);
             for val in schema.iter() {
                 match val.dtype().as_str() {
@@ -124,12 +121,12 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
     }
 
     fn process(& mut  self,  slices: Vec<&'a [u8]>) -> usize {
-        let mut bytes_processed: usize = 0;
+        let bytes_processed: usize = 0;
 
 
 
         let arc_slices = Arc::new(& slices);
-        self.masterbuilders.builders.par_iter_mut().enumerate().for_each(|(i, mut n)| {
+        self.masterbuilders.builders.par_iter_mut().enumerate().for_each(|(i,  n)| {
 
             let arc_slice_clone = Arc::clone(&arc_slices);
             match arc_slice_clone.get(i) {
@@ -143,7 +140,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         for b in self.masterbuilders.builders.iter_mut() {
             let mut br:Vec<(&str, ArrayRef)> = vec![];
 
-            for mut bb in b.iter_mut() {
+            for bb in b.iter_mut() {
                 br.push(  bb.finish());
             }
             let batch = RecordBatch::try_from_iter(br).unwrap();
@@ -162,17 +159,15 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 
 
 fn
-parse_slice(i:usize, n: &[u8], mut builders: &mut Vec<Box<dyn ColumnBuilder +Send + Sync>>)  {
+parse_slice(i:usize, n: &[u8], builders: &mut Vec<Box<dyn ColumnBuilder +Send + Sync>>)  {
 
 
     println!("index {} {}", i, n.len());
-//    let builders: Vec<Box<dyn ColumnBuilder>>;
-    let start_byte_pos=0;
 
     let mut cursor:usize = 0;
     while cursor < n.len() {
-        for mut cb in &mut *builders {
-            let mut bytelen = cb.parse_value(&n[cursor..]);
+        for cb in &mut *builders {
+            let bytelen = cb.parse_value(&n[cursor..]);
             cursor += bytelen;
         }
         cursor+=1; // TODO adjust to CR/LF mode
@@ -253,7 +248,7 @@ impl ColumnBuilder for HandlerStringBuilder {
     {
         let column_length:usize= converters::column_length(data, self.runes_in_column as i16);
 // Me dont like ... what is the cost ? Could it be done once for the whole chunk ?
-        let mut text:&str = unsafe {
+        let text:&str = unsafe {
             from_utf8_unchecked(&data[..column_length])
         };
 
@@ -287,7 +282,7 @@ impl ColumnBuilder for HandlerBooleanBuilder {
     {
         let (start,stop)= converters::column_length_char_rightaligned(data, self.runes_in_column as i16);
 
-        let mut text:&str = unsafe {
+        let text:&str = unsafe {
             from_utf8_unchecked(&data[start..stop])
         };
 

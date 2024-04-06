@@ -28,19 +28,18 @@
 use log::{debug, error, info};
 use std::fs::File;
 use std::io::{BufReader, Read};
-use std::path::PathBuf;
 use crate::converters::Converter;
-use std::{cmp, fs};
-use rayon::prelude::*;
-use crate::slicers::{ChunkAndResidue, find_last_nl, FnLineBreak, Slicer, Stats};
-use chrono::format::Item;
-use crate::slicers::old_slicer::{IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE};
+use std::{fs};
+use crate::slicers::{ChunkAndResidue,  FnLineBreak, Slicer, Stats};
+ use crate::slicers::old_slicer::{IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE};
 
 
 pub(crate) static DEFAULT_SLICE_BUFFER_LEN: usize = 1024 * 1024;
 
 ///
-pub struct new_slicer<'a> {
+
+#[allow(dead_code)]
+pub struct NewSlicer<'a> {
     pub(crate) fn_line_break: FnLineBreak<'a>,
     file: File,
     n_threads: usize,
@@ -49,7 +48,7 @@ pub struct new_slicer<'a> {
 }
 
 
-impl<'a> Slicer<'a> for new_slicer<'a> {
+impl<'a> Slicer<'a> for NewSlicer<'a> {
      fn slice_and_convert(& mut self,
                           mut converter: Box<dyn  'a+Converter<'a>>,
                           in_buffers: &'a mut [ChunkAndResidue; IN_MAX_CHUNKS],
@@ -75,7 +74,7 @@ impl<'a> Slicer<'a> for new_slicer<'a> {
             if remaining_bytes < DEFAULT_SLICE_BUFFER_LEN { buff_capacity = remaining_bytes; };
 
             // Read part of the file and find index of where to slice the file.
-            let mut buffer = vec![0u8; buff_capacity];
+            let _buffer = vec![0u8; buff_capacity];
 //            &mut target_chunk_read[0..cmp::min(target_chunk_read_len, chunk_len_toread)];
             match file_reader.read_exact( & mut cr.chunk[0..SLICER_IN_CHUNK_SIZE]).is_ok() {
                 true => {},
@@ -106,10 +105,7 @@ impl<'a> Slicer<'a> for new_slicer<'a> {
                 }
             };
 
-            // TODO: This is where we should slice the buffer and send it to workers!
-             let bytes_processed_for_slices = converter.process(slices);
-
-//            let _rows: Vec<&[u8]> = vec![];
+             let _bytes_processed_for_slices = converter.process(slices);
 
             bytes_processed += buff_capacity - n_bytes_left_after_line_break;
             bytes_overlapped += n_bytes_left_after_line_break;
@@ -135,7 +131,7 @@ pub fn find_worker_borders_aligned_to_linebreak(bytes: &[u8],n_threads:i16) -> V
     let mut worker_stop_pos=worker_size-1;
 
 // Simply calculate the border without care of breaking lines.
-    for index in 0..n_threads {
+    for _index in 0..n_threads {
         worker_borders.push(&bytes[worker_start_pos..worker_stop_pos]);
         worker_start_pos+=worker_size;
         worker_stop_pos+=worker_size;

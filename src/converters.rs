@@ -25,7 +25,6 @@
 * Last updated: 2023-11-21
 */
 
-use std::any::Any;
 use std::cmp::min;
 use arrow::array::ArrayRef;
 use parquet::format;
@@ -59,7 +58,7 @@ fn column_length_num_rightaligned(data: &[u8], runes: i16) -> (usize, usize) {
     let mut eat=data.iter();
     let mut counted_runes=0;
     let mut start:usize =0;
-    let mut stop:usize =min (data.len(), runes as usize);
+    let stop:usize =min (data.len(), runes as usize);
 
     while counted_runes< runes as usize {
         let byten=    eat.nth(0);
@@ -88,7 +87,7 @@ fn column_length_char_rightaligned(data: &[u8], runes: i16) -> (usize, usize) {
     let mut eat=data.iter();
     let mut counted_runes=0;
     let mut start:usize =0;
-    let mut stop:usize =min (data.len(), runes as usize);
+    let stop:usize =min (data.len(), runes as usize);
 
     while counted_runes< runes as usize {
         let byten=    eat.nth(0);
@@ -140,9 +139,10 @@ fn column_length(data: &[u8], runes: i16) -> usize {
             bb if bb >> 5 == 0b110 =>  2,
             bb if bb >> 4 == 0b1110 =>  3,
             bb if bb >> 3 == 0b11110 => 4,
-            bb => {
+            _bb => {
 // TODO BAD ERROR HANDL
                  panic!("Incorrect UTF-8 sequence");
+                #[allow(unreachable_code)]
                 0
             }
         };

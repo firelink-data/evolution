@@ -30,16 +30,15 @@ use std::fs::File;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-use log::{info, SetLoggerError};
+use log::{info};
 use parquet::arrow::ArrowWriter;
-use rand::rngs::mock;
 use crate::slicers::{ChunkAndResidue, find_last_nl};
-use crate::slicers::old_slicer::{IN_MAX_CHUNKS, old_slicer, SLICER_IN_CHUNK_SIZE, SLICER_MAX_RESIDUE_SIZE};
+use crate::slicers::old_slicer::{IN_MAX_CHUNKS, OldSlicer};
 use crate::converters::arrow2_converter::{MasterBuilder, Slice2Arrow2};
 use crate::converters::arrow_converter::{MasterBuilders, Slice2Arrow};
 use crate::converters::self_converter::SampleSliceAggregator;
 use crate::converters::Converter;
-use crate::{converters, error, mocker, schema};
+use crate::{ error, mocker, schema};
 use crate::slicers::Slicer;
 
 
@@ -112,7 +111,6 @@ enum Commands {
 impl Cli {
 
     pub fn run<'a>(& self, in_buffers: & mut [ChunkAndResidue; IN_MAX_CHUNKS] ) -> Result<(), error::ExecutionError> {
-
         let n_logical_threads = num_cpus::get();
         let mut n_threads: usize = self.n_threads as usize;
 
@@ -143,31 +141,28 @@ impl Cli {
                     n_threads,
                 )
                     .generate(n_rows.unwrap() as usize);
-
+                Ok(())
             }
 
             Some(Commands::Convert {
                      converter,
-                     slicer,
+                     slicer: _,
                      schema,
                      in_file,
                      out_file
                  }) => {
-
                 let _in_file = fs::File::open(&in_file).expect("bbb");
 
+                let mut slicer_instance: Box<dyn Slicer> = Box::new(OldSlicer {
+                    fn_line_break: find_last_nl
+                });
 
-                let mut slicer_instance: Box<dyn  Slicer> = Box::new(old_slicer {
-                    fn_line_break: find_last_nl});
-
-
-                let converter_instance: Box<dyn  Converter> = match converter {
-
+                let converter_instance: Box<dyn Converter> = match converter {
                     Converters::Arrow => {
-                        let mut master_builders=MasterBuilders::builders_factory(schema.to_path_buf(), n_threads as i16,);
-                        let writer:ArrowWriter<File>=master_builders.writer_factory( out_file );
+                        let mut master_builders = MasterBuilders::builders_factory(schema.to_path_buf(), n_threads as i16, );
+                        let writer: ArrowWriter<File> = master_builders.writer_factory(out_file);
 
-                        let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow {  writer: writer, fn_line_break: find_last_nl,masterbuilders: master_builders });
+                        let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { writer: writer, fn_line_break: find_last_nl, masterbuilders: master_builders });
                         s2a
                     },
                     Converters::Arrow2 => {
@@ -195,14 +190,19 @@ impl Cli {
                     },
                 };
 
-                let _ = slicer_instance.slice_and_convert(converter_instance, in_buffers, _in_file, n_threads as usize);
+
+               let r = slicer_instance.slice_and_convert(converter_instance, in_buffers, _in_file, n_threads as usize);
+                match r {
+                    Ok(s) => {print!("Operation successful inbytes={} out bytes={}",s.bytes_in,s.bytes_out);}
+                    Err(x) => {print!("Operation failed: {}",x);}
+                }
+
+
+                Ok(())
             }
 
-            None => {}
-            #[allow(unreachable_patterns)]
-            _ => {}
+//            Ok(()) => todo!(),
+            _ => {Ok(())}
         }
-
-        Ok(())
     }
 }

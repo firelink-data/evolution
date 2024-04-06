@@ -34,15 +34,15 @@ use std::fs::File;
 use std::str;
 use std::path::PathBuf;
 use str::from_utf8_unchecked;
-use arrow2::array::{Array, MutablePrimitiveArray};
+use arrow2::array::{ MutablePrimitiveArray};
 use rayon::prelude::*;
 use std::sync::Arc;
 use arrow2::types::NativeType;
 use parquet::format;
 use crate::converters::{Converter};
-use crate::slicers::{find_last_nl, FnLineBreak, Slicer};
+use crate::slicers::{ FnLineBreak};
 
-
+#[allow(dead_code)]
 pub(crate) struct Slice2Arrow2<'a> {
     pub(crate) file_out: File,
     pub(crate) fn_line_break: FnLineBreak<'a>,
@@ -58,7 +58,7 @@ impl<'a> Converter<'a> for Slice2Arrow2<'a> {
     }
 
     fn process(&  mut self, slices: Vec<& [u8]>) -> usize {
-        let mut bytes_processed: usize = 0;
+        let bytes_processed: usize = 0;
 //        let chunks:Chunk<?>;
         let arc_masterbuilder = Arc::new(& self.master_builder);
         // TODO declare a array of chunks[slices.len]  , pass it on to the parse_slice funktion
@@ -74,19 +74,17 @@ impl<'a> Converter<'a> for Slice2Arrow2<'a> {
         todo!()
     }
 }
-fn parse_slice(i:usize, n: &&[u8],master_builder: &MasterBuilder)  {
+fn parse_slice(i:usize, n: &&[u8],_master_builder: &MasterBuilder)  {
 
 
     println!("index {} {}", i, n.len());
-//    let builders: Vec<Box<dyn ColumnBuilder>>;
-    let start_byte_pos=0;
 
     // TODO make safe/unsafe configurable
-    let text:&str = unsafe {
+    let _text:&str = unsafe {
         from_utf8_unchecked(&n)
     };
 
-    let offset=0;
+    let _offset=0;
 }
 
 pub(crate) struct ColumnBuilderType<T1: NativeType> {
@@ -245,6 +243,7 @@ pub trait ColumnBuilder {
 }
 
 pub(crate) struct MasterBuilder<'a> {
+    #[allow(dead_code)]
     builders: Vec<Box<dyn Sync + Send + 'a + ColumnBuilder>>
 }
 

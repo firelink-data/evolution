@@ -27,15 +27,11 @@
 
     use crate::slicers::{IterRevolver, Stats};
     use std::{cmp, fs};
-    use std::ffi::c_float;
     use std::fs::File;
-    use std::io::{BufReader, Read, Write};
-    use rayon::prelude::*;
+    use std::io::{BufReader, Read};
     use log::info;
     use crate::converters::Converter;
-    use crate::slicers::{ChunkAndResidue, find_last_nl, FnLineBreak,  Slicer};
-    use chrono::format::Item;
-    use crate::slicers;
+    use crate::slicers::{ChunkAndResidue, FnLineBreak,  Slicer};
 
     /**
     GOAL(s)
@@ -61,19 +57,19 @@
     //struct Chunk {
     //    chunk: [u8;SLICER_IN_CHUNK_SIZE]
     //}
-    pub(crate) type Chunk =[u8; SLICER_IN_CHUNK_SIZE];
 
-    pub(crate) struct old_slicer<'a> {
+    pub(crate) struct OldSlicer<'a> {
         pub(crate) fn_line_break: FnLineBreak<'a>,
     }
 
+#[allow(dead_code)]
     fn ceil_amount_of_chunks (a:i64,b:i64)->usize {
 
         (a / b + (a % b).signum() ) as usize
     }
 
 
-    impl<'a> Slicer<'a> for old_slicer<'a> {
+    impl<'a> Slicer<'a> for OldSlicer<'a> {
          fn slice_and_convert(& mut self,
                               mut converter:  Box<dyn  'a+Converter<'a>>,
                               in_buffers: &'a mut [ChunkAndResidue; IN_MAX_CHUNKS],
@@ -89,6 +85,7 @@
              let mut residue= [0_u8; SLICER_MAX_RESIDUE_SIZE];
              let mut residue_len = 0;
              let mut slices: Vec<& [u8]>;
+             #[allow(unused_assignments)]
              let mut bytes_processed_for_slices=0;
 
             let mut ir=IterRevolver {
@@ -103,7 +100,7 @@
 
              loop
              {
-                 let mut cr=ir.next().unwrap();
+                 let cr=ir.next().unwrap();
 
                 let mut chunk_len_toread = SLICER_IN_CHUNK_SIZE;
                 if remaining_file_length < SLICER_IN_CHUNK_SIZE {
@@ -113,7 +110,8 @@
                 let chunk_len_effective_read: usize;
 
                      (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
-                         find_last_nl,
+//                         find_last_nl,
+                         self.fn_line_break,
                          &mut residue,
                          &mut cr.chunk,
                          &infile,
@@ -133,8 +131,8 @@
 
             }
 
-             let mut cr=ir.next().unwrap();
-             cr=ir.next().unwrap();
+             let cr=ir.next().unwrap();
+//             cr=ir.next().unwrap();
              if 0 != residue_len {
                  slices = residual_to_slice(
                      & residue,
@@ -150,8 +148,8 @@
 
 
              match converter.finish() {
-                 Ok(x) => {Result::Ok(Stats{ bytes_in: 0, bytes_out: 0 })}
-                 Err(x) => {Result::Err("Could not produce Parquet")}
+                 Ok(_x) => {Result::Ok(Stats{ bytes_in: 0, bytes_out: 0 })}
+                 Err(_x) => {Result::Err("Could not produce Parquet")}
              }
 
 
@@ -168,9 +166,8 @@
     ) -> Vec<&'a[u8]> {
         #[allow(unused_mut)]
             let mut target_chunk_residue: &mut [u8];
-            let mut target_chunk_read: &mut [u8];
 
-        (target_chunk_residue, target_chunk_read) = chunk.split_at_mut(residue_effective_len);
+        (target_chunk_residue, _) = chunk.split_at_mut(residue_effective_len);
         if 0 != residue_effective_len {
             target_chunk_residue.copy_from_slice(&residue[0..residue_effective_len]);
         }

@@ -31,7 +31,6 @@ use crate::converters::Converter;
 use crate::slicers::{FnLineBreak};
 use rayon::prelude::*;
 use std::io::{Write};
-use rayon::prelude::*;
 
 
 pub struct SampleSliceAggregator<'a> {
