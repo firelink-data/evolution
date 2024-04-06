@@ -58,5 +58,9 @@ impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
         }
         bytes_processed
     }
+
+    fn finish(&mut self) {
+        todo!()
+    }
 }
 

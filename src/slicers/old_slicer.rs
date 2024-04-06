@@ -146,7 +146,7 @@
                  bytes_processed += bytes_processed_for_slices;
              }
 
-
+             converter.finish();
              info!("Bytes processed {}", bytes_processed);
         }
 

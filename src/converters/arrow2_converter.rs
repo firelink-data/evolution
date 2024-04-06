@@ -68,6 +68,10 @@ impl<'a> Converter<'a> for Slice2Arrow2<'a> {
 
         bytes_processed
     }
+
+    fn finish(&mut self) {
+        todo!()
+    }
 }
 fn parse_slice(i:usize, n: &&[u8],master_builder: &MasterBuilder)  {
 

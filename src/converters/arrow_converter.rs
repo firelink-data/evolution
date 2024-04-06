@@ -148,9 +148,12 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 
             self.writer.write(&batch).expect("Writing batch");
         }
-        self.writer.finish();
 
         bytes_processed
+    }
+
+    fn finish(&mut self) {
+        self.writer.finish();
     }
 }
 
