@@ -28,6 +28,7 @@ use parquet::file::properties::WriterProperties;
 use tempfile::tempfile;
 use std::io::{self, Write};
 use std::fmt::{Debug, Pointer};
+use std::fs;
 use std::fs::File;
 use std::path::PathBuf;
 use std::str::from_utf8_unchecked;
@@ -44,9 +45,11 @@ use crate::slicers::FnLineBreak;
 use rayon::prelude::*;
 
 pub(crate) struct Slice2Arrow<'a> {
-    pub(crate) file_out: File,
+//    pub(crate) file_out: File,
+    pub(crate) writer:ArrowWriter<File>,
     pub(crate) fn_line_break: FnLineBreak<'a>,
     pub(crate) masterbuilders:  MasterBuilders
+
 }
 
 pub(crate) struct MasterBuilders {
@@ -59,6 +62,31 @@ unsafe impl Send for MasterBuilders {}
 unsafe impl Sync for MasterBuilders {}
 
 impl MasterBuilders {
+
+    pub fn writer_factory<'a>(& mut self, out_file: &PathBuf)->ArrowWriter<File> {
+        let _out_file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(out_file)
+            .expect("aaa");
+
+        let props = WriterProperties::builder()
+
+
+            .set_compression(Compression::SNAPPY)
+            .build();
+
+        let b: &mut Vec<Box<dyn Sync+Send+ColumnBuilder>>=self.builders.get_mut(0).unwrap();
+        let mut br:Vec<(&str, ArrayRef)> = vec![];
+        for mut bb in b.iter_mut() {
+            br.push(  bb.finish());
+        }
+
+        let batch = RecordBatch::try_from_iter(br).unwrap();
+        let mut writer:ArrowWriter<File>=ArrowWriter::try_new(_out_file, batch.schema(), Some(props.clone())).unwrap();
+        writer
+
+    }
 
     pub fn builders_factory<'a>(schema_path: PathBuf, instances: i16) -> Self {
         let schema = schema::FixedSchema::from_path(schema_path.into());
@@ -108,18 +136,6 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
             }
         });
 
-        let props = WriterProperties::builder()
-            .set_compression(Compression::SNAPPY)
-            .build();
-
-        let b: &mut Vec<Box<dyn Sync+Send+ColumnBuilder>>=self.masterbuilders.builders.get_mut(0).unwrap();
-        let mut br:Vec<(&str, ArrayRef)> = vec![];
-        for mut bb in b.iter_mut() {
-            br.push(  bb.finish());
-        }
-
-        let batch = RecordBatch::try_from_iter(br).unwrap();
-        let mut writer:ArrowWriter<&File>=ArrowWriter::try_new(&self.file_out, batch.schema(), Some(props.clone())).unwrap();
 
 
         for b in self.masterbuilders.builders.iter_mut() {
@@ -130,10 +146,9 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
             }
             let batch = RecordBatch::try_from_iter(br).unwrap();
 
-            writer.write(&batch).expect("Writing batch");
+            self.writer.write(&batch).expect("Writing batch");
         }
-
-        writer.close().unwrap();
+        self.writer.flush();
 
         bytes_processed
     }
