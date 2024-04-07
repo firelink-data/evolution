@@ -41,14 +41,14 @@ use rayon::prelude::*;
 
 use crate::{converters, schema};
 use crate::converters::{ColumnBuilder, Converter};
-use crate::slicers::FnLineBreak;
+use crate::slicers::{FnFindLastLineBreak, FnLineBreakLen};
 
 pub(crate) struct Slice2Arrow<'a> {
 //    pub(crate) file_out: File,
     pub(crate) writer:ArrowWriter<File>,
-    pub(crate) fn_line_break: FnLineBreak<'a>,
+    pub(crate) fn_line_break: FnFindLastLineBreak<'a>,
+    pub(crate) fn_line_break_len: FnLineBreakLen,
     pub(crate) masterbuilders:  MasterBuilders
-
 }
 
 pub(crate) struct MasterBuilders {
@@ -113,10 +113,10 @@ impl MasterBuilders {
 
 
 impl<'a> Converter<'a> for Slice2Arrow<'a> {
-    fn set_line_break_handler(& mut self, fnl: FnLineBreak<'a>) {
+    fn set_line_break_handler(& mut self, fnl: FnFindLastLineBreak<'a>) {
         self.fn_line_break = fnl;
     }
-    fn get_line_break_handler(& self) -> FnLineBreak<'a> {
+    fn get_line_break_handler(& self) -> FnFindLastLineBreak<'a> {
         self.fn_line_break
     }
 
@@ -131,7 +131,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
             let arc_slice_clone = Arc::clone(&arc_slices);
             match arc_slice_clone.get(i) {
                 None => {}
-                Some(_) => {            parse_slice(i, arc_slice_clone.get(i).unwrap(),n);}
+                Some(_) => {            parse_slice(i, arc_slice_clone.get(i).unwrap(), n,(self.fn_line_break_len)() );}
             }
         });
 
@@ -159,7 +159,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 
 
 fn
-parse_slice(i:usize, n: &[u8], builders: &mut Vec<Box<dyn ColumnBuilder +Send + Sync>>)  {
+parse_slice(i:usize, n: &[u8], builders: &mut Vec<Box<dyn ColumnBuilder +Send + Sync>>, linebreak: usize)  {
 
 
     println!("index {} {}", i, n.len());
@@ -170,7 +170,7 @@ parse_slice(i:usize, n: &[u8], builders: &mut Vec<Box<dyn ColumnBuilder +Send + 
             let bytelen = cb.parse_value(&n[cursor..]);
             cursor += bytelen;
         }
-        cursor+=1; // TODO adjust to CR/LF mode
+        cursor+=linebreak; // TODO adjust to CR/LF mode
     }
 
 }

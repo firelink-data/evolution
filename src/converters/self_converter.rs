@@ -28,21 +28,21 @@
 use std::fs::File;
 use rayon::iter::IntoParallelRefIterator;
 use crate::converters::Converter;
-use crate::slicers::{FnLineBreak};
+use crate::slicers::{FnFindLastLineBreak};
 use rayon::prelude::*;
 use std::io::{Write};
 
 
 pub struct SampleSliceAggregator<'a> {
     pub(crate) file_out: File,
-    pub(crate) fn_line_break: FnLineBreak<'a>,
+    pub(crate) fn_line_break: FnFindLastLineBreak<'a>,
 }
 
 impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
-    fn set_line_break_handler(& mut self, fnl: FnLineBreak<'a>) {
+    fn set_line_break_handler(& mut self, fnl: FnFindLastLineBreak<'a>) {
         self.fn_line_break = fnl;
     }
-    fn get_line_break_handler(& self) -> FnLineBreak<'a> {
+    fn get_line_break_handler(& self) -> FnFindLastLineBreak<'a> {
         self.fn_line_break
     }
 

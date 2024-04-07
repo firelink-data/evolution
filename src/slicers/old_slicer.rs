@@ -25,13 +25,13 @@
     * Last updated: 2023-12-14
     */
 
-    use crate::slicers::{IterRevolver, Stats};
+    use crate::slicers::{ IterRevolver, Stats};
     use std::{cmp, fs};
     use std::fs::File;
     use std::io::{BufReader, Read};
     use log::info;
     use crate::converters::Converter;
-    use crate::slicers::{ChunkAndResidue, FnLineBreak,  Slicer};
+    use crate::slicers::{ChunkAndResidue, FnFindLastLineBreak, Slicer};
 
     /**
     GOAL(s)
@@ -59,7 +59,7 @@
     //}
 
     pub(crate) struct OldSlicer<'a> {
-        pub(crate) fn_line_break: FnLineBreak<'a>,
+        pub(crate) fn_find_last_nl: FnFindLastLineBreak<'a>,
     }
 
 #[allow(dead_code)]
@@ -111,13 +111,13 @@
 
                      (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
 //                         find_last_nl,
-                         self.fn_line_break,
-                         &mut residue,
-                         &mut cr.chunk,
-                         &infile,
-                         n_threads,
-                         residue_len,
-                         chunk_len_toread,
+                         self.fn_find_last_nl,
+&mut residue,
+&mut cr.chunk,
+&infile,
+n_threads,
+residue_len,
+chunk_len_toread,
                      );
 
                 remaining_file_length -= chunk_len_effective_read;
@@ -132,7 +132,7 @@
             }
 
              let cr=ir.next().unwrap();
-//             cr=ir.next().unwrap();
+
              if 0 != residue_len {
                  slices = residual_to_slice(
                      & residue,

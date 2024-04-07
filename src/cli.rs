@@ -32,7 +32,7 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use log::{info};
 use parquet::arrow::ArrowWriter;
-use crate::slicers::{ChunkAndResidue, find_last_nl};
+use crate::slicers::{ChunkAndResidue, find_last_nl, line_break_len_cr};
 use crate::slicers::old_slicer::{IN_MAX_CHUNKS, OldSlicer};
 use crate::converters::arrow2_converter::{MasterBuilder, Slice2Arrow2};
 use crate::converters::arrow_converter::{MasterBuilders, Slice2Arrow};
@@ -154,7 +154,7 @@ impl Cli {
                 let _in_file = fs::File::open(&in_file).expect("bbb");
 
                 let mut slicer_instance: Box<dyn Slicer> = Box::new(OldSlicer {
-                    fn_line_break: find_last_nl
+                    fn_find_last_nl: find_last_nl,
                 });
 
                 let converter_instance: Box<dyn Converter> = match converter {
@@ -162,7 +162,7 @@ impl Cli {
                         let mut master_builders = MasterBuilders::builders_factory(schema.to_path_buf(), n_threads as i16, );
                         let writer: ArrowWriter<File> = master_builders.writer_factory(out_file);
 
-                        let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { writer: writer, fn_line_break: find_last_nl, masterbuilders: master_builders });
+                        let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { writer: writer, fn_line_break: find_last_nl, fn_line_break_len: line_break_len_cr, masterbuilders: master_builders });
                         s2a
                     },
                     Converters::Arrow2 => {

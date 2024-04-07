@@ -30,7 +30,7 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use crate::converters::Converter;
 use std::{fs};
-use crate::slicers::{ChunkAndResidue,  FnLineBreak, Slicer, Stats};
+use crate::slicers::{ChunkAndResidue, FnFindLastLineBreak, Slicer, Stats};
  use crate::slicers::old_slicer::{IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE};
 
 
@@ -40,7 +40,7 @@ pub(crate) static DEFAULT_SLICE_BUFFER_LEN: usize = 1024 * 1024;
 
 #[allow(dead_code)]
 pub struct NewSlicer<'a> {
-    pub(crate) fn_line_break: FnLineBreak<'a>,
+    pub(crate) fn_line_break: FnFindLastLineBreak<'a>,
     file: File,
     n_threads: usize,
     multithreaded: bool,

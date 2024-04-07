@@ -40,20 +40,20 @@ use std::sync::Arc;
 use arrow2::types::NativeType;
 use parquet::format;
 use crate::converters::{Converter};
-use crate::slicers::{ FnLineBreak};
+use crate::slicers::{FnFindLastLineBreak};
 
 #[allow(dead_code)]
 pub(crate) struct Slice2Arrow2<'a> {
     pub(crate) file_out: File,
-    pub(crate) fn_line_break: FnLineBreak<'a>,
+    pub(crate) fn_line_break: FnFindLastLineBreak<'a>,
     pub(crate) master_builder: MasterBuilder<'a>
 }
 
 impl<'a> Converter<'a> for Slice2Arrow2<'a> {
-    fn set_line_break_handler(& mut self, fnl: FnLineBreak<'a>) {
+    fn set_line_break_handler(& mut self, fnl: FnFindLastLineBreak<'a>) {
         self.fn_line_break = fnl;
     }
-    fn get_line_break_handler(& self) -> FnLineBreak<'a> {
+    fn get_line_break_handler(& self) -> FnFindLastLineBreak<'a> {
         self.fn_line_break
     }
 

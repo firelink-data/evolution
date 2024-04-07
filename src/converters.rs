@@ -28,7 +28,7 @@
 use std::cmp::min;
 use arrow::array::ArrayRef;
 use parquet::format;
-use crate::slicers::FnLineBreak;
+use crate::slicers::FnFindLastLineBreak;
 
 pub(crate) mod self_converter;
 pub(crate) mod arrow2_converter;
@@ -38,8 +38,8 @@ pub mod arrow_converter;
 
 
 pub(crate) trait Converter<'a> {
-    fn set_line_break_handler(& mut self, fn_line_break: FnLineBreak<'a>);
-    fn get_line_break_handler(& self) -> FnLineBreak<'a>;
+    fn set_line_break_handler(& mut self, fn_line_break: FnFindLastLineBreak<'a>);
+    fn get_line_break_handler(& self) -> FnFindLastLineBreak<'a>;
 
 //    fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
     fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;

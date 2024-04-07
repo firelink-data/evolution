@@ -43,7 +43,18 @@ pub(crate) struct Stats {
     pub(crate) bytes_out:i64,
 }
 
-pub(crate) type FnLineBreak<'a> = fn(bytes: &'a[u8]) -> (bool, usize);
+pub(crate) type FnLineBreakLen = fn() -> usize;
+#[allow(dead_code)]
+pub(crate) fn line_break_len_cr() -> usize {
+    1 as usize
+}
+#[allow(dead_code)]
+pub(crate) fn line_break_len_crlf() -> usize {
+    2 as usize
+}
+
+
+pub(crate) type FnFindLastLineBreak<'a> = fn(bytes: &'a[u8]) -> (bool, usize);
 #[allow(dead_code)]
 pub(crate) fn find_last_nlcr(bytes: &[u8]) -> (bool, usize) {
     if bytes.is_empty() {
