@@ -200,6 +200,7 @@ impl ColumnBuilder for HandlerInt32Builder {
     }
 
     fn finish(& mut self) -> (&str,ArrayRef) {
+
         (self.name.as_str(), Arc::new(self.int32builder.finish()) as ArrayRef)
 
     }
@@ -229,6 +230,7 @@ impl ColumnBuilder for HandlerInt64Builder {
     }
 
     fn finish(& mut self) -> (&str,ArrayRef) {
+
         (self.name.as_str(), Arc::new(self.int64builder.finish()) as ArrayRef)
     }
 
