@@ -26,6 +26,7 @@
 */
 use std::fs::File;
 use std::fs;
+use arrow_array::Datum;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
 pub(crate) fn dump(infile: fs::File) -> usize {
@@ -46,6 +47,8 @@ pub(crate) fn dump(infile: fs::File) -> usize {
                 println!("Read {} records.", record_batch.num_rows());
                 for col in record_batch.columns() {
                     println!("col={}", col.data_type());
+                    println!("col={:#?}", col.get());
+
                 }
             }
         }
