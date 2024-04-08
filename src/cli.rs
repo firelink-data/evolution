@@ -39,6 +39,7 @@ use crate::converters::arrow_converter::{MasterBuilders, Slice2Arrow};
 use crate::converters::self_converter::SampleSliceAggregator;
 use crate::converters::Converter;
 use crate::{ error, mocker, schema};
+use crate::dump::dump;
 use crate::slicers::Slicer;
 
 
@@ -106,6 +107,15 @@ enum Commands {
         #[arg(short, long, value_name = "OUT-FILE")]
         out_file: PathBuf,
     },
+    Dump {
+        /// Sets schema file
+        #[clap(value_enum,value_name = "CONVERTER")]
+        converter: Converters,
+        /// Sets input file
+        #[arg(short, long, value_name = "IN-FILE")]
+        in_file: PathBuf,
+    },
+
 }
 
 impl Cli {
@@ -144,6 +154,15 @@ impl Cli {
                 Ok(())
             }
 
+            Some(Commands::Dump {
+                     converter: _,
+                     in_file
+                 }) => {
+                let _in_file = fs::File::open(&in_file).expect("bbb");
+                dump(_in_file);
+
+                Ok(())
+            }
             Some(Commands::Convert {
                      converter,
                      slicer: _,

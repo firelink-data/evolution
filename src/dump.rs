@@ -22,41 +22,24 @@
 * SOFTWARE.
 *
 * File created: 2023-11-21
-* Last updated: 2024-02-28
+* Last updated: 2023-11-21
 */
+use std::fs::File;
+use std::fs;
+use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
-use clap::Parser;
-use log::{debug, error, info};
+pub(crate) fn dump(infile: fs::File) -> usize {
 
-mod cli;
-mod error;
-mod logger;
-mod mocker;
-mod schema;
-use cli::Cli;
-use crate::slicers::ChunkAndResidue;
-use crate::slicers::old_slicer::{IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE};
+    let file = File::open("data.parquet").unwrap();
 
-mod converters;
-mod slicers;
-mod dump;
-///
-fn main() {
-    let cli = Cli::parse();
+    let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
+    println!("Converted arrow schema is: {}", builder.schema());
 
-    match logger::setup_log() {
-        Ok(_) => debug!("Logging setup, ok!"),
-        Err(e) => error!("Could not set up env logging: {:?}", e),
-    };
+    let mut reader = builder.build().unwrap();
 
-    // Effektiv med fixa buffrar men fult att allokeringen ligger här ...känns banalt.
-    let  in_out_buffers:  & mut [ChunkAndResidue; IN_MAX_CHUNKS] = & mut [  ChunkAndResidue {chunk: Box::new(   [0_u8; SLICER_IN_CHUNK_SIZE])},
-        ChunkAndResidue {chunk: Box::new(  [0_u8; SLICER_IN_CHUNK_SIZE])} ];
+    let record_batch = reader.next().unwrap().unwrap();
 
-
-    match cli.run(in_out_buffers) {
-        Ok(_) => info!("All done! Bye."),
-        Err(e) => error!("Something went wrong during execution: {:?}", e),
-    }
-
+    println!("Read {} records.", record_batch.num_rows());
+    0
 }
+

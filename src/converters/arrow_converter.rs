@@ -42,6 +42,7 @@ use rayon::prelude::*;
 use crate::{converters, schema};
 use crate::converters::{ColumnBuilder, Converter};
 use crate::slicers::{FnFindLastLineBreak, FnLineBreakLen};
+use debug_print::{ debug_println};
 
 pub(crate) struct Slice2Arrow<'a> {
 //    pub(crate) file_out: File,
@@ -144,6 +145,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
                 br.push(  bb.finish());
             }
             let batch = RecordBatch::try_from_iter(br).unwrap();
+            debug_println!("num_cols? {:#?}",batch.columns());
 
             self.writer.write(&batch).expect("Writing batch");
         }
@@ -200,7 +202,6 @@ impl ColumnBuilder for HandlerInt32Builder {
     }
 
     fn finish(& mut self) -> (&str,ArrayRef) {
-
         (self.name.as_str(), Arc::new(self.int32builder.finish()) as ArrayRef)
 
     }
@@ -230,7 +231,6 @@ impl ColumnBuilder for HandlerInt64Builder {
     }
 
     fn finish(& mut self) -> (&str,ArrayRef) {
-
         (self.name.as_str(), Arc::new(self.int64builder.finish()) as ArrayRef)
     }
 
