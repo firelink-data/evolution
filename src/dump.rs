@@ -37,9 +37,18 @@ pub(crate) fn dump(infile: fs::File) -> usize {
 
     let mut reader = builder.build().unwrap();
 
-    let record_batch = reader.next().unwrap().unwrap();
-
-    println!("Read {} records.", record_batch.num_rows());
+    loop {
+        let record_batch_result = reader.next();
+        match record_batch_result {
+            None => { break }
+            Some(r) => {
+                let record_batch = r.unwrap();
+                println!("Read {} records.", record_batch.num_rows());
+                for col in record_batch.columns() {
+                    println!("col={}", col.data_type());
+                }
+            }
+        }
+    }
     0
 }
-
