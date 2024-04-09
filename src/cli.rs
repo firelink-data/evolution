@@ -179,7 +179,7 @@ impl Cli {
                     Converters::Arrow => {
                         let master_builders = MasterBuilders::builders_factory(schema.to_path_buf(), n_threads as i16, );
 
-                        let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { outfile: out_file, fn_line_break: find_last_nl, fn_line_break_len: line_break_len_cr, masterbuilders: master_builders });
+                        let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { outfile: out_file, fn_line_break: find_last_nl, fn_line_break_len: line_break_len_cr, masterbuilders: master_builders, writer: None });
                         s2a
                     },
                     Converters::Arrow2 => {

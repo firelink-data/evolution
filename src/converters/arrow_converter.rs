@@ -7,7 +7,7 @@ use std::sync::Arc;
 use arrow::array::{ ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
 use arrow_schema::SchemaRef;
-use parquet::arrow::ArrowWriter;
+use parquet::arrow::{ArrowWriter, AsyncArrowWriter};
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
 use parquet::format;
@@ -19,6 +19,7 @@ use crate::converters::{ColumnBuilder, Converter};
 use crate::slicers::{FnFindLastLineBreak, FnLineBreakLen};
 use debug_print::{ debug_println};
 use parquet::format::FileMetaData;
+use tokio::fs::File;
 use tokio::task;
 use tokio::runtime::Handle;
 
@@ -28,7 +29,8 @@ pub(crate) struct Slice2Arrow<'a> {
     pub(crate) outfile: &'a PathBuf,
     pub(crate) fn_line_break: FnFindLastLineBreak<'a>,
     pub(crate) fn_line_break_len: FnLineBreakLen,
-    pub(crate) masterbuilders:  MasterBuilders
+    pub(crate) masterbuilders:  MasterBuilders,
+    pub(crate) writer: Option<parquet::arrow::async_writer::AsyncArrowWriter<tokio::fs::File>>
 }
 
 pub(crate) struct MasterBuilders {
@@ -159,7 +161,11 @@ impl<'a> Slice2Arrow<'a> {
             let props = WriterProperties::builder().set_compression(Compression::SNAPPY)
             .build();
 
-        let mut writer:parquet::arrow::async_writer::AsyncArrowWriter<tokio::fs::File>=parquet::arrow::async_writer::AsyncArrowWriter::try_new(_out_file,self.masterbuilders.schema.clone() , Some(props.clone())).unwrap();
+        match self.writer {
+            None => {self.writer = Some( parquet::arrow::async_writer::AsyncArrowWriter::try_new(_out_file,self.masterbuilders.schema.clone() , Some(props.clone())).unwrap());}
+            Some(_) => {}
+        }
+
 
 
         for b in self.masterbuilders.builders.iter_mut() {
@@ -171,7 +177,7 @@ impl<'a> Slice2Arrow<'a> {
                 let batch = RecordBatch::try_from_iter(br).unwrap();
                 debug_println!("num_cols? {:#?}", batch.columns());
 
-                writer.write(&batch).await.expect("Writing batch");
+                self.writer.as_mut().unwrap().write(&batch).await.expect("Writing batch");
             }
         }
 }
