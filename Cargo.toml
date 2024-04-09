@@ -26,7 +26,7 @@ debug_print = "1.0.0"
 arrow-format = "0.8.1"
 arrow-schema = "51.0.0"
 arrow-array = "51.0.0"
-parquet = "51.0.0"
+parquet = { version = "51.0.0", features = ["async"] }
 atoi_simd = "0.15.6"
 chrono = "0.4.35"
 clap = { version = "4.5.3", features = ["default", "derive"] }
@@ -44,6 +44,7 @@ serde_json = "1.0.114"
 threadpool = "1.8.1"
 substring = "1.4.5"
 tempfile = "3.10.1"
+tokio = { version="1.37.0", features = ["macros","fs", "rt-multi-thread"] }
 
 [dev-dependencies]
 glob = "0.3.1"

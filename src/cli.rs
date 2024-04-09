@@ -25,8 +25,7 @@
 * Last updated: 2023-11-21
 */
 
-use std::fs;
-use std::fs::File;
+
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
@@ -41,7 +40,6 @@ use crate::converters::Converter;
 use crate::{ error, mocker, schema};
 use crate::dump::dump;
 use crate::slicers::Slicer;
-
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -158,7 +156,7 @@ impl Cli {
                      converter: _,
                      in_file
                  }) => {
-                let _in_file = fs::File::open(&in_file).expect("bbb");
+                let _in_file = std::fs::File::open(&in_file).expect("bbb");
                 dump(_in_file);
 
                 Ok(())
@@ -170,7 +168,8 @@ impl Cli {
                      in_file,
                      out_file
                  }) => {
-                let _in_file = fs::File::open(&in_file).expect("bbb");
+                let _in_file = std::fs::File::open(&in_file).expect("bbb");
+
 
                 let mut slicer_instance: Box<dyn Slicer> = Box::new(OldSlicer {
                     fn_find_last_nl: find_last_nl,
@@ -178,14 +177,13 @@ impl Cli {
 
                 let converter_instance: Box<dyn Converter> = match converter {
                     Converters::Arrow => {
-                        let mut master_builders = MasterBuilders::builders_factory(schema.to_path_buf(), n_threads as i16, );
-                        let writer: ArrowWriter<File> = master_builders.writer_factory(out_file);
+                        let master_builders = MasterBuilders::builders_factory(schema.to_path_buf(), n_threads as i16, );
 
-                        let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { writer: writer, fn_line_break: find_last_nl, fn_line_break_len: line_break_len_cr, masterbuilders: master_builders });
+                        let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { outfile: out_file, fn_line_break: find_last_nl, fn_line_break_len: line_break_len_cr, masterbuilders: master_builders });
                         s2a
                     },
                     Converters::Arrow2 => {
-                        let _out_file = fs::OpenOptions::new()
+                        let _out_file = std::fs::OpenOptions::new()
                             .create(true)
                             .append(true)
                             .open(out_file)
@@ -198,7 +196,7 @@ impl Cli {
                     },
 
                     Converters::None => {
-                        let _out_file = fs::OpenOptions::new()
+                        let _out_file = std::fs::OpenOptions::new()
                             .create(true)
                             .append(true)
                             .open(out_file)

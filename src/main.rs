@@ -40,7 +40,6 @@ use crate::slicers::old_slicer::{IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE};
 mod converters;
 mod slicers;
 mod dump;
-///
 fn main() {
     let cli = Cli::parse();
 

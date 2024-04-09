@@ -38,6 +38,7 @@ use arrow2::array::{ MutablePrimitiveArray};
 use rayon::prelude::*;
 use std::sync::Arc;
 use arrow2::types::NativeType;
+use arrow_schema::SchemaRef;
 use parquet::format;
 use crate::converters::{Converter};
 use crate::slicers::{FnFindLastLineBreak};
@@ -244,7 +245,8 @@ pub trait ColumnBuilder {
 
 pub(crate) struct MasterBuilder<'a> {
     #[allow(dead_code)]
-    builders: Vec<Box<dyn Sync + Send + 'a + ColumnBuilder>>
+    builders: Vec<Box<dyn Sync + Send + 'a + ColumnBuilder>>,
+//    schema: SchemaRef
 }
 
 unsafe impl Send for MasterBuilder<'_> {}

@@ -1,37 +1,12 @@
-/*
-* MIT License
-*
-* Copyright (c) 2024 Firelink Data
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
-*
-* The above copyright notice and this permission notice shall be included in all
-* copies or substantial portions of the Software.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE.
-*
-* File created: 2023-11-21
-* Last updated: 2023-11-21
-*/
-use std::fs;
-use std::fs::File;
+//use std::fs;
+//use std::fs::File;
 use std::path::PathBuf;
 use std::str::from_utf8_unchecked;
 use std::sync::Arc;
 
 use arrow::array::{ ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
+use arrow_schema::SchemaRef;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
@@ -43,10 +18,14 @@ use crate::{converters, schema};
 use crate::converters::{ColumnBuilder, Converter};
 use crate::slicers::{FnFindLastLineBreak, FnLineBreakLen};
 use debug_print::{ debug_println};
+use parquet::format::FileMetaData;
+use tokio::task;
+use tokio::runtime::Handle;
 
 pub(crate) struct Slice2Arrow<'a> {
 //    pub(crate) file_out: File,
-    pub(crate) writer:ArrowWriter<File>,
+//    pub(crate) writer:parquet::arrow::async_writer::AsyncArrowWriter<tokio::fs::File>,
+    pub(crate) outfile: &'a PathBuf,
     pub(crate) fn_line_break: FnFindLastLineBreak<'a>,
     pub(crate) fn_line_break_len: FnLineBreakLen,
     pub(crate) masterbuilders:  MasterBuilders
@@ -54,7 +33,7 @@ pub(crate) struct Slice2Arrow<'a> {
 
 pub(crate) struct MasterBuilders {
       builders:  Vec<Vec<Box<dyn  Sync + Send   + ColumnBuilder>>>,
-//      schema: arrow_schema::SchemaRef
+      schema: arrow_schema::SchemaRef
 
 }
 
@@ -63,16 +42,9 @@ unsafe impl Sync for MasterBuilders {}
 
 impl MasterBuilders {
 
-    pub fn writer_factory<'a>(& mut self, out_file: &PathBuf)->ArrowWriter<File> {
-        let _out_file = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(out_file)
-            .expect("aaa");
+    pub fn schema_factory<'a>(& mut self) -> SchemaRef {
 
         let props = WriterProperties::builder()
-
-
             .set_compression(Compression::SNAPPY)
             .build();
 
@@ -83,16 +55,13 @@ impl MasterBuilders {
         }
 
         let batch = RecordBatch::try_from_iter(br).unwrap();
-        let writer:ArrowWriter<File>=ArrowWriter::try_new(_out_file, batch.schema(), Some(props.clone())).unwrap();
-        writer
-
+        batch.schema()
     }
 
     pub fn builders_factory<'a>(schema_path: PathBuf, instances: i16) -> Self {
         let schema = schema::FixedSchema::from_path(schema_path.into());
         let antal_col = schema.num_columns();
         let mut builders:Vec<Vec<Box<dyn ColumnBuilder + Sync + Send>>>=Vec::new();
-
 
         for _i in 1..=instances {
             let mut buildersmut:  Vec<Box<dyn ColumnBuilder + Sync + Send>> =  Vec::with_capacity(antal_col);
@@ -108,7 +77,23 @@ impl MasterBuilders {
             }
             builders.push(buildersmut);
         }
-        MasterBuilders { builders }
+
+        let props = WriterProperties::builder()
+            .set_compression(Compression::SNAPPY)
+            .build();
+
+        let b: &mut Vec<Box<dyn Sync+Send+ColumnBuilder>>=builders.get_mut(0).unwrap();
+        let mut br:Vec<(&str, ArrayRef)> = vec![];
+        for bb in b.iter_mut() {
+            br.push(  bb.finish());
+        }
+
+        let batch = RecordBatch::try_from_iter(br).unwrap();
+        
+
+
+        MasterBuilders { builders, schema: batch.schema() }
+
     }
 }
 
@@ -120,8 +105,8 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
     fn get_line_break_handler(& self) -> FnFindLastLineBreak<'a> {
         self.fn_line_break
     }
-
-    fn process(& mut  self,  slices: Vec<&'a [u8]>) -> usize {
+    #[tokio::main]
+      async fn process(& mut  self,  slices: Vec<&'a [u8]>) -> usize {
         let bytes_processed: usize = 0;
 
 
@@ -136,28 +121,60 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
             }
         });
 
-
-
-        for b in self.masterbuilders.builders.iter_mut() {
-            let mut br:Vec<(&str, ArrayRef)> = vec![];
-
-            for bb in b.iter_mut() {
-                br.push(  bb.finish());
-            }
-            let batch = RecordBatch::try_from_iter(br).unwrap();
-            debug_println!("num_cols? {:#?}",batch.columns());
-
-            self.writer.write(&batch).expect("Writing batch");
-        }
+        self.dump(self.outfile).await;
 
         bytes_processed
+
+//        let f =self.dump();
+//        block_on(f);
+//        bytes_processed
     }
 
     fn finish(&mut self)-> parquet::errors::Result<format::FileMetaData> {
-        self.writer.finish()
+//        self.writer.finish()
+        std::result::Result::Ok(FileMetaData {
+            version: 0,
+            schema: vec![],
+            num_rows: 0,
+            row_groups: vec![],
+            key_value_metadata: None,
+            created_by: None,
+            column_orders: None,
+            encryption_algorithm: None,
+            footer_signing_key_metadata: None,
+        })
     }
 }
 
+impl<'a> Slice2Arrow<'a> {
+    async fn dump(&mut self, out_file: &PathBuf) {
+
+//            let mut writer: parquet::arrow::async_writer::AsyncArrowWriter<tokio::fs::File> = self.masterbuilders.writer_factory(self.outfile);
+
+            let _out_file = tokio::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(out_file).await.unwrap();
+
+            let props = WriterProperties::builder().set_compression(Compression::SNAPPY)
+            .build();
+
+        let mut writer:parquet::arrow::async_writer::AsyncArrowWriter<tokio::fs::File>=parquet::arrow::async_writer::AsyncArrowWriter::try_new(_out_file,self.masterbuilders.schema.clone() , Some(props.clone())).unwrap();
+
+
+        for b in self.masterbuilders.builders.iter_mut() {
+                let mut br: Vec<(&str, ArrayRef)> = vec![];
+
+                for bb in b.iter_mut() {
+                    br.push(bb.finish());
+                }
+                let batch = RecordBatch::try_from_iter(br).unwrap();
+                debug_println!("num_cols? {:#?}", batch.columns());
+
+                writer.write(&batch).await.expect("Writing batch");
+            }
+        }
+}
 
 
 fn
