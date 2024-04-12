@@ -24,16 +24,16 @@
 * File created: 2023-11-21
 * Last updated: 2023-11-21
 */
+use std::fmt::Debug;
 use std::fs::File;
 use std::fs;
-use arrow_array::Datum;
+use arrow_array::{Array, Datum};
+use arrow_array::cast::AsArray;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
 pub(crate) fn dump(infile: fs::File) -> usize {
 
-    let file = File::open("data.parquet").unwrap();
-
-    let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
+    let builder = ParquetRecordBatchReaderBuilder::try_new(infile).unwrap();
     println!("Converted arrow schema is: {}", builder.schema());
 
     let mut reader = builder.build().unwrap();
@@ -45,9 +45,18 @@ pub(crate) fn dump(infile: fs::File) -> usize {
             Some(r) => {
                 let record_batch = r.unwrap();
                 println!("Read {} records.", record_batch.num_rows());
-                for col in record_batch.columns() {
-                    println!("col={}", col.data_type());
-                    println!("col={:#?}", col.get());
+
+                for rnr in 0..record_batch.num_rows() {
+                    let slice=record_batch.slice(rnr,1);
+                    for c in slice.columns() {
+                        print!("{:?}",c.get())
+                    }
+
+//                    println!("ROW {}  {:?}",rnr,slice)
+//                    for col in slice.columns() {
+//                        println!("col={}", col.data_type());
+//                        //println!("col={:#?}", col.get());
+//                    }
 
                 }
             }

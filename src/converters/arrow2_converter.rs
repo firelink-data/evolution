@@ -59,9 +59,9 @@ impl<'a> Converter<'a> for Slice2Arrow2<'a> {
 
     fn process(&  mut self, slices: Vec<& [u8]>) -> usize {
         let bytes_processed: usize = 0;
-//        let chunks:Chunk<?>;
+
         let arc_masterbuilder = Arc::new(& self.master_builder);
-        // TODO declare a array of chunks[slices.len]  , pass it on to the parse_slice funktion
+
         slices.par_iter().enumerate().for_each(|(i, n)| {
             let arc_mastbuilder_clone = Arc::clone(&arc_masterbuilder);
             parse_slice(i, n, &arc_mastbuilder_clone);
