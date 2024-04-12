@@ -145,7 +145,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
                 br.push(  bb.finish());
             }
             let batch = RecordBatch::try_from_iter(br).unwrap();
-            debug_println!("num_cols? {:#?}",batch.columns());
+            //debug_println!("num_cols? {:#?}",batch.columns());
 
             self.writer.write(&batch).expect("Writing batch");
         }
