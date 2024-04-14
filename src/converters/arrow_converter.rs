@@ -121,9 +121,9 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         self.fn_line_break
     }
 
-    fn process(& mut  self,  slices: Vec<&'a [u8]>) -> usize {
-        let bytes_processed: usize = 0;
-
+    fn process(& mut  self,  slices: Vec<&'a [u8]>) -> (usize,usize) {
+        let mut bytes_in: usize = 0;
+        let mut bytes_out: usize = 0;
 
 
         let arc_slices = Arc::new(& slices);
@@ -136,7 +136,9 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
             }
         });
 
-
+        for ii in slices.iter() {
+            bytes_in+=ii.len();
+        }
 
         for b in self.masterbuilders.builders.iter_mut() {
             let mut br:Vec<(&str, ArrayRef)> = vec![];
@@ -144,27 +146,33 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
             for bb in b.iter_mut() {
                 br.push(  bb.finish());
             }
-            let batch = RecordBatch::try_from_iter(br).unwrap();
-            //debug_println!("num_cols? {:#?}",batch.columns());
 
-            self.writer.write(&batch).expect("Writing batch");
+            let batch = RecordBatch::try_from_iter(br).unwrap();
+
+            self.writer.write(&batch).expect("Error Writing batch");
+            bytes_out+=self.writer.bytes_written();
+            debug_println!("Batch write: accumulated bytes_written {}",bytes_out);
         }
 
-        bytes_processed
+        (bytes_in,bytes_out)
     }
 
     fn finish(&mut self)-> parquet::errors::Result<format::FileMetaData> {
         self.writer.finish()
+    }
+
+    fn get_finish_bytes_written(&mut self) -> usize {
+        self.writer.bytes_written()
     }
 }
 
 
 
 fn
-parse_slice(i:usize, n: &[u8], builders: &mut Vec<Box<dyn ColumnBuilder +Send + Sync>>, linebreak: usize)  {
+parse_slice(_i:usize, n: &[u8], builders: &mut Vec<Box<dyn ColumnBuilder +Send + Sync>>, linebreak: usize)  {
 
 
-    println!("index {} {}", i, n.len());
+    debug_println!("index slice={} slice len={}", _i, n.len());
 
     let mut cursor:usize = 0;
     while cursor < n.len() {

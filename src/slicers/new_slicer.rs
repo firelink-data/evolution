@@ -115,7 +115,7 @@ impl<'a> Slicer<'a> for NewSlicer<'a> {
             debug!("We have {} bytes left to read!", remaining_bytes);
         }
         info!("We read {} bytes two times (due to sliding window overlap).", bytes_overlapped);
-        Result::Ok(Stats{ bytes_in: 0, bytes_out: 0 })
+        Result::Ok(Stats{ bytes_in: 0, bytes_out: 0, num_rows: 0 })
 
      }
 }

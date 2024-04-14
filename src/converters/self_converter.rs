@@ -46,7 +46,7 @@ impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
         self.fn_line_break
     }
 
-    fn process(& mut self, slices: Vec<&'a [u8]>) -> usize {
+    fn process(& mut self, slices: Vec<&'a [u8]>) -> (usize,usize) {
         let mut bytes_processed: usize = 0;
 
         slices.par_iter().enumerate().for_each(|(i, n)| println!("index {} {}", i, n.len()));
@@ -55,10 +55,15 @@ impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
             let l = val.len();
             bytes_processed += l;
         }
-        bytes_processed
+        (bytes_processed,0)
     }
 
+
     fn finish(&mut self) -> Result<parquet::format::FileMetaData, parquet::errors::ParquetError> {
+        todo!()
+    }
+
+    fn get_finish_bytes_written(&mut self) -> usize {
         todo!()
     }
 }

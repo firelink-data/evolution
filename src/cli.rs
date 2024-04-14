@@ -179,7 +179,7 @@ impl Cli {
                 let converter_instance: Box<dyn Converter> = match converter {
                     Converters::Arrow => {
                         let mut master_builders = MasterBuilders::builders_factory(schema.to_path_buf(), n_threads as i16, );
-                        let mut writer: ArrowWriter<File> = master_builders.writer_factory(out_file);
+                        let writer: ArrowWriter<File> = master_builders.writer_factory(out_file);
 
                         let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { writer: writer, fn_line_break: find_last_nl, fn_line_break_len: line_break_len_cr, masterbuilders: master_builders });
 //                        writer.finish().expect("finish");
@@ -213,7 +213,7 @@ impl Cli {
 
                let r = slicer_instance.slice_and_convert(converter_instance, in_buffers, _in_file, n_threads as usize);
                 match r {
-                    Ok(s) => {print!("Operation successful inbytes={} out bytes={}",s.bytes_in,s.bytes_out);}
+                    Ok(s) => {print!("Operation successful inbytes={} out bytes={} num of rows={}",s.bytes_in,s.bytes_out,s.num_rows);}
                     Err(x) => {print!("Operation failed: {}",x);}
                 }
 

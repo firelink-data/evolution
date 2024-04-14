@@ -42,8 +42,9 @@ pub(crate) trait Converter<'a> {
     fn get_line_break_handler(& self) -> FnFindLastLineBreak<'a>;
 
 //    fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
-    fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
+    fn process(& mut self, slices: Vec< &'a[u8]>) -> (usize,usize);
     fn finish(& mut self)->parquet::errors::Result<format::FileMetaData>;
+    fn get_finish_bytes_written(& mut self)->usize;
 
 }
 

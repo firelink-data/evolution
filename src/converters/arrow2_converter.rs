@@ -57,7 +57,7 @@ impl<'a> Converter<'a> for Slice2Arrow2<'a> {
         self.fn_line_break
     }
 
-    fn process(&  mut self, slices: Vec<& [u8]>) -> usize {
+    fn process(&  mut self, slices: Vec<& [u8]>) -> (usize,usize) {
         let bytes_processed: usize = 0;
 
         let arc_masterbuilder = Arc::new(& self.master_builder);
@@ -67,10 +67,15 @@ impl<'a> Converter<'a> for Slice2Arrow2<'a> {
             parse_slice(i, n, &arc_mastbuilder_clone);
         });
 
-        bytes_processed
+        (bytes_processed,0)
     }
 
+
     fn finish(&mut self) -> parquet::errors::Result<format::FileMetaData> {
+        todo!()
+    }
+
+    fn get_finish_bytes_written(&mut self) -> usize {
         todo!()
     }
 }

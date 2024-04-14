@@ -39,8 +39,10 @@ pub(crate) trait Slicer<'a> {
     fn slice_and_convert(& mut self, converter: Box<dyn  'a+Converter<'a>>, in_buffers: &'a mut [ChunkAndResidue; IN_MAX_CHUNKS], infile: fs::File, n_threads : usize) -> Result<Stats,& str>;
 }
 pub(crate) struct Stats {
-    pub(crate) bytes_in: i64,
-    pub(crate) bytes_out:i64,
+    pub(crate) bytes_in: usize,
+    pub(crate) bytes_out:usize,
+
+    pub(crate) num_rows: i64,
 }
 
 pub(crate) type FnLineBreakLen = fn() -> usize;
