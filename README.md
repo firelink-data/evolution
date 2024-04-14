@@ -33,5 +33,10 @@ $ cd evolution
 $ cargo build --release
 ```
 
+Run a small conversion test using the "arrow" converter with slicer type "old"
+```
+$ cargo run --package evolution --release --bin evolution -- convert --schema resources/schema/test_schema.json --in-file resources/schema/test_schema_mock.txt --out-file out.parquet arrow old
+```
+
 ## 📋 License
 All code is to be held under a general MIT license, please see [LICENSE](https://github.com/firelink-data/alloy/blob/main/LICENSE) for specific information.
