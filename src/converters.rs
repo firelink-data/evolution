@@ -26,8 +26,8 @@
 */
 
 use crate::slicers::FnFindLastLineBreak;
+// Try to remove this arrow imports.
 use arrow::array::ArrayRef;
-use parquet::format;
 use std::cmp::min;
 
 pub(crate) mod arrow2_converter;
@@ -41,8 +41,12 @@ pub(crate) trait Converter<'a> {
 
     //    fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
     fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize);
-    fn finish(&mut self) -> parquet::errors::Result<format::FileMetaData>;
+    fn finish(&mut self) -> Result<(), &str>;
     fn get_finish_bytes_written(&mut self) -> usize;
+}
+pub(crate) struct MasterBuilders {
+    builders: Vec<Vec<Box<dyn Sync + Send + ColumnBuilder>>>,
+    //      schema: arrow_schema::SchemaRef
 }
 
 pub trait ColumnBuilder {

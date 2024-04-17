@@ -30,12 +30,12 @@ use std::fs::File;
 use std::path::PathBuf;
 
 use crate::converters::arrow2_converter::{MasterBuilder, Slice2Arrow2};
-use crate::converters::arrow_converter::{MasterBuilders, Slice2Arrow};
+use crate::converters::arrow_converter::{ Slice2Arrow};
 use crate::converters::self_converter::SampleSliceAggregator;
-use crate::converters::Converter;
+use crate::converters::{Converter, MasterBuilders};
 use crate::dump::dump;
 use crate::slicers::old_slicer::{OldSlicer, IN_MAX_CHUNKS};
-use crate::slicers::Slicer;
+use crate::slicers::{FnLineBreakLen, Slicer};
 use crate::slicers::{find_last_nl, line_break_len_cr, ChunkAndResidue};
 use crate::{error, mocker, schema};
 use clap::{Parser, Subcommand};
@@ -199,11 +199,12 @@ impl Cli {
                             .open(out_file)
                             .expect("aaa");
 
-                        let master_builder = MasterBuilder::builder_factory(schema.to_path_buf());
+                        let master_builders = MasterBuilder::builder_factory(schema.to_path_buf());
                         let s2a: Box<Slice2Arrow2> = Box::new(Slice2Arrow2 {
-                            file_out: _out_file,
+                            writer: ,
                             fn_line_break: find_last_nl,
-                            master_builder,
+                            fn_line_break_len: FnLineBreakLen,
+                            masterbuilders: master_builders,
                         });
 
                         s2a

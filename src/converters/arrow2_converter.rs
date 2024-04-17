@@ -30,23 +30,24 @@ use arrow2::io::ipc::write::Record;
 
 use crate::schema;
 
-use crate::converters::Converter;
-use crate::slicers::FnFindLastLineBreak;
+use crate::converters::{Converter, MasterBuilders};
+use crate::slicers::{FnFindLastLineBreak, FnLineBreakLen};
 use arrow2::array::MutablePrimitiveArray;
 use arrow2::types::NativeType;
-use parquet::format;
 use rayon::prelude::*;
 use std::fs::File;
 use std::path::PathBuf;
 use std::str;
 use std::sync::Arc;
 use str::from_utf8_unchecked;
+use parquet::arrow::ArrowWriter;
 
-#[allow(dead_code)]
 pub(crate) struct Slice2Arrow2<'a> {
-    pub(crate) file_out: File,
+    //    pub(crate) file_out: File,
+    pub(crate) writer: ArrowWriter<File>,
     pub(crate) fn_line_break: FnFindLastLineBreak<'a>,
-    pub(crate) master_builder: MasterBuilder<'a>,
+    pub(crate) fn_line_break_len: FnLineBreakLen,
+    pub(crate) masterbuilders: MasterBuilders,
 }
 
 impl<'a> Converter<'a> for Slice2Arrow2<'a> {
@@ -60,7 +61,7 @@ impl<'a> Converter<'a> for Slice2Arrow2<'a> {
     fn process(&mut self, slices: Vec<&[u8]>) -> (usize, usize) {
         let bytes_processed: usize = 0;
 
-        let arc_masterbuilder = Arc::new(&self.master_builder);
+        let arc_masterbuilder = Arc::new(&self.masterbuilders);
 
         slices.par_iter().enumerate().for_each(|(i, n)| {
             let arc_mastbuilder_clone = Arc::clone(&arc_masterbuilder);
@@ -70,7 +71,7 @@ impl<'a> Converter<'a> for Slice2Arrow2<'a> {
         (bytes_processed, 0)
     }
 
-    fn finish(&mut self) -> parquet::errors::Result<format::FileMetaData> {
+    fn finish(&mut self) -> Result<(), &str> {
         todo!()
     }
 
@@ -78,7 +79,7 @@ impl<'a> Converter<'a> for Slice2Arrow2<'a> {
         todo!()
     }
 }
-fn parse_slice(i: usize, n: &&[u8], _master_builder: &MasterBuilder) {
+fn parse_slice(i: usize, n: &&[u8], _master_builder: &Arc<&MasterBuilders>) {
     println!("index {} {}", i, n.len());
 
     // TODO make safe/unsafe configurable

@@ -141,10 +141,11 @@ impl<'a> Slicer<'a> for OldSlicer<'a> {
         info!("Bytes in= {} out= {}", bytes_in, bytes_out);
 
         match converter.finish() {
-            Ok(x) => Result::Ok(Stats {
+            Ok(_x) => Result::Ok(Stats {
                 bytes_in: bytes_in,
                 bytes_out: converter.get_finish_bytes_written(),
-                num_rows: x.num_rows,
+//                num_rows: x.num_rows,
+                num_rows: 0,
             }),
             Err(_x) => Result::Err("Could not produce Parquet"),
         }

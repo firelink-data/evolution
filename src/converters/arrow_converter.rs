@@ -35,11 +35,10 @@ use arrow::record_batch::RecordBatch;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
-use parquet::format;
 use rayon::iter::IndexedParallelIterator;
 use rayon::prelude::*;
 
-use crate::converters::{ColumnBuilder, Converter};
+use crate::converters::{ColumnBuilder, Converter, MasterBuilders};
 use crate::slicers::{FnFindLastLineBreak, FnLineBreakLen};
 use crate::{converters, schema};
 use debug_print::debug_println;
@@ -52,10 +51,6 @@ pub(crate) struct Slice2Arrow<'a> {
     pub(crate) masterbuilders: MasterBuilders,
 }
 
-pub(crate) struct MasterBuilders {
-    builders: Vec<Vec<Box<dyn Sync + Send + ColumnBuilder>>>,
-    //      schema: arrow_schema::SchemaRef
-}
 
 unsafe impl Send for MasterBuilders {}
 unsafe impl Sync for MasterBuilders {}
@@ -177,8 +172,12 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         (bytes_in, bytes_out)
     }
 
-    fn finish(&mut self) -> parquet::errors::Result<format::FileMetaData> {
-        self.writer.finish()
+    fn finish(&mut self) -> Result<(), &str> {
+        
+        match self.writer.finish() {
+            Ok(_) => {Result::Ok(()) }
+            Err(_) => {Result::Err("Could not finish write parquet") }
+        }
     }
 
     fn get_finish_bytes_written(&mut self) -> usize {
