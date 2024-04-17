@@ -25,9 +25,9 @@
 * Last updated: 2023-12-14
 */
 
+use arrow::datatypes::Field;
 use arrow::datatypes::{DataType, Schema};
 use arrow::error::ArrowError;
-use arrow::datatypes::Field;
 use serde::{Deserialize, Serialize};
 
 use std::path::PathBuf;

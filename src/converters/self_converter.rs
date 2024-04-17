@@ -25,13 +25,12 @@
 * Last updated: 2023-12-14
 */
 
-use std::fs::File;
-use rayon::iter::IntoParallelRefIterator;
 use crate::converters::Converter;
-use crate::slicers::{FnFindLastLineBreak};
+use crate::slicers::FnFindLastLineBreak;
+use rayon::iter::IntoParallelRefIterator;
 use rayon::prelude::*;
-use std::io::{Write};
-
+use std::fs::File;
+use std::io::Write;
 
 pub struct SampleSliceAggregator<'a> {
     pub(crate) file_out: File,
@@ -39,25 +38,27 @@ pub struct SampleSliceAggregator<'a> {
 }
 
 impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
-    fn set_line_break_handler(& mut self, fnl: FnFindLastLineBreak<'a>) {
+    fn set_line_break_handler(&mut self, fnl: FnFindLastLineBreak<'a>) {
         self.fn_line_break = fnl;
     }
-    fn get_line_break_handler(& self) -> FnFindLastLineBreak<'a> {
+    fn get_line_break_handler(&self) -> FnFindLastLineBreak<'a> {
         self.fn_line_break
     }
 
-    fn process(& mut self, slices: Vec<&'a [u8]>) -> (usize,usize) {
+    fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize) {
         let mut bytes_processed: usize = 0;
 
-        slices.par_iter().enumerate().for_each(|(i, n)| println!("index {} {}", i, n.len()));
+        slices
+            .par_iter()
+            .enumerate()
+            .for_each(|(i, n)| println!("index {} {}", i, n.len()));
         for val in slices {
             self.file_out.write_all(val).expect("dasd");
             let l = val.len();
             bytes_processed += l;
         }
-        (bytes_processed,0)
+        (bytes_processed, 0)
     }
-
 
     fn finish(&mut self) -> Result<parquet::format::FileMetaData, parquet::errors::ParquetError> {
         todo!()
@@ -67,4 +68,3 @@ impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
         todo!()
     }
 }
-

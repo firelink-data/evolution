@@ -24,23 +24,29 @@
 * File created: 2023-12-11
 * Last updated: 2023-12-14
 */
-use std::fs;
 use crate::converters::Converter;
 use crate::slicers::old_slicer::{IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE};
+use std::fs;
 
-pub mod old_slicer;
 pub mod new_slicer;
+pub mod old_slicer;
 //pub mod new_slicer;
 
 pub(crate) struct ChunkAndResidue {
-     pub(crate) chunk: Box< [u8; SLICER_IN_CHUNK_SIZE]>,
+    pub(crate) chunk: Box<[u8; SLICER_IN_CHUNK_SIZE]>,
 }
 pub(crate) trait Slicer<'a> {
-    fn slice_and_convert(& mut self, converter: Box<dyn  'a+Converter<'a>>, in_buffers: &'a mut [ChunkAndResidue; IN_MAX_CHUNKS], infile: fs::File, n_threads : usize) -> Result<Stats,& str>;
+    fn slice_and_convert(
+        &mut self,
+        converter: Box<dyn 'a + Converter<'a>>,
+        in_buffers: &'a mut [ChunkAndResidue; IN_MAX_CHUNKS],
+        infile: fs::File,
+        n_threads: usize,
+    ) -> Result<Stats, &str>;
 }
 pub(crate) struct Stats {
     pub(crate) bytes_in: usize,
-    pub(crate) bytes_out:usize,
+    pub(crate) bytes_out: usize,
 
     pub(crate) num_rows: i64,
 }
@@ -55,8 +61,7 @@ pub(crate) fn line_break_len_crlf() -> usize {
     2 as usize
 }
 
-
-pub(crate) type FnFindLastLineBreak<'a> = fn(bytes: &'a[u8]) -> (bool, usize);
+pub(crate) type FnFindLastLineBreak<'a> = fn(bytes: &'a [u8]) -> (bool, usize);
 #[allow(dead_code)]
 pub(crate) fn find_last_nlcr(bytes: &[u8]) -> (bool, usize) {
     if bytes.is_empty() {
@@ -107,16 +112,16 @@ pub(crate) struct IterRevolver<'a, T> {
     shards: *mut T,
     next: usize,
     len: usize,
-    phantom: std::marker::PhantomData<&'a mut [T]>
+    phantom: std::marker::PhantomData<&'a mut [T]>,
 }
 
 impl<'a, T> From<&'a mut [T]> for IterRevolver<'a, T> {
-    fn from(shards: &'a mut [T])-> IterRevolver<'a, T> {
+    fn from(shards: &'a mut [T]) -> IterRevolver<'a, T> {
         IterRevolver {
             next: 0,
             len: shards.len(),
             shards: shards.as_mut_ptr(),
-            phantom: std::marker::PhantomData
+            phantom: std::marker::PhantomData,
         }
     }
 }
@@ -129,10 +134,6 @@ impl<'a, T> Iterator for IterRevolver<'a, T> {
         } else {
             self.next = 1;
         }
-        unsafe {
-            Some(&mut *self.shards.offset(self.next as isize - 1))
-        }
+        unsafe { Some(&mut *self.shards.offset(self.next as isize - 1)) }
     }
 }
-
-

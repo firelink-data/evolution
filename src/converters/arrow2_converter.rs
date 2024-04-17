@@ -30,46 +30,45 @@ use arrow2::io::ipc::write::Record;
 
 use crate::schema;
 
-use std::fs::File;
-use std::str;
-use std::path::PathBuf;
-use str::from_utf8_unchecked;
-use arrow2::array::{ MutablePrimitiveArray};
-use rayon::prelude::*;
-use std::sync::Arc;
+use crate::converters::Converter;
+use crate::slicers::FnFindLastLineBreak;
+use arrow2::array::MutablePrimitiveArray;
 use arrow2::types::NativeType;
 use parquet::format;
-use crate::converters::{Converter};
-use crate::slicers::{FnFindLastLineBreak};
+use rayon::prelude::*;
+use std::fs::File;
+use std::path::PathBuf;
+use std::str;
+use std::sync::Arc;
+use str::from_utf8_unchecked;
 
 #[allow(dead_code)]
 pub(crate) struct Slice2Arrow2<'a> {
     pub(crate) file_out: File,
     pub(crate) fn_line_break: FnFindLastLineBreak<'a>,
-    pub(crate) master_builder: MasterBuilder<'a>
+    pub(crate) master_builder: MasterBuilder<'a>,
 }
 
 impl<'a> Converter<'a> for Slice2Arrow2<'a> {
-    fn set_line_break_handler(& mut self, fnl: FnFindLastLineBreak<'a>) {
+    fn set_line_break_handler(&mut self, fnl: FnFindLastLineBreak<'a>) {
         self.fn_line_break = fnl;
     }
-    fn get_line_break_handler(& self) -> FnFindLastLineBreak<'a> {
+    fn get_line_break_handler(&self) -> FnFindLastLineBreak<'a> {
         self.fn_line_break
     }
 
-    fn process(&  mut self, slices: Vec<& [u8]>) -> (usize,usize) {
+    fn process(&mut self, slices: Vec<&[u8]>) -> (usize, usize) {
         let bytes_processed: usize = 0;
 
-        let arc_masterbuilder = Arc::new(& self.master_builder);
+        let arc_masterbuilder = Arc::new(&self.master_builder);
 
         slices.par_iter().enumerate().for_each(|(i, n)| {
             let arc_mastbuilder_clone = Arc::clone(&arc_masterbuilder);
             parse_slice(i, n, &arc_mastbuilder_clone);
         });
 
-        (bytes_processed,0)
+        (bytes_processed, 0)
     }
-
 
     fn finish(&mut self) -> parquet::errors::Result<format::FileMetaData> {
         todo!()
@@ -79,17 +78,13 @@ impl<'a> Converter<'a> for Slice2Arrow2<'a> {
         todo!()
     }
 }
-fn parse_slice(i:usize, n: &&[u8],_master_builder: &MasterBuilder)  {
-
-
+fn parse_slice(i: usize, n: &&[u8], _master_builder: &MasterBuilder) {
     println!("index {} {}", i, n.len());
 
     // TODO make safe/unsafe configurable
-    let _text:&str = unsafe {
-        from_utf8_unchecked(&n)
-    };
+    let _text: &str = unsafe { from_utf8_unchecked(&n) };
 
-    let _offset=0;
+    let _offset = 0;
 }
 
 pub(crate) struct ColumnBuilderType<T1: NativeType> {
@@ -98,8 +93,8 @@ pub(crate) struct ColumnBuilderType<T1: NativeType> {
 
 impl ColumnBuilder for ColumnBuilderType<i32> {
     fn parse_value(&mut self, name: &str)
-        where
-            Self: Sized,
+    where
+        Self: Sized,
     {
         match name.parse::<i32>() {
             Ok(n) => {
@@ -114,26 +109,24 @@ impl ColumnBuilder for ColumnBuilderType<i32> {
     }
 
     fn finish_column(&mut self)
-        where
-            Self: Sized,
+    where
+        Self: Sized,
     {
         todo!()
     }
 
     fn nullify(&mut self)
-        where
-            Self: Sized,
+    where
+        Self: Sized,
     {
         self.rows.push(None);
     }
-
-
 }
 
 impl ColumnBuilder for ColumnBuilderType<i64> {
     fn parse_value(&mut self, name: &str)
-        where
-            Self: Sized,
+    where
+        Self: Sized,
     {
         match name.parse::<i64>() {
             Ok(n) => {
@@ -148,22 +141,19 @@ impl ColumnBuilder for ColumnBuilderType<i64> {
     }
 
     fn finish_column(&mut self)
-        where
-            Self: Sized,
+    where
+        Self: Sized,
     {
         todo!()
     }
 
     fn nullify(&mut self)
-        where
-            Self: Sized,
+    where
+        Self: Sized,
     {
         self.rows.push(None);
     }
-
 }
-
-
 
 ///
 #[allow(dead_code)]
@@ -244,12 +234,11 @@ pub trait ColumnBuilder {
     /// I think this function won't be necessary.
     /// `[arrow2]` supports bitmap nulling out-of-the-box.
     fn nullify(&mut self);
-
 }
 
 pub(crate) struct MasterBuilder<'a> {
     #[allow(dead_code)]
-    builders: Vec<Box<dyn Sync + Send + 'a + ColumnBuilder>>
+    builders: Vec<Box<dyn Sync + Send + 'a + ColumnBuilder>>,
 }
 
 unsafe impl Send for MasterBuilder<'_> {}
@@ -257,12 +246,12 @@ unsafe impl Sync for MasterBuilder<'_> {}
 
 impl MasterBuilder<'_> {
     pub fn builder_factory<'a>(schema_path: PathBuf) -> Self {
-//    builders: &mut Vec<Box<dyn ColumnBuilder>>
-        let schema=schema::FixedSchema::from_path(schema_path.into());
-        let antal_col=schema.num_columns();
+        //    builders: &mut Vec<Box<dyn ColumnBuilder>>
+        let schema = schema::FixedSchema::from_path(schema_path.into());
+        let antal_col = schema.num_columns();
 
-        let mut buildersmut: Vec<Box<dyn ColumnBuilder + Send + Sync>>=Vec::with_capacity(antal_col);
-
+        let mut buildersmut: Vec<Box<dyn ColumnBuilder + Send + Sync>> =
+            Vec::with_capacity(antal_col);
 
         for val in schema.iter() {
             match val.dtype().as_str() {
@@ -279,7 +268,5 @@ impl MasterBuilder<'_> {
 
         let builders = buildersmut;
         MasterBuilder { builders }
-
     }
-
 }

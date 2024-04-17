@@ -110,7 +110,7 @@ impl Mocker {
                 file.write_all(&buffer).expect("Bad buffer, write failed!");
                 // Here maybe we should just use the same allocated memory?, but overwrite it..
                 // Because re-allocation is slow (::with_capacity will re-allocate on heap).
-                buffer.clear();  // Vec::with_capacity(buffer_size);
+                buffer.clear(); // Vec::with_capacity(buffer_size);
             }
             for col in self.schema.iter() {
                 pad_and_push_to_buffer(

@@ -25,15 +25,15 @@
 * Last updated: 2023-12-14
 */
 
-use std::{cmp, fs};
 use std::fs::File;
 use std::io::{BufReader, Read};
+use std::{cmp, fs};
 
 use log::info;
 
 use crate::converters::Converter;
-use crate::slicers::{IterRevolver, Stats};
 use crate::slicers::{ChunkAndResidue, FnFindLastLineBreak, Slicer};
+use crate::slicers::{IterRevolver, Stats};
 
 /**
 GOAL(s)
@@ -69,13 +69,13 @@ fn ceil_amount_of_chunks(a: i64, b: i64) -> usize {
     (a / b + (a % b).signum()) as usize
 }
 
-
 impl<'a> Slicer<'a> for OldSlicer<'a> {
-    fn slice_and_convert(&mut self,
-                         mut converter: Box<dyn 'a + Converter<'a>>,
-                         in_buffers: &'a mut [ChunkAndResidue; IN_MAX_CHUNKS],
-                         infile: fs::File,
-                         n_threads: usize,
+    fn slice_and_convert(
+        &mut self,
+        mut converter: Box<dyn 'a + Converter<'a>>,
+        in_buffers: &'a mut [ChunkAndResidue; IN_MAX_CHUNKS],
+        infile: fs::File,
+        n_threads: usize,
     ) -> Result<Stats, &str> {
         let mut bytes_in = 0;
         let mut bytes_out = 0;
@@ -93,8 +93,10 @@ impl<'a> Slicer<'a> for OldSlicer<'a> {
             phantom: std::marker::PhantomData,
         };
 
-        rayon::ThreadPoolBuilder::new().stack_size(((SLICER_IN_CHUNK_SIZE as f32) * 2f32) as usize).build_global().unwrap();
-
+        rayon::ThreadPoolBuilder::new()
+            .stack_size(((SLICER_IN_CHUNK_SIZE as f32) * 2f32) as usize)
+            .build_global()
+            .unwrap();
 
         loop {
             let cr = ir.next().unwrap();
@@ -119,7 +121,7 @@ impl<'a> Slicer<'a> for OldSlicer<'a> {
             remaining_file_length -= chunk_len_effective_read;
             let (bin, bout) = converter.process(slices);
             bytes_in += bin;
-            bytes_out+=bout;
+            bytes_out += bout;
 
             if remaining_file_length == 0 {
                 break;
@@ -129,36 +131,33 @@ impl<'a> Slicer<'a> for OldSlicer<'a> {
         let cr = ir.next().unwrap();
 
         if 0 != residue_len {
-            slices = residual_to_slice(
-                &residue,
-                &mut cr.chunk,
-                residue_len,
-            );
+            slices = residual_to_slice(&residue, &mut cr.chunk, residue_len);
 
             let (bin, bout) = converter.process(slices);
             bytes_in += bin;
             bytes_out += bout;
         }
 
-        info!("Bytes in= {} out= {}", bytes_in,bytes_out);
-
+        info!("Bytes in= {} out= {}", bytes_in, bytes_out);
 
         match converter.finish() {
-            Ok(x) => {
-
-                Result::Ok(Stats { bytes_in: bytes_in, bytes_out: converter.get_finish_bytes_written(), num_rows: x.num_rows }) }
-            Err(_x) => { Result::Err("Could not produce Parquet") }
+            Ok(x) => Result::Ok(Stats {
+                bytes_in: bytes_in,
+                bytes_out: converter.get_finish_bytes_written(),
+                num_rows: x.num_rows,
+            }),
+            Err(_x) => Result::Err("Could not produce Parquet"),
         }
     }
 }
-
 
 fn residual_to_slice<'a>(
     residue: &[u8; SLICER_IN_CHUNK_SIZE],
     chunk: &'a mut [u8; SLICER_IN_CHUNK_SIZE],
     residue_effective_len: usize,
 ) -> Vec<&'a [u8]> {
-    #[allow(unused_mut)] let mut target_chunk_residue: &mut [u8];
+    #[allow(unused_mut)]
+    let mut target_chunk_residue: &mut [u8];
 
     (target_chunk_residue, _) = chunk.split_at_mut(residue_effective_len);
     if 0 != residue_effective_len {
@@ -179,8 +178,10 @@ fn read_chunk_and_slice<'a>(
     residue_effective_len: usize,
     chunk_len_toread: usize,
 ) -> (usize, usize, Vec<&'a [u8]>) {
-    #[allow(unused_mut)] let mut target_chunk_residue: &mut [u8];
-    #[allow(unused_mut)] let mut target_chunk_read: &mut [u8];
+    #[allow(unused_mut)]
+    let mut target_chunk_residue: &mut [u8];
+    #[allow(unused_mut)]
+    let mut target_chunk_read: &mut [u8];
 
     (target_chunk_residue, target_chunk_read) = chunk.split_at_mut(residue_effective_len);
     if 0 != residue_effective_len {
@@ -188,7 +189,8 @@ fn read_chunk_and_slice<'a>(
     }
     let target_chunk_read_len = target_chunk_read.len();
 
-    let read_exact_buffer = &mut target_chunk_read[0..cmp::min(target_chunk_read_len, chunk_len_toread)];
+    let read_exact_buffer =
+        &mut target_chunk_read[0..cmp::min(target_chunk_read_len, chunk_len_toread)];
 
     let _ = BufReader::new(file).read_exact(read_exact_buffer).is_ok();
     let chunk_len_was_read = read_exact_buffer.len();
@@ -239,7 +241,6 @@ fn read_chunk_and_slice<'a>(
         (residual.len(), chunk_len_was_read, r)
     }
 }
-
 
 #[cfg(test)]
 mod tests_old_slicer {}

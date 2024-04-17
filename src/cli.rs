@@ -29,19 +29,18 @@ use std::fs;
 use std::fs::File;
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
-use log::{info};
-use parquet::arrow::ArrowWriter;
-use crate::slicers::{ChunkAndResidue, find_last_nl, line_break_len_cr};
-use crate::slicers::old_slicer::{IN_MAX_CHUNKS, OldSlicer};
 use crate::converters::arrow2_converter::{MasterBuilder, Slice2Arrow2};
 use crate::converters::arrow_converter::{MasterBuilders, Slice2Arrow};
 use crate::converters::self_converter::SampleSliceAggregator;
 use crate::converters::Converter;
-use crate::{ error, mocker, schema};
 use crate::dump::dump;
+use crate::slicers::old_slicer::{OldSlicer, IN_MAX_CHUNKS};
 use crate::slicers::Slicer;
-
+use crate::slicers::{find_last_nl, line_break_len_cr, ChunkAndResidue};
+use crate::{error, mocker, schema};
+use clap::{Parser, Subcommand};
+use log::info;
+use parquet::arrow::ArrowWriter;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -73,7 +72,6 @@ enum Slicers {
     New,
 }
 
-
 #[derive(Subcommand)]
 enum Commands {
     /// does testing things
@@ -90,10 +88,10 @@ enum Commands {
     Convert {
         /// Sets schema file
 
-        #[clap(value_enum,value_name = "CONVERTER")]
+        #[clap(value_enum, value_name = "CONVERTER")]
         converter: Converters,
 
-        #[clap(value_enum,value_name = "SLICER")]
+        #[clap(value_enum, value_name = "SLICER")]
         slicer: Slicers,
 
         #[arg(short, long, value_name = "SCHEMA")]
@@ -109,26 +107,27 @@ enum Commands {
     },
     Dump {
         /// Sets schema file
-        #[clap(value_enum,value_name = "CONVERTER")]
+        #[clap(value_enum, value_name = "CONVERTER")]
         converter: Converters,
         /// Sets input file
         #[arg(short, long, value_name = "IN-FILE")]
         in_file: PathBuf,
     },
-
 }
 
 impl Cli {
-
-    pub fn run<'a>(& self, in_buffers: & mut [ChunkAndResidue; IN_MAX_CHUNKS] ) -> Result<(), error::ExecutionError> {
+    pub fn run<'a>(
+        &self,
+        in_buffers: &mut [ChunkAndResidue; IN_MAX_CHUNKS],
+    ) -> Result<(), error::ExecutionError> {
         let n_logical_threads = num_cpus::get();
         let mut n_threads: usize = self.n_threads as usize;
 
         if n_threads > n_logical_threads {
             info!(
-            "you specified to use {} thread, but your CPU only has {} logical threads",
-            n_threads, n_logical_threads,
-        );
+                "you specified to use {} thread, but your CPU only has {} logical threads",
+                n_threads, n_logical_threads,
+            );
             n_threads = n_logical_threads;
         }
 
@@ -139,10 +138,10 @@ impl Cli {
 
         match &self.command {
             Some(Commands::Mock {
-                     schema,
-                     file,
-                     n_rows,
-                 }) => {
+                schema,
+                file,
+                n_rows,
+            }) => {
                 print!("target file {:?}", file.as_ref());
 
                 mocker::Mocker::new(
@@ -150,26 +149,26 @@ impl Cli {
                     file.clone(),
                     n_threads,
                 )
-                    .generate(n_rows.unwrap() as usize);
+                .generate(n_rows.unwrap() as usize);
                 Ok(())
             }
 
             Some(Commands::Dump {
-                     converter: _,
-                     in_file
-                 }) => {
+                converter: _,
+                in_file,
+            }) => {
                 let _in_file = fs::File::open(&in_file).expect("bbb");
                 dump(_in_file);
 
                 Ok(())
             }
             Some(Commands::Convert {
-                     converter,
-                     slicer: _,
-                     schema,
-                     in_file,
-                     out_file
-                 }) => {
+                converter,
+                slicer: _,
+                schema,
+                in_file,
+                out_file,
+            }) => {
                 let _in_file = fs::File::open(&in_file).expect("bbb");
 
                 let mut slicer_instance: Box<dyn Slicer> = Box::new(OldSlicer {
@@ -178,13 +177,21 @@ impl Cli {
 
                 let converter_instance: Box<dyn Converter> = match converter {
                     Converters::Arrow => {
-                        let mut master_builders = MasterBuilders::builders_factory(schema.to_path_buf(), n_threads as i16, );
+                        let mut master_builders = MasterBuilders::builders_factory(
+                            schema.to_path_buf(),
+                            n_threads as i16,
+                        );
                         let writer: ArrowWriter<File> = master_builders.writer_factory(out_file);
 
-                        let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow { writer: writer, fn_line_break: find_last_nl, fn_line_break_len: line_break_len_cr, masterbuilders: master_builders });
-//                        writer.finish().expect("finish");
+                        let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow {
+                            writer: writer,
+                            fn_line_break: find_last_nl,
+                            fn_line_break_len: line_break_len_cr,
+                            masterbuilders: master_builders,
+                        });
+                        //                        writer.finish().expect("finish");
                         s2a
-                    },
+                    }
                     Converters::Arrow2 => {
                         let _out_file = fs::OpenOptions::new()
                             .create(true)
@@ -193,10 +200,14 @@ impl Cli {
                             .expect("aaa");
 
                         let master_builder = MasterBuilder::builder_factory(schema.to_path_buf());
-                        let s2a: Box<Slice2Arrow2> = Box::new(Slice2Arrow2 { file_out: _out_file, fn_line_break: find_last_nl, master_builder });
+                        let s2a: Box<Slice2Arrow2> = Box::new(Slice2Arrow2 {
+                            file_out: _out_file,
+                            fn_line_break: find_last_nl,
+                            master_builder,
+                        });
 
                         s2a
-                    },
+                    }
 
                     Converters::None => {
                         let _out_file = fs::OpenOptions::new()
@@ -205,24 +216,37 @@ impl Cli {
                             .open(out_file)
                             .expect("aaa");
 
-                        let s3a: Box<SampleSliceAggregator> = Box::new(SampleSliceAggregator { file_out: _out_file, fn_line_break: find_last_nl });
+                        let s3a: Box<SampleSliceAggregator> = Box::new(SampleSliceAggregator {
+                            file_out: _out_file,
+                            fn_line_break: find_last_nl,
+                        });
                         s3a
-                    },
+                    }
                 };
 
-
-               let r = slicer_instance.slice_and_convert(converter_instance, in_buffers, _in_file, n_threads as usize);
+                let r = slicer_instance.slice_and_convert(
+                    converter_instance,
+                    in_buffers,
+                    _in_file,
+                    n_threads as usize,
+                );
                 match r {
-                    Ok(s) => {print!("Operation successful inbytes={} out bytes={} num of rows={}",s.bytes_in,s.bytes_out,s.num_rows);}
-                    Err(x) => {print!("Operation failed: {}",x);}
+                    Ok(s) => {
+                        print!(
+                            "Operation successful inbytes={} out bytes={} num of rows={}",
+                            s.bytes_in, s.bytes_out, s.num_rows
+                        );
+                    }
+                    Err(x) => {
+                        print!("Operation failed: {}", x);
+                    }
                 }
-
 
                 Ok(())
             }
 
-//            Ok(()) => todo!(),
-            _ => {Ok(())}
+            //            Ok(()) => todo!(),
+            _ => Ok(()),
         }
     }
 }
