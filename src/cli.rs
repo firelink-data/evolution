@@ -29,28 +29,29 @@ use std::fs;
 use std::fs::File;
 use std::path::PathBuf;
 
-use crate::converters::arrow2_converter::{MasterBuilder, Slice2Arrow2};
-use crate::converters::arrow_converter::{ Slice2Arrow};
-use crate::converters::self_converter::SampleSliceAggregator;
-use crate::converters::{Converter, MasterBuilders};
-use crate::dump::dump;
-use crate::slicers::old_slicer::{OldSlicer, IN_MAX_CHUNKS};
-use crate::slicers::{FnLineBreakLen, Slicer};
-use crate::slicers::{find_last_nl, line_break_len_cr, ChunkAndResidue};
-use crate::{error, mocker, schema};
-use clap::{Parser, Subcommand};
-use log::info;
-use parquet::arrow::ArrowWriter;
 use arrow2::{
     array::{Array, Int32Array},
     chunk::Chunk,
     datatypes::{Field, Schema},
     error::Result,
     io::parquet::write::{
-        transverse, CompressionOptions, Encoding, FileWriter, RowGroupIterator, Version,
+        CompressionOptions, Encoding, FileWriter, RowGroupIterator, transverse, Version,
         WriteOptions,
     },
 };
+use clap::{Parser, Subcommand};
+use log::info;
+use parquet::arrow::ArrowWriter;
+
+use crate::{error, mocker, schema};
+use crate::converters::{Converter, MasterBuilders};
+use crate::converters::arrow2_converter::Slice2Arrow2;
+use crate::converters::arrow_converter::Slice2Arrow;
+use crate::converters::self_converter::SampleSliceAggregator;
+use crate::dump::dump;
+use crate::slicers::{FnLineBreakLen, Slicer};
+use crate::slicers::{ChunkAndResidue, find_last_nl, line_break_len_cr};
+use crate::slicers::old_slicer::{IN_MAX_CHUNKS, OldSlicer};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -59,7 +60,7 @@ pub struct Cli {
     name: Option<String>,
 
     /// Threads
-    #[arg(short, long, action = clap::ArgAction::Count,default_value = "12" )]
+    #[arg(short, long, action = clap::ArgAction::Count, default_value = "12")]
     n_threads: u8,
     //    value_parser(value_parser!(usize))
     /// Turn debugging information on
@@ -69,6 +70,7 @@ pub struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 }
+
 #[derive(clap::ValueEnum, Clone)]
 enum Converters {
     Arrow,
@@ -97,7 +99,6 @@ enum Commands {
     },
     Convert {
         /// Sets schema file
-
         #[clap(value_enum, value_name = "CONVERTER")]
         converter: Converters,
 
@@ -148,37 +149,36 @@ impl Cli {
 
         match &self.command {
             Some(Commands::Mock {
-                schema,
-                file,
-                n_rows,
-            }) => {
+                     schema,
+                     file,
+                     n_rows,
+                 }) => {
                 print!("target file {:?}", file.as_ref());
 
                 mocker::Mocker::new(
                     schema::FixedSchema::from_path(schema.into()),
                     file.clone(),
                     n_threads,
-                )
-                .generate(n_rows.unwrap() as usize);
+                ).generate(n_rows.unwrap() as usize);
                 Ok(())
             }
 
             Some(Commands::Dump {
-                converter: _,
-                in_file,
-            }) => {
+                     converter: _,
+                     in_file,
+                 }) => {
                 let _in_file = fs::File::open(&in_file).expect("bbb");
                 dump(_in_file);
 
                 Ok(())
             }
             Some(Commands::Convert {
-                converter,
-                slicer: _,
-                schema,
-                in_file,
-                out_file,
-            }) => {
+                     converter,
+                     slicer: _,
+                     schema,
+                     in_file,
+                     out_file,
+                 }) => {
                 let _in_file = fs::File::open(&in_file).expect("bbb");
 
                 let mut slicer_instance: Box<dyn Slicer> = Box::new(OldSlicer {
@@ -203,11 +203,7 @@ impl Cli {
                         s2a
                     }
                     Converters::Arrow2 => {
-                        let _out_file = fs::OpenOptions::new()
-                            .create(true)
-                            .append(true)
-                            .open(out_file)
-                            .expect("aaa");
+                        let _out_file = fs::OpenOptions::new().create(true).append(true).open(out_file).expect("aaa");
 
 //                        let master_builders = MasterBuilder::builder_factory(schema.to_path_buf());
 
@@ -218,7 +214,7 @@ impl Cli {
                         let writer: ArrowWriter<File> = master_builders.writer_factory(out_file);
 
                         let s2a: Box<Slice2Arrow2> = Box::new(Slice2Arrow2 {
-                            writer: ,
+                            writer: writer,
                             fn_line_break: find_last_nl,
                             fn_line_break_len: line_break_len_cr,
                             masterbuilders: master_builders,
@@ -228,11 +224,7 @@ impl Cli {
                     }
 
                     Converters::None => {
-                        let _out_file = fs::OpenOptions::new()
-                            .create(true)
-                            .append(true)
-                            .open(out_file)
-                            .expect("aaa");
+                        let _out_file = fs::OpenOptions::new().create(true).append(true).open(out_file).expect("aaa");
 
                         let s3a: Box<SampleSliceAggregator> = Box::new(SampleSliceAggregator {
                             file_out: _out_file,
@@ -263,7 +255,6 @@ impl Cli {
                 Ok(())
             }
 
-            //            Ok(()) => todo!(),
             _ => Ok(()),
         }
     }

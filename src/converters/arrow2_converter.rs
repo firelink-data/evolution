@@ -26,7 +26,7 @@
 */
 
 use arrow2::datatypes::{DataType, Field, Schema};
-use arrow2::io::ipc::write::Record;
+use arrow2::io::parquet::write::{FileWriter};
 
 use crate::schema;
 
@@ -40,6 +40,9 @@ use std::path::PathBuf;
 use std::str;
 use std::sync::Arc;
 use str::from_utf8_unchecked;
+use arrow2::io::ipc::write::Record;
+use arrow2::io::parquet::write::{CompressionOptions, Version, WriteOptions};
+use arrow_array::ArrayRef;
 use parquet::arrow::ArrowWriter;
 
 pub(crate) struct Slice2Arrow2<'a> {
@@ -248,7 +251,31 @@ unsafe impl Send for MasterBuilders {}
 unsafe impl Sync for MasterBuilders {}
 
 impl MasterBuilders {
-    pub fn builder_factory2<'a>(schema_path: PathBuf, instances: i16) -> Self {
+    pub fn writer_factory<'a>(&mut self, out_file: &PathBuf) -> FileWriter<File> {
+        let options = WriteOptions {
+            write_statistics: true,
+            compression: CompressionOptions::Uncompressed,
+            version: Version::V2,
+            data_pagesize_limit: None,
+        };
+
+        let b: &mut Vec<Box<dyn Sync + Send + crate::converters::ColumnBuilder>> = self.builders.get_mut(0).unwrap();
+        let mut br: Vec<(&str, ArrayRef)> = vec![];
+        for bb in b.iter_mut() {
+            match bb {
+                &mut _ => {bb.}
+            }
+            br.push(bb.finish());
+        }
+
+
+        let schema = Schema::from(vec![field]);
+
+        let mut writer = FileWriter::try_new(out_file, schema, options)?;
+    }
+
+
+        pub fn builder_factory2<'a>(schema_path: PathBuf, instances: i16) -> Self {
         //    builders: &mut Vec<Box<dyn ColumnBuilder>>
         let schema = schema::FixedSchema::from_path(schema_path.into());
         let antal_col = schema.num_columns();
