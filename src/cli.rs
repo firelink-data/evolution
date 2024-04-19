@@ -41,6 +41,16 @@ use crate::{error, mocker, schema};
 use clap::{Parser, Subcommand};
 use log::info;
 use parquet::arrow::ArrowWriter;
+use arrow2::{
+    array::{Array, Int32Array},
+    chunk::Chunk,
+    datatypes::{Field, Schema},
+    error::Result,
+    io::parquet::write::{
+        transverse, CompressionOptions, Encoding, FileWriter, RowGroupIterator, Version,
+        WriteOptions,
+    },
+};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -119,7 +129,7 @@ impl Cli {
     pub fn run<'a>(
         &self,
         in_buffers: &mut [ChunkAndResidue; IN_MAX_CHUNKS],
-    ) -> Result<(), error::ExecutionError> {
+    ) -> std::result::Result<(), error::ExecutionError> {
         let n_logical_threads = num_cpus::get();
         let mut n_threads: usize = self.n_threads as usize;
 
@@ -199,11 +209,18 @@ impl Cli {
                             .open(out_file)
                             .expect("aaa");
 
-                        let master_builders = MasterBuilder::builder_factory(schema.to_path_buf());
+//                        let master_builders = MasterBuilder::builder_factory(schema.to_path_buf());
+
+                        let mut master_builders = MasterBuilders::builder_factory2(
+                            schema.to_path_buf(),
+                            n_threads as i16,
+                        );
+                        let writer: ArrowWriter<File> = master_builders.writer_factory(out_file);
+
                         let s2a: Box<Slice2Arrow2> = Box::new(Slice2Arrow2 {
                             writer: ,
                             fn_line_break: find_last_nl,
-                            fn_line_break_len: FnLineBreakLen,
+                            fn_line_break_len: line_break_len_cr,
                             masterbuilders: master_builders,
                         });
 

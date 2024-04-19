@@ -20,7 +20,7 @@ default-run = "evolution"
 
 
 [dependencies]
-arrow2 = { version = "0.18.0", features = ["io_ipc"] }
+arrow2 = { version = "0.18.0", features = ["io_ipc", "io_parquet"] }
 arrow = { version = "51.0.0", features = ["ipc"] }
 debug_print = "1.0.0"
 arrow-format = "0.8.1"

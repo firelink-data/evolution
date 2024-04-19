@@ -237,37 +237,44 @@ pub trait ColumnBuilder {
     fn nullify(&mut self);
 }
 
+/*
 pub(crate) struct MasterBuilder<'a> {
     #[allow(dead_code)]
     builders: Vec<Box<dyn Sync + Send + 'a + ColumnBuilder>>,
 }
+*/
 
-unsafe impl Send for MasterBuilder<'_> {}
-unsafe impl Sync for MasterBuilder<'_> {}
+unsafe impl Send for MasterBuilders {}
+unsafe impl Sync for MasterBuilders {}
 
-impl MasterBuilder<'_> {
-    pub fn builder_factory<'a>(schema_path: PathBuf) -> Self {
+impl MasterBuilders {
+    pub fn builder_factory2<'a>(schema_path: PathBuf, instances: i16) -> Self {
         //    builders: &mut Vec<Box<dyn ColumnBuilder>>
         let schema = schema::FixedSchema::from_path(schema_path.into());
         let antal_col = schema.num_columns();
+        let mut builders: Vec<Vec<Box<dyn crate::converters::ColumnBuilder + Sync + Send>>> = Vec::new();
 
-        let mut buildersmut: Vec<Box<dyn ColumnBuilder + Send + Sync>> =
-            Vec::with_capacity(antal_col);
+        for _i in 1..=instances {
+            let mut buildersmut: Vec<Box<dyn crate::converters::ColumnBuilder + Sync + Send>> =
+                Vec::with_capacity(antal_col);
 
-        for val in schema.iter() {
-            match val.dtype().as_str() {
-                "i32" => buildersmut.push(Box::new(ColumnBuilderType::<i32> {
-                    rows: MutablePrimitiveArray::new(),
-                })),
-                "i64" => buildersmut.push(Box::new(ColumnBuilderType::<i64> {
-                    rows: MutablePrimitiveArray::new(),
-                })),
 
-                &_ => {}
-            };
+            for val in schema.iter() {
+                match val.dtype().as_str() {
+                    "i32" => buildersmut.push(Box::new(ColumnBuilderType::<i32> {
+                        rows: MutablePrimitiveArray::new(),
+                    })),
+                    "i64" => buildersmut.push(Box::new(ColumnBuilderType::<i64> {
+                        rows: MutablePrimitiveArray::new(),
+                    })),
+
+                    &_ => {}
+                };
+            }
+            builders.push(buildersmut);
+
         }
 
-        let builders = buildersmut;
-        MasterBuilder { builders }
+        MasterBuilders { builders }
     }
 }
