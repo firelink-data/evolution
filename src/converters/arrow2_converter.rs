@@ -50,7 +50,7 @@ pub(crate) struct Slice2Arrow2<'a> {
     pub(crate) writer: ArrowWriter<File>,
     pub(crate) fn_line_break: FnFindLastLineBreak<'a>,
     pub(crate) fn_line_break_len: FnLineBreakLen,
-    pub(crate) masterbuilders: MasterBuilders,
+    pub(crate) masterbuilders: MasterBuilders<String>,
 }
 
 impl<'a> Converter<'a> for Slice2Arrow2<'a> {
@@ -82,7 +82,7 @@ impl<'a> Converter<'a> for Slice2Arrow2<'a> {
         todo!()
     }
 }
-fn parse_slice(i: usize, n: &&[u8], _master_builder: &Arc<&MasterBuilders>) {
+fn parse_slice(i: usize, n: &&[u8], _master_builder: &Arc<&MasterBuilders<String>>) {
     println!("index {} {}", i, n.len());
 
     // TODO make safe/unsafe configurable
@@ -247,10 +247,10 @@ pub(crate) struct MasterBuilder<'a> {
 }
 */
 
-unsafe impl Send for MasterBuilders {}
-unsafe impl Sync for MasterBuilders {}
+unsafe impl Send for MasterBuilders<String> {}
+unsafe impl Sync for MasterBuilders<String> {}
 
-impl MasterBuilders {
+impl MasterBuilders<FileWriter<File>> {
     pub fn writer_factory<'a>(&mut self, out_file: &PathBuf) -> FileWriter<File> {
         let options = WriteOptions {
             write_statistics: true,
@@ -259,18 +259,15 @@ impl MasterBuilders {
             data_pagesize_limit: None,
         };
 
-        let b: &mut Vec<Box<dyn Sync + Send + crate::converters::ColumnBuilder>> = self.builders.get_mut(0).unwrap();
-        let mut br: Vec<(&str, ArrayRef)> = vec![];
+        let b: &mut Vec<Box<dyn Sync + Send + crate::converters::ColumnBuilder<String>>> = self.builders.get_mut(0).unwrap();
+        let mut br: Vec<String> = vec![];
         for bb in b.iter_mut() {
-            match bb {
-                &mut _ => {bb.}
-            }
             br.push(bb.finish());
         }
 
 
-        let schema = Schema::from(vec![field]);
-
+//        let schema = Schema::from(vec![field]);
+        let schema=todo!();
         let mut writer = FileWriter::try_new(out_file, schema, options)?;
     }
 
@@ -279,10 +276,10 @@ impl MasterBuilders {
         //    builders: &mut Vec<Box<dyn ColumnBuilder>>
         let schema = schema::FixedSchema::from_path(schema_path.into());
         let antal_col = schema.num_columns();
-        let mut builders: Vec<Vec<Box<dyn crate::converters::ColumnBuilder + Sync + Send>>> = Vec::new();
+        let mut builders: Vec<Vec<Box<dyn crate::converters::ColumnBuilder<String> + Sync + Send>>> = Vec::new();
 
         for _i in 1..=instances {
-            let mut buildersmut: Vec<Box<dyn crate::converters::ColumnBuilder + Sync + Send>> =
+            let mut buildersmut: Vec<Box<dyn crate::converters::ColumnBuilder<String> + Sync + Send>> =
                 Vec::with_capacity(antal_col);
 
 

@@ -48,14 +48,14 @@ pub(crate) struct Slice2Arrow<'a> {
     pub(crate) writer: ArrowWriter<File>,
     pub(crate) fn_line_break: FnFindLastLineBreak<'a>,
     pub(crate) fn_line_break_len: FnLineBreakLen,
-    pub(crate) masterbuilders: MasterBuilders,
+    pub(crate) masterbuilders: MasterBuilders<(&'a str, ArrayRef)>,
 }
 
+unsafe impl Send for MasterBuilders<(&str, ArrayRef)> {}
+unsafe impl Sync for MasterBuilders<(&str, ArrayRef)> {}
 
-unsafe impl Send for MasterBuilders {}
-unsafe impl Sync for MasterBuilders {}
 
-impl MasterBuilders {
+impl MasterBuilders<(&str, ArrayRef)> {
     pub fn writer_factory<'a>(&mut self, out_file: &PathBuf) -> ArrowWriter<File> {
         let _out_file = fs::OpenOptions::new()
             .create(true)
@@ -67,7 +67,7 @@ impl MasterBuilders {
             .set_compression(Compression::SNAPPY)
             .build();
 
-        let b: &mut Vec<Box<dyn Sync + Send + ColumnBuilder>> = self.builders.get_mut(0).unwrap();
+        let b: &mut Vec<Box<dyn Sync + Send + ColumnBuilder<(&str, ArrayRef)>>> = self.builders.get_mut(0).unwrap();
         let mut br: Vec<(&str, ArrayRef)> = vec![];
         for bb in b.iter_mut() {
             br.push(bb.finish());
@@ -82,10 +82,10 @@ impl MasterBuilders {
     pub fn builders_factory<'a>(schema_path: PathBuf, instances: i16) -> Self {
         let schema = schema::FixedSchema::from_path(schema_path.into());
         let antal_col = schema.num_columns();
-        let mut builders: Vec<Vec<Box<dyn ColumnBuilder + Sync + Send>>> = Vec::new();
+        let mut builders: Vec<Vec<Box<dyn ColumnBuilder<(&str, ArrayRef)> + Sync + Send>>> = Vec::new();
 
         for _i in 1..=instances {
-            let mut buildersmut: Vec<Box<dyn ColumnBuilder + Sync + Send>> =
+            let mut buildersmut: Vec<Box<dyn ColumnBuilder<(&str, ArrayRef)> + Sync + Send>> =
                 Vec::with_capacity(antal_col);
             for val in schema.iter() {
                 match val.dtype().as_str() {
@@ -188,7 +188,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 fn parse_slice(
     _i: usize,
     n: &[u8],
-    builders: &mut Vec<Box<dyn ColumnBuilder + Send + Sync>>,
+    builders: &mut Vec<Box<dyn ColumnBuilder<(&str, ArrayRef)> + Send + Sync>>,
     linebreak: usize,
 ) {
     debug_println!("index slice={} slice len={}", _i, n.len());
@@ -209,7 +209,7 @@ struct HandlerInt32Builder {
     name: String,
 }
 
-impl ColumnBuilder for HandlerInt32Builder {
+impl ColumnBuilder<(&str, ArrayRef)> for HandlerInt32Builder {
     fn parse_value(&mut self, data: &[u8]) -> usize
     where
         Self: Sized,
@@ -228,7 +228,7 @@ impl ColumnBuilder for HandlerInt32Builder {
         self.runes_in_column
     }
 
-    fn finish(&mut self) -> (&str, ArrayRef) {
+    fn finish(&mut self) -> (&'static str, ArrayRef) {
         (
             self.name.as_str(),
             Arc::new(self.int32builder.finish()) as ArrayRef,
@@ -240,7 +240,7 @@ struct HandlerInt64Builder {
     runes_in_column: usize,
     name: String,
 }
-impl ColumnBuilder for HandlerInt64Builder {
+impl ColumnBuilder<(&str, ArrayRef)> for HandlerInt64Builder {
     fn parse_value(&mut self, data: &[u8]) -> usize
     where
         Self: Sized,
@@ -259,7 +259,7 @@ impl ColumnBuilder for HandlerInt64Builder {
         self.runes_in_column
     }
 
-    fn finish(&mut self) -> (&str, ArrayRef) {
+    fn finish(&mut self) -> (&'static str, ArrayRef) {
         (
             self.name.as_str(),
             Arc::new(self.int64builder.finish()) as ArrayRef,
@@ -273,7 +273,7 @@ struct HandlerStringBuilder {
     runes_in_column: usize,
     name: String,
 }
-impl ColumnBuilder for HandlerStringBuilder {
+impl ColumnBuilder<(&str, ArrayRef)> for HandlerStringBuilder {
     fn parse_value(&mut self, data: &[u8]) -> usize
     where
         Self: Sized,
@@ -294,7 +294,7 @@ impl ColumnBuilder for HandlerStringBuilder {
         column_length
     }
 
-    fn finish(&mut self) -> (&str, ArrayRef) {
+    fn finish(&mut self) -> (&'static str, ArrayRef) {
         (
             self.name.as_str(),
             Arc::new(self.string_builder.finish()) as ArrayRef,
@@ -308,7 +308,7 @@ struct HandlerBooleanBuilder {
     name: String,
 }
 
-impl ColumnBuilder for HandlerBooleanBuilder {
+impl ColumnBuilder<(&str, ArrayRef)> for HandlerBooleanBuilder {
     fn parse_value(&mut self, data: &[u8]) -> usize
     where
         Self: Sized,
@@ -330,7 +330,7 @@ impl ColumnBuilder for HandlerBooleanBuilder {
         self.runes_in_column
     }
 
-    fn finish(&mut self) -> (&str, ArrayRef) {
+    fn finish(&mut self) -> (&'static str, ArrayRef) {
         (
             self.name.as_str(),
             Arc::new(self.boolean_builder.finish()) as ArrayRef,

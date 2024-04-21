@@ -44,17 +44,18 @@ pub(crate) trait Converter<'a> {
     fn finish(&mut self) -> Result<(), &str>;
     fn get_finish_bytes_written(&mut self) -> usize;
 }
-pub(crate) struct MasterBuilders {
-    builders: Vec<Vec<Box<dyn Sync + Send + ColumnBuilder>>>,
+pub(crate) struct MasterBuilders<R> {
+    builders: Vec<Vec<Box<dyn Sync + Send + ColumnBuilder<R>>>>,
     //      schema: arrow_schema::SchemaRef
 }
 
-pub trait ColumnBuilder {
+
+pub trait ColumnBuilder<R> {
     fn parse_value(&mut self, name: &[u8]) -> usize;
-    fn finish(&mut self) -> (&str, ArrayRef);
+    fn finish(&mut self) -> R;
     //    fn name(&  self) -> &String;
 }
-
+// (&str, ArrayRef)
 fn column_length_num_rightaligned(data: &[u8], runes: i16) -> (usize, usize) {
     let mut eat = data.iter();
     let mut counted_runes = 0;
