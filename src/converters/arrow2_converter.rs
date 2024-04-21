@@ -30,7 +30,7 @@ use arrow2::io::parquet::write::{FileWriter};
 
 use crate::schema;
 
-use crate::converters::{Converter, MasterBuilders};
+use crate::converters::{ColumnBuilder, Converter, MasterBuilders};
 use crate::slicers::{FnFindLastLineBreak, FnLineBreakLen};
 use arrow2::array::MutablePrimitiveArray;
 use arrow2::types::NativeType;
@@ -47,7 +47,7 @@ use parquet::arrow::ArrowWriter;
 
 pub(crate) struct Slice2Arrow2<'a> {
     //    pub(crate) file_out: File,
-    pub(crate) writer: ArrowWriter<File>,
+    pub(crate) writer: FileWriter<File>,
     pub(crate) fn_line_break: FnFindLastLineBreak<'a>,
     pub(crate) fn_line_break_len: FnLineBreakLen,
     pub(crate) masterbuilders: MasterBuilders<String>,
@@ -95,7 +95,7 @@ pub(crate) struct ColumnBuilderType<T1: NativeType> {
     pub rows: MutablePrimitiveArray<T1>,
 }
 
-impl ColumnBuilder for ColumnBuilderType<i32> {
+impl ColumnBuilder<String> for ColumnBuilderType<i32> {
     fn parse_value(&mut self, name: &str)
     where
         Self: Sized,
@@ -112,22 +112,14 @@ impl ColumnBuilder for ColumnBuilderType<i32> {
         };
     }
 
-    fn finish_column(&mut self)
-    where
-        Self: Sized,
-    {
-        todo!()
-    }
 
-    fn nullify(&mut self)
-    where
-        Self: Sized,
-    {
-        self.rows.push(None);
+
+    fn finish(&mut self) -> String {
+        todo!()
     }
 }
 
-impl ColumnBuilder for ColumnBuilderType<i64> {
+impl ColumnBuilder<String> for ColumnBuilderType<i64> {
     fn parse_value(&mut self, name: &str)
     where
         Self: Sized,
@@ -144,18 +136,8 @@ impl ColumnBuilder for ColumnBuilderType<i64> {
         };
     }
 
-    fn finish_column(&mut self)
-    where
-        Self: Sized,
-    {
+    fn finish(&mut self) -> String {
         todo!()
-    }
-
-    fn nullify(&mut self)
-    where
-        Self: Sized,
-    {
-        self.rows.push(None);
     }
 }
 
@@ -191,7 +173,7 @@ struct FixedTableChunk<'a> {
     ///
     fixed_table: &'a FixedTable<'a>,
 
-    column_builders: Vec<Box<dyn ColumnBuilder>>,
+    column_builders: Vec<Box<dyn ColumnBuilder<FileWriter<File>>>>,
 
     // record_builder: Vec<Box< ??? >>
     records: Vec<&'a Record<'a>>,
@@ -228,30 +210,12 @@ struct FixedTable<'a> {
 }
 
 ///
-pub trait ColumnBuilder {
-    ///
-    fn parse_value(&mut self, name: &str);
-
-    ///
-    fn finish_column(&mut self);
-
-    /// I think this function won't be necessary.
-    /// `[arrow2]` supports bitmap nulling out-of-the-box.
-    fn nullify(&mut self);
-}
-
-/*
-pub(crate) struct MasterBuilder<'a> {
-    #[allow(dead_code)]
-    builders: Vec<Box<dyn Sync + Send + 'a + ColumnBuilder>>,
-}
-*/
 
 unsafe impl Send for MasterBuilders<String> {}
 unsafe impl Sync for MasterBuilders<String> {}
 
-impl MasterBuilders<FileWriter<File>> {
-    pub fn writer_factory<'a>(&mut self, out_file: &PathBuf) -> FileWriter<File> {
+impl MasterBuilders<String> {
+    pub fn writer_factory2<'a>(&mut self, out_file: &PathBuf) -> FileWriter<File> {
         let options = WriteOptions {
             write_statistics: true,
             compression: CompressionOptions::Uncompressed,
@@ -268,7 +232,9 @@ impl MasterBuilders<FileWriter<File>> {
 
 //        let schema = Schema::from(vec![field]);
         let schema=todo!();
-        let mut writer = FileWriter::try_new(out_file, schema, options)?;
+        let file = File::create(out_file).expect("");
+        let mut writer = FileWriter::try_new(file, schema, options).expect("");
+        writer
     }
 
 

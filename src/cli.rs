@@ -211,7 +211,7 @@ impl Cli {
                             schema.to_path_buf(),
                             n_threads as i16,
                         );
-                        let writer: ArrowWriter<File> = master_builders.writer_factory(out_file);
+                        let writer = master_builders.writer_factory2(out_file);
 
                         let s2a: Box<Slice2Arrow2> = Box::new(Slice2Arrow2 {
                             writer: writer,
