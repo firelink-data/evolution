@@ -38,14 +38,14 @@ pub(crate) static DEFAULT_SLICE_BUFFER_LEN: usize = 1024 * 1024;
 ///
 
 #[allow(dead_code)]
-pub struct NewSlicer<'a> {
-    pub(crate) fn_line_break: FnFindLastLineBreak<'a>,
+pub struct NewSlicer {
+    pub(crate) fn_line_break: FnFindLastLineBreak,
     file: File,
     n_threads: usize,
     multithreaded: bool,
 }
 
-impl<'a> Slicer<'a> for NewSlicer<'a> {
+impl<'a> Slicer<'a> for NewSlicer {
     fn slice_and_convert(
         &mut self,
         mut converter: Box<dyn 'a + Converter<'a>>,

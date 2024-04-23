@@ -46,7 +46,7 @@ use debug_print::debug_println;
 pub(crate) struct Slice2Arrow<'a> {
     //    pub(crate) file_out: File,
     pub(crate) writer: ArrowWriter<File>,
-    pub(crate) fn_line_break: FnFindLastLineBreak<'a>,
+    pub(crate) fn_line_break: FnFindLastLineBreak,
     pub(crate) fn_line_break_len: FnLineBreakLen,
     pub(crate) masterbuilders: MasterBuilders<(&'a str, ArrayRef)>,
 }
@@ -120,10 +120,10 @@ impl MasterBuilders<(&str, ArrayRef)> {
 }
 
 impl<'a> Converter<'a> for Slice2Arrow<'a> {
-    fn set_line_break_handler(&mut self, fnl: FnFindLastLineBreak<'a>) {
+    fn set_line_break_handler(&mut self, fnl: FnFindLastLineBreak) {
         self.fn_line_break = fnl;
     }
-    fn get_line_break_handler(&self) -> FnFindLastLineBreak<'a> {
+    fn get_line_break_handler(&self) -> FnFindLastLineBreak {
         self.fn_line_break
     }
 
@@ -228,7 +228,7 @@ impl ColumnBuilder<(&str, ArrayRef)> for HandlerInt32Builder {
         self.runes_in_column
     }
 
-    fn finish(&mut self) -> (&'static str, ArrayRef) {
+    fn finish(&mut self) -> (& str, ArrayRef) {
         (
             self.name.as_str(),
             Arc::new(self.int32builder.finish()) as ArrayRef,

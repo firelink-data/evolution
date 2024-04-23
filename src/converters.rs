@@ -36,8 +36,8 @@ pub(crate) mod self_converter;
 pub mod arrow_converter;
 
 pub(crate) trait Converter<'a> {
-    fn set_line_break_handler(&mut self, fn_line_break: FnFindLastLineBreak<'a>);
-    fn get_line_break_handler(&self) -> FnFindLastLineBreak<'a>;
+    fn set_line_break_handler(&mut self, fn_line_break: FnFindLastLineBreak);
+    fn get_line_break_handler(&self) -> FnFindLastLineBreak;
 
     //    fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
     fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize);
@@ -52,7 +52,7 @@ pub(crate) struct MasterBuilders<R> {
 
 pub trait ColumnBuilder<R> {
     fn parse_value(&mut self, name: &[u8]) -> usize;
-    fn finish(&mut self) -> R;
+    fn finish(& mut self) -> R;
     //    fn name(&  self) -> &String;
 }
 // (&str, ArrayRef)

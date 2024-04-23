@@ -28,11 +28,11 @@
 use arrow2::datatypes::{DataType, Field, Schema};
 use arrow2::io::parquet::write::{FileWriter};
 
-use crate::schema;
+use crate::{converters, schema};
 
 use crate::converters::{ColumnBuilder, Converter, MasterBuilders};
 use crate::slicers::{FnFindLastLineBreak, FnLineBreakLen};
-use arrow2::array::MutablePrimitiveArray;
+use arrow2::array::{MutableArray, MutablePrimitiveArray, MutableUtf8Array, Utf8Array};
 use arrow2::types::NativeType;
 use rayon::prelude::*;
 use std::fs::File;
@@ -43,21 +43,22 @@ use str::from_utf8_unchecked;
 use arrow2::io::ipc::write::Record;
 use arrow2::io::parquet::write::{CompressionOptions, Version, WriteOptions};
 use arrow_array::ArrayRef;
+use arrow_array::builder::BooleanBuilder;
 use parquet::arrow::ArrowWriter;
 
-pub(crate) struct Slice2Arrow2<'a> {
+pub(crate) struct Slice2Arrow2 {
     //    pub(crate) file_out: File,
     pub(crate) writer: FileWriter<File>,
-    pub(crate) fn_line_break: FnFindLastLineBreak<'a>,
+    pub(crate) fn_line_break: FnFindLastLineBreak,
     pub(crate) fn_line_break_len: FnLineBreakLen,
     pub(crate) masterbuilders: MasterBuilders<String>,
 }
 
-impl<'a> Converter<'a> for Slice2Arrow2<'a> {
-    fn set_line_break_handler(&mut self, fnl: FnFindLastLineBreak<'a>) {
+impl Converter<'_> for Slice2Arrow2 {
+    fn set_line_break_handler(&mut self, fnl: FnFindLastLineBreak) {
         self.fn_line_break = fnl;
     }
-    fn get_line_break_handler(&self) -> FnFindLastLineBreak<'a> {
+    fn get_line_break_handler(&self) -> FnFindLastLineBreak {
         self.fn_line_break
     }
 
@@ -91,131 +92,91 @@ fn parse_slice(i: usize, n: &&[u8], _master_builder: &Arc<&MasterBuilders<String
     let _offset = 0;
 }
 
-pub(crate) struct ColumnBuilderType<T1: NativeType> {
-    pub rows: MutablePrimitiveArray<T1>,
+//pub(crate) struct ColumnBuilderType<T1: NativeType> {
+//    pub rows: MutablePrimitiveArray<T1>,
+//}
+struct Handleri32Builder {
+    i32_rows:  MutablePrimitiveArray<i32>,
+    runes_in_column: usize,
+    name: String,
 }
-
-impl ColumnBuilder<String> for ColumnBuilderType<i32> {
-    fn parse_value(&mut self, name: &str)
-    where
-        Self: Sized,
-    {
-        match name.parse::<i32>() {
+impl  ColumnBuilder<String> for Handleri32Builder {
+    fn parse_value(&mut self, data: &[u8]) -> usize {
+        let (start, stop) =
+            converters::column_length_num_rightaligned(data, self.runes_in_column as i16);
+        match atoi_simd::parse::<i32>(&data[start..stop]) {
             Ok(n) => {
-                self.rows.push(Some(n));
-                n
+                self.i32_rows.push(Some(n));
             }
             Err(_e) => {
-                self.nullify();
-                0
+                self.i32_rows.push_null();
             }
         };
-    }
-
-
-
-    fn finish(&mut self) -> String {
-        todo!()
-    }
-}
-
-impl ColumnBuilder<String> for ColumnBuilderType<i64> {
-    fn parse_value(&mut self, name: &str)
-    where
-        Self: Sized,
-    {
-        match name.parse::<i64>() {
-            Ok(n) => {
-                self.rows.push(Some(n));
-                n
-            }
-            Err(_e) => {
-                self.nullify();
-                0
-            }
-        };
+        // todo fix below
+        self.runes_in_column
     }
 
     fn finish(&mut self) -> String {
         todo!()
     }
 }
+struct HandleriUtf8Builder {
+    utf8_rows:  MutableUtf8Array<i32>,
+    runes_in_column: usize,
+    name: String,
+}
+impl  ColumnBuilder<String> for crate::converters::arrow2_converter::HandleriUtf8Builder {
 
-///
-#[allow(dead_code)]
-struct FixedField {
-    /// The destination field.
-    field: Field,
+    fn parse_value(&mut self, data: &[u8])-> usize {
 
-    /// The source datatype.
-    dtype: DataType,
+        let column_length: usize = converters::column_length(data, self.runes_in_column as i16);
+        // Me dont like ... what is the cost ? Could it be done once for the whole chunk ?
+        let text: &str = unsafe { from_utf8_unchecked(&data[..column_length]) };
 
-    ///
-    len: u32,
+        match column_length {
+            0 => {self.utf8_rows.push_null()},
+            _ => {self.utf8_rows.push(Some(text))}
+        }
+        column_length
+    }
 
-    ///
-    id: u32,
+    fn finish(&mut self) -> String {
+        todo!()
+    }
 }
 
-///
-#[allow(dead_code)]
-struct FixedRow<'a> {
-    ///
-    fixed_fields: Vec<&'a FixedField>,
+struct Handleri64Builder {
+    i64_rows:  MutablePrimitiveArray<i64>,
+    runes_in_column: usize,
+    name: String,
+}
+impl  ColumnBuilder<String> for crate::converters::arrow2_converter::Handleri64Builder {
+    fn parse_value(&mut self, data: &[u8]) -> usize {
+        let (start, stop) =
+            converters::column_length_num_rightaligned(data, self.runes_in_column as i16);
+        match atoi_simd::parse::<i64>(&data[start..stop]) {
+            Ok(n) => {
+                self.i64_rows.push(Some(n));
+            }
+            Err(_e) => {
+                self.i64_rows.push_null();
+            }
+        };
+        // todo fix below
+        self.runes_in_column
+    }
+
+    fn finish(&mut self) -> String {
+        todo!()
+    }
 }
 
-///
-#[allow(dead_code)]
-struct FixedTableChunk<'a> {
-    ///
-    chunk_idx: u32,
 
-    ///
-    fixed_table: &'a FixedTable<'a>,
-
-    column_builders: Vec<Box<dyn ColumnBuilder<FileWriter<File>>>>,
-
-    // record_builder: Vec<Box< ??? >>
-    records: Vec<&'a Record<'a>>,
-
-    bytes: Vec<u8>,
-}
-
-///
-#[allow(dead_code)]
-struct FixedTable<'a> {
-    ///
-    bytes: Vec<u8>,
-
-    ///
-    fixed_table_chunks: Vec<&'a FixedTableChunk<'a>>,
-
-    ///
-    row: FixedRow<'a>,
-
-    ///
-    schemas: Vec<&'a Schema>,
-
-    ///
-    table_n_cols: Vec<u32>,
-
-    ///
-    header: Option<String>,
-
-    ///
-    footer: Option<String>,
-
-    ///
-    encoding: String,
-}
-
-///
-
-unsafe impl Send for MasterBuilders<String> {}
-unsafe impl Sync for MasterBuilders<String> {}
+unsafe impl<'a> Send for MasterBuilders<String> {}
+unsafe impl<'a> Sync for MasterBuilders<String> {}
 
 impl MasterBuilders<String> {
-    pub fn writer_factory2<'a>(&mut self, out_file: &PathBuf) -> FileWriter<File> {
+    pub fn writer_factory2(&mut self, out_file: &PathBuf) -> FileWriter<File> {
         let options = WriteOptions {
             write_statistics: true,
             compression: CompressionOptions::Uncompressed,
@@ -223,11 +184,6 @@ impl MasterBuilders<String> {
             data_pagesize_limit: None,
         };
 
-        let b: &mut Vec<Box<dyn Sync + Send + crate::converters::ColumnBuilder<String>>> = self.builders.get_mut(0).unwrap();
-        let mut br: Vec<String> = vec![];
-        for bb in b.iter_mut() {
-            br.push(bb.finish());
-        }
 
 
 //        let schema = Schema::from(vec![field]);
@@ -238,7 +194,7 @@ impl MasterBuilders<String> {
     }
 
 
-        pub fn builder_factory2<'a>(schema_path: PathBuf, instances: i16) -> Self {
+        pub fn builder_factory2(schema_path: PathBuf, instances: i16) -> Self {
         //    builders: &mut Vec<Box<dyn ColumnBuilder>>
         let schema = schema::FixedSchema::from_path(schema_path.into());
         let antal_col = schema.num_columns();
@@ -251,11 +207,22 @@ impl MasterBuilders<String> {
 
             for val in schema.iter() {
                 match val.dtype().as_str() {
-                    "i32" => buildersmut.push(Box::new(ColumnBuilderType::<i32> {
-                        rows: MutablePrimitiveArray::new(),
+                    "i32" => buildersmut.push(Box::new(Handleri32Builder {
+                        i32_rows: Default::default(),
+                        runes_in_column: val.length(),
+                        name: val.name().clone(),
+                    } )),
+
+                    "i64" => buildersmut.push(Box::new(Handleri64Builder {
+                        i64_rows: Default::default(),
+                        runes_in_column: val.length(),
+                        name: val.name().clone(),
                     })),
-                    "i64" => buildersmut.push(Box::new(ColumnBuilderType::<i64> {
-                        rows: MutablePrimitiveArray::new(),
+
+                    "utf8" => buildersmut.push(Box::new(HandleriUtf8Builder {
+                        utf8_rows: Default::default(),
+                        runes_in_column: val.length(),
+                        name: val.name().clone(),
                     })),
 
                     &_ => {}

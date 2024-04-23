@@ -32,16 +32,16 @@ use rayon::prelude::*;
 use std::fs::File;
 use std::io::Write;
 
-pub struct SampleSliceAggregator<'a> {
+pub struct SampleSliceAggregator {
     pub(crate) file_out: File,
-    pub(crate) fn_line_break: FnFindLastLineBreak<'a>,
+    pub(crate) fn_line_break: FnFindLastLineBreak,
 }
 
-impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
-    fn set_line_break_handler(&mut self, fnl: FnFindLastLineBreak<'a>) {
+impl<'a> Converter<'a> for SampleSliceAggregator {
+    fn set_line_break_handler(&mut self, fnl: FnFindLastLineBreak) {
         self.fn_line_break = fnl;
     }
-    fn get_line_break_handler(&self) -> FnFindLastLineBreak<'a> {
+    fn get_line_break_handler(&self) -> FnFindLastLineBreak {
         self.fn_line_break
     }
 

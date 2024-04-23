@@ -61,7 +61,7 @@ pub(crate) fn line_break_len_crlf() -> usize {
     2 as usize
 }
 
-pub(crate) type FnFindLastLineBreak<'a> = fn(bytes: &'a [u8]) -> (bool, usize);
+pub(crate) type FnFindLastLineBreak = fn(bytes: & [u8]) -> (bool, usize);
 #[allow(dead_code)]
 pub(crate) fn find_last_nlcr(bytes: &[u8]) -> (bool, usize) {
     if bytes.is_empty() {

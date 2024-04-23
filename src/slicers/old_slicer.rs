@@ -60,8 +60,8 @@ pub(crate) const IN_MAX_CHUNKS: usize = 2;
 //    chunk: [u8;SLICER_IN_CHUNK_SIZE]
 //}
 
-pub(crate) struct OldSlicer<'a> {
-    pub(crate) fn_find_last_nl: FnFindLastLineBreak<'a>,
+pub(crate) struct OldSlicer {
+    pub(crate) fn_find_last_nl: FnFindLastLineBreak,
 }
 
 #[allow(dead_code)]
@@ -69,7 +69,7 @@ fn ceil_amount_of_chunks(a: i64, b: i64) -> usize {
     (a / b + (a % b).signum()) as usize
 }
 
-impl<'a> Slicer<'a> for OldSlicer<'a> {
+impl<'a> Slicer<'a> for OldSlicer {
     fn slice_and_convert(
         &mut self,
         mut converter: Box<dyn 'a + Converter<'a>>,
