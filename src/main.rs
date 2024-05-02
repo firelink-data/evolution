@@ -28,6 +28,7 @@
 use clap::Parser;
 use log::{debug, error, info};
 
+mod builder;
 mod cli;
 mod converter;
 mod error;
