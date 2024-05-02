@@ -22,9 +22,10 @@
 * SOFTWARE.
 *
 * File created: 2024-02-17
-* Last updated: 2024-02-28
+* Last updated: 2024-05-02
 */
 
+use crate::builder::{self, ColumnBuilder};
 use crate::schema::FixedSchema;
 use rayon::prelude::*;
 use crossbeam::channel;
@@ -32,9 +33,7 @@ use log::{debug, error, info};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read, Write};
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::thread;
-use std::thread::JoinHandle;
+use std::slice::Iter;
 
 pub(crate) static DEFAULT_SLICE_BUFFER_LEN: usize = 4 * 1024 * 1024;
 pub(crate) static DEFAULT_SLICER_THREAD_CHANNEL_CAPACITY: usize = 128;
@@ -189,6 +188,43 @@ pub fn master_thread_convert(
     }
 }
 
+
+pub fn byte_indices_from_runes(
+    line: &[u8],
+    total_runes: usize,
+    col_lengths: &Vec<usize>,
+) -> Vec<usize> {
+
+    let mut acc_runes: usize = 0;
+    let mut num_bytes: usize = 0;
+    let mut units: usize = 1;
+    let mut iterator: Iter<u8> = line.iter();
+    let mut byte_indices: Vec<usize> = Vec::with_capacity(col_lengths.len());
+
+    while acc_runes < total_runes {
+        let byte = match iterator.nth(units - 1) {
+            None => return byte_indices,
+            Some(b) => *b,
+        };
+
+        units = match byte {
+            byte if byte >> 7 == 0 => 1,
+            byte if byte >> 5 == 0b110 => 2,
+            byte if byte >> 4 == 0b1110 => 3,
+            byte if byte >> 3 == 0b1110 => 4,
+            _ => {
+                panic!("Incorrect UTF-8 sequence!");
+            }
+        };
+
+        acc_runes += 1;
+        num_bytes += units;
+        byte_indices.push(num_bytes);
+    }
+
+    byte_indices
+}
+
 pub fn worker_thread_convert(
     thread: usize,
     slice: &[u8],
@@ -197,14 +233,39 @@ pub fn worker_thread_convert(
     sender: &channel::Sender<Vec<u8>>,
 ) {
     info!("Thread {} converting new slice...", thread);
-    let mut columns: Vec<Vec<&str>> = Vec::with_capacity(schema.num_columns());
-    let mut prev_idx: usize = 0;
+
+    let col_lengths: Vec<usize> = schema.column_lengths();
+    let mut prev_line_idx: usize = 0;
+    let column_builders = schema
+        .iter()
+        .map(|c| c.as_column_builder())
+        .collect::<Vec<Box<dyn ColumnBuilder>>>();
+
     for line_break_idx in line_breaks.into_iter() {
-        let line: Vec<char> = std::str::from_utf8(&slice[prev_idx..*line_break_idx]).unwrap().chars().collect();
-        for (col_idx, (col_offset, col_len)) in schema.column_offsets().iter().zip(schema.column_lengths()).enumerate() {
-            columns[col_idx].push(line[col_offset..col_offset+col_len]);
+
+        let line: &[u8] = &slice[prev_line_idx..*line_break_idx];
+        let mut byte_indices: Vec<usize> = byte_indices_from_runes(
+            line,
+            col_lengths.iter().sum(),
+            &col_lengths,
+        );
+
+        let mut prev_byte_idx: usize = 0;
+        for (byte_idx, builder) in byte_indices.iter_mut().zip(&column_builders) {
+            builder.push_bytes(&line[prev_byte_idx..*byte_idx]);
+            prev_byte_idx = *byte_idx;
         }
-        prev_idx = *line_break_idx;
+
+
+        // for (col_idx, builder) in column_builders.iter_mut().enumerate() {
+          //   let col_num_bytes = builder.parse_to_bytes();
+        // }
+
+
+        // for (col_idx, (col_offset, col_len)) in schema.column_offsets().iter().zip(schema.column_lengths()).enumerate() {
+            // columns[col_idx].push(line[col_offset..col_offset+col_len]);
+        // }
+        prev_line_idx = *line_break_idx;
     }
 
     let _ = sender.send(vec![0u8;10]);
@@ -217,10 +278,10 @@ pub fn worker_thread_convert(
 ///
 /// TODO: this should be used whenever host system is windows!
 pub fn find_line_breaks_windows(bytes: &[u8]) -> Vec<(usize, usize)> {
-    if bytes.is_empty() { panic!("Empty bytes slice!, something went wrong..."); }
+    if bytes.is_empty() { panic!("Empty bytes slice!"); }
 
     let n_bytes = bytes.len();
-    if n_bytes == 0 { panic!("No bytes in buffer!, something went wrong..."); }
+    if n_bytes == 0 { panic!("No bytes in buffer!"); }
 
     let mut line_breaks: Vec<(usize, usize)> = vec![];
     let mut last_idx: usize = 0;
@@ -237,12 +298,12 @@ pub fn find_line_breaks_windows(bytes: &[u8]) -> Vec<(usize, usize)> {
 /// On *nix systems line breaks in files are represented by "\n",
 /// also called LF (Line Feed), represented by the byte 0x0a.
 pub fn find_line_breaks_unix(bytes: &[u8]) -> Vec<usize> {
-    if bytes.is_empty() { panic!("UUUH, empty bytes slice!, something went wrong..."); }
+    if bytes.is_empty() { panic!("Empty bytes slice!"); }
 
     let n_bytes = bytes.len();
     // The only way we can have only one byte left to read is if we have read everything
     // and then this byte will represent EOF, most likely a "\n"?..
-    if n_bytes == 0 { panic!("UUUH, bytes is length 1, not good, dont know what to do here..."); }
+    if n_bytes == 0 { panic!("No bytes in buffer!"); }
     
     let mut line_breaks: Vec<usize> = vec![];
     for idx in 0..n_bytes {
@@ -253,3 +314,6 @@ pub fn find_line_breaks_unix(bytes: &[u8]) -> Vec<usize> {
 
     line_breaks
 }
+
+//
+
