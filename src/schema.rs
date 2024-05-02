@@ -22,16 +22,18 @@
 * SOFTWARE.
 *
 * File created: 2023-11-25
-* Last updated: 2024-02-17
+* Last updated: 2024-05-02
 */
 
 use arrow2::datatypes::{DataType, Field, Schema};
 use arrow2::error::Error;
+use arrow::array::{BooleanBuilder, Float16Builder, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, StringBuilder};
 use serde::{Deserialize, Serialize};
 
 use std::path::PathBuf;
 use std::{fs, io};
 
+use crate::builder::{ColumnBuilder, BooleanBuilderHandler, Float16BuilderHandler, Float32BuilderHandler, Float64BuilderHandler, Int16BuilderHandler, Int32BuilderHandler, Int64BuilderHandler, StringBuilderHandler};
 use crate::mocker;
 
 ///
@@ -123,6 +125,25 @@ impl FixedColumn {
                 "Could not parse json schema dtype to arrow datatype, dtype: {:?}",
                 self.dtype,
             ))),
+        }
+    }
+
+    ///
+    pub fn as_column_builder(&self) -> Box<dyn ColumnBuilder> {
+        match self.dtype.as_str() {
+            "bool" => Box::new(BooleanBuilderHandler { builder: BooleanBuilder::new(), runes: self.length(), name: self.name() }),
+            "boolean" => Box::new(BooleanBuilderHandler { builder: BooleanBuilder::new(), runes: self.length(), name: self.name() }),
+            "i16" => Box::new(Int16BuilderHandler { builder: Int16Builder::new(), runes: self.length(), name: self.name() }),
+            "i32" => Box::new(Int32BuilderHandler { builder: Int32Builder::new(), runes: self.length(), name: self.name() }),
+            "i64" => Box::new(Int64BuilderHandler { builder: Int64Builder::new(), runes: self.length(), name: self.name() }),
+            "f16" => Box::new(Float16BuilderHandler { builder: Float16Builder::new(), runes: self.length(), name: self.name() }),
+            "f32" => Box::new(Float32BuilderHandler { builder: Float32Builder::new(), runes: self.length(), name: self.name() }),
+            "f64" => Box::new(Float64BuilderHandler { builder: Float64Builder::new(), runes: self.length(), name: self.name() }),
+            "utf8" => Box::new(StringBuilderHandler { builder: StringBuilder::new(), runes: self.length(), name: self.name() }),
+            "string" => Box::new(StringBuilderHandler { builder: StringBuilder::new(), runes: self.length(), name: self.name() }),
+            "lutf8" => Box::new(StringBuilderHandler { builder: StringBuilder::new(), runes: self.length(), name: self.name() }),
+            "lstring" => Box::new(StringBuilderHandler { builder: StringBuilder::new(), runes: self.length(), name: self.name() }),
+            _ => panic!("Could not find matching FixedColumn dtype when creating ColumnBuilder!"),
         }
     }
 }
