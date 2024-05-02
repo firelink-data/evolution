@@ -22,132 +22,201 @@
 * SOFTWARE.
 *
 * File created: 2023-11-21
-* Last updated: 2024-02-17
+* Last updated: 2024-05-02
 */
 
-use std::path::PathBuf;
+use log::error;
+use std::str::from_utf8_unchecked;
+use std::sync::Arc;
 
-use arrow2::array::MutablePrimitiveArray;
-use arrow2::datatypes::{DataType, Field, Schema};
-use arrow2::io::ipc::write::Record;
-
-use crate::builder_datatypes::ColumnBuilderType;
-use crate::schema;
-
-///
-#[allow(dead_code)]
-struct FixedField {
-    /// The destination field.
-    field: Field,
-
-    /// The source datatype.
-    dtype: DataType,
-
-    ///
-    len: u32,
-
-    ///
-    id: u32,
-}
-
-///
-#[allow(dead_code)]
-struct FixedRow<'a> {
-    ///
-    fixed_fields: Vec<&'a FixedField>,
-}
-
-///
-#[allow(dead_code)]
-struct FixedTableChunk<'a> {
-    ///
-    chunk_idx: u32,
-
-    ///
-    fixed_table: &'a FixedTable<'a>,
-
-    column_builders: Vec<Box<dyn ColumnBuilder>>,
-
-    // record_builder: Vec<Box< ??? >>
-    records: Vec<&'a Record<'a>>,
-
-    bytes: Vec<u8>,
-}
-
-///
-#[allow(dead_code)]
-struct FixedTable<'a> {
-    ///
-    bytes: Vec<u8>,
-
-    ///
-    fixed_table_chunks: Vec<&'a FixedTableChunk<'a>>,
-
-    ///
-    row: FixedRow<'a>,
-
-    ///
-    schemas: Vec<&'a Schema>,
-
-    ///
-    table_n_cols: Vec<u32>,
-
-    ///
-    header: Option<String>,
-
-    ///
-    footer: Option<String>,
-
-    ///
-    encoding: String,
-}
+use arrow::array::{ArrayRef, BooleanBuilder, Float16Builder, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, StringBuilder};
 
 ///
 pub trait ColumnBuilder {
-    ///
-    fn parse_value(&mut self, name: &str);
-
-    ///
-    fn finish_column(&mut self);
-
-    /// I think this function won't be necessary.
-    /// `[arrow2]` supports bitmap nulling out-of-the-box.
-    fn nullify(&mut self);
+    fn push_bytes(&mut self, data: &[u8]);
+    fn finish(&mut self) -> (&str, ArrayRef);
 }
 
-pub(crate) fn parse_from_schema(
-    schema_path: PathBuf,
-    _in_file_path: PathBuf,
-    _out_file_path: PathBuf,
-    _n_threads: i16,
-) {
-    let mut builders: Vec<Box<dyn ColumnBuilder>> = Vec::new();
-    for val in schema::FixedSchema::from_path(schema_path.into()).iter() {
-        match val.dtype().as_str() {
-            "i32" => builders.push(Box::new(ColumnBuilderType::<i32> {
-                rows: MutablePrimitiveArray::new(),
-            })),
-            "i64" => builders.push(Box::new(ColumnBuilderType::<i64> {
-                rows: MutablePrimitiveArray::new(),
-            })),
+///
+pub struct BooleanBuilderHandler<'a> {
+    pub builder: BooleanBuilder,
+    pub runes: usize,
+    pub name: &'a str,
+}
 
-            &_ => {}
-        };
+impl<'a> ColumnBuilder for BooleanBuilderHandler<'a> {
+    fn push_bytes(&mut self, data: &[u8]) {
+        let text: &str = unsafe { from_utf8_unchecked(&data) };
+        match text.parse::<bool>() {
+            Ok(b) => self.builder.append_value(b),
+            Err(e) => {
+                error!("Could not convert utf-8 text as boolean: {:?}", e);
+                self.builder.append_null();
+            },
+        }
+    }
+
+    fn finish(&mut self) -> (&str, ArrayRef) {
+        (
+            self.name,
+            Arc::new(self.builder.finish()) as ArrayRef,
+        )
     }
 }
-/*
 
-  "bool" => Ok(DataType::Boolean),
-           "boolean" => Ok(DataType::Boolean),
-           "i16" => Ok(DataType::Int16),
-           "i32" => Ok(DataType::Int32),
-           "i64" => Ok(DataType::Int64),
-           "f16" => Ok(DataType::Float16),
-           "f32" => Ok(DataType::Float32),
-           "f64" => Ok(DataType::Float64),
-           "utf8" => Ok(DataType::Utf8),
-           "string" => Ok(DataType::Utf8),
-           "lutf8" => Ok(DataType::LargeUtf8),
-           "lstring" => Ok(DataType::LargeUtf8),
+///
+pub struct Float16BuilderHandler<'a> {
+    pub builder: Float16Builder,
+    pub runes: usize,
+    pub name: &'a str,
+}
 
-*/
+impl<'a> ColumnBuilder for Float16BuilderHandler<'a> {
+    fn push_bytes(&mut self, data: &[u8]) {
+        todo!();
+    }
+
+    fn finish(&mut self) -> (&str, ArrayRef) {
+        todo!();
+    }
+}
+
+///
+pub struct Float32BuilderHandler<'a> {
+    pub builder: Float32Builder,
+    pub runes: usize,
+    pub name: &'a str,
+}
+
+impl<'a> ColumnBuilder for Float32BuilderHandler<'a> {
+    fn push_bytes(&mut self, data: &[u8]) {
+        todo!();
+    }
+
+    fn finish(&mut self) -> (&str, ArrayRef) {
+        todo!();
+    }
+}
+
+///
+pub struct Float64BuilderHandler<'a> {
+    pub builder: Float64Builder,
+    pub runes: usize,
+    pub name: &'a str,
+}
+
+impl<'a> ColumnBuilder for Float64BuilderHandler<'a> {
+    fn push_bytes(&mut self, data: &[u8]) {
+        todo!();
+    }
+
+    fn finish(&mut self) -> (&str, ArrayRef) {
+        todo!();
+    }
+}
+
+///
+pub struct Int16BuilderHandler<'a> {
+    pub builder: Int16Builder,
+    pub runes: usize,
+    pub name: &'a str,
+}
+
+impl<'a> ColumnBuilder for Int16BuilderHandler<'a> {
+    fn push_bytes(&mut self, data: &[u8]) {
+        match atoi_simd::parse(data) {
+            Ok(i) => self.builder.append_value(i),
+            Err(e) => {
+                error!("Could not parse byte slice as Int16: {:?}", e);
+                self.builder.append_null();
+            },
+        }
+    }
+
+    fn finish(&mut self) -> (&str, ArrayRef) {
+        (
+            self.name,
+            Arc::new(self.builder.finish()) as ArrayRef,
+        )
+    }
+}
+
+///
+pub struct Int32BuilderHandler<'a> {
+    pub builder: Int32Builder,
+    pub runes: usize,
+    pub name: &'a str,
+}
+
+impl<'a> ColumnBuilder for Int32BuilderHandler<'a> {
+    fn push_bytes(&mut self, data: &[u8]) {
+        match atoi_simd::parse(data) {
+            Ok(i) => self.builder.append_value(i),
+            Err(e) => {
+                error!("Could not parse byte slice as Int32: {:?}", e);
+                self.builder.append_null();
+            },
+        }
+    }
+
+    fn finish(&mut self) -> (&str, ArrayRef) {
+        (
+            self.name,
+            Arc::new(self.builder.finish()) as ArrayRef,
+        )
+    }
+}
+
+///
+pub struct Int64BuilderHandler<'a> {
+    pub builder: Int64Builder,
+    pub runes: usize,
+    pub name: &'a str,
+}
+
+impl<'a> ColumnBuilder for Int64BuilderHandler<'a> {
+    fn push_bytes(&mut self, data: &[u8]) {
+        match atoi_simd::parse(data) {
+            Ok(i) => self.builder.append_value(i),
+            Err(e) => {
+                error!("Could not parse byte slice as Int64: {:?}", e);
+                self.builder.append_null();
+            },
+        }
+    }
+
+    fn finish(&mut self) -> (&str, ArrayRef) {
+        (
+            self.name,
+            Arc::new(self.builder.finish()) as ArrayRef,
+        )
+    }
+}
+
+///
+pub struct StringBuilderHandler<'a> {
+    pub builder: StringBuilder,
+    pub runes: usize,
+    pub name: &'a str,
+}
+
+impl<'a> ColumnBuilder for StringBuilderHandler<'a> {
+    fn push_bytes(&mut self, data: &[u8]) {
+        let text: &str = unsafe { from_utf8_unchecked(&data) };
+        match text.is_empty() {
+            false => self.builder.append_value(text),
+            true => {
+                error!("Byte slice as utf-8 was empty!");
+                self.builder.append_null();
+            },
+        }
+    }
+
+    fn finish(&mut self) -> (&str, ArrayRef) {
+        (
+            self.name,
+            Arc::new(self.builder.finish()) as ArrayRef,
+        )
+    }
+}
+
