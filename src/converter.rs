@@ -175,12 +175,12 @@ pub fn spawn_convert_threads(
     schema: FixedSchema,
 ) {
     let (sender, receiver) = channel::bounded(DEFAULT_SLICER_THREAD_CHANNEL_CAPACITY);
-    let mut empty_col_builders = schema
+    let mut empty_column_builders = schema
         .iter()
         .map(|c| c.as_column_builder())
         .collect::<Vec<Box<dyn ColumnBuilder>>>();
 
-    let col_refs = empty_col_builders
+    let col_refs = empty_column_builders
         .iter_mut()
         .map(|b| b.finish())
         .collect::<Vec<(&str, ArrayRef)>>();
@@ -203,10 +203,19 @@ pub fn spawn_convert_threads(
         out_file, record_batch.schema(), Some(properties.clone())
     ).expect("Could not create ArrowWriter from RecordBatch!");
 
+    let mut thread_column_builders: Vec<Vec<Box<dyn ColumnBuilder>>> = Vec::with_capacity(thread_workloads.len());
+    for _ in 0..thread_workloads.len() {
+        let mut tcb = schema
+            .iter()
+            .map(|c| c.as_column_builder())
+            .collect::<Vec<Box<dyn ColumnBuilder>>>();
+        thread_column_builders.push(tcb);
+    }
+
     slices
         .into_par_iter()
         .enumerate()
-        .for_each_with(&sender,|s, (t, slice)| worker_thread_convert(t, *slice, thread_workloads[t], &schema, s));
+        .for_each_with(&sender,|s, (t, slice)| worker_thread_convert(t, *slice, thread_workloads[t], &mut thread_column_builders[t], &schema, s));
 
     drop(sender);
     master_thread_convert(&receiver, &mut writer);
@@ -247,6 +256,7 @@ pub fn worker_thread_convert<'a>(
     thread: usize,
     slice: &[u8],
     line_breaks: &[usize],
+    column_builders: &'a mut Vec<Box<dyn ColumnBuilder>>,
     schema: &'a FixedSchema,
     sender: &channel::Sender<Box<(&'a str, ArrayRef)>>,
 ) {
@@ -254,13 +264,8 @@ pub fn worker_thread_convert<'a>(
 
     let col_lengths: Vec<usize> = schema.column_lengths();
     let mut prev_line_idx: usize = 0;
-    let mut column_builders = schema
-        .iter()
-        .map(|c| c.as_column_builder())
-        .collect::<Vec<Box<dyn ColumnBuilder>>>();
 
     for line_break_idx in line_breaks.into_iter() {
-
         let line: &[u8] = &slice[prev_line_idx..*line_break_idx];
         let byte_indices: Vec<usize> = byte_indices_from_runes(
             line,
@@ -277,7 +282,7 @@ pub fn worker_thread_convert<'a>(
         prev_line_idx = *line_break_idx;
     }
 
-    for mut builder in column_builders {
+    for builder in column_builders {
         let _ = sender.send(Box::new(builder.finish()))
             .expect("Could not send ColumnBuilder output from worker thread to channel!");
     }

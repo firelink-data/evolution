@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2023-11-21
-* Last updated: 2024-05-02
+* Last updated: 2024-05-03
 */
 
 use log::error;
@@ -31,8 +31,54 @@ use std::sync::Arc;
 
 use arrow::array::{ArrayRef, BooleanBuilder, Float16Builder, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, StringBuilder};
 
+use crate::schema::FixedSchema;
+
 ///
-pub trait ColumnBuilder {
+pub struct Builder {
+    columns: Vec<Box<dyn ColumnBuilder>>,
+}
+
+impl Builder {
+    pub fn from_schema(schema: &FixedSchema) -> Self {
+        let mut columns: Vec<Box<dyn ColumnBuilder>> = Vec::with_capacity(schema.num_columns());
+        for col in schema.iter() {
+            let runes: usize = col.length();
+            let name: &str = col.name().as_str();
+
+            match col.dtype().as_str() {
+                "bool" => columns.push(Box::new(BooleanBuilderHandler { builder: BooleanBuilder::new(), runes, name })),
+                _ => panic!(""),
+            }
+        }
+
+        Self { columns }
+    }
+}
+
+///
+pub struct MasterBuilder {
+    builders: Vec<Builder>,
+}
+
+impl MasterBuilder {
+
+    ///
+    pub fn from_schema(num_builders: usize, schema: &FixedSchema) -> Self {
+        let builders = (0..num_builders)
+            .map(|_| Builder::from_schema(schema))
+            .collect::<Vec<Builder>>();
+
+        Self { builders }
+    }
+
+    ///
+    pub fn num_builders(&self) -> usize {
+        self.builders.len()
+    }
+}
+
+///
+pub trait ColumnBuilder: Send + Sync {
     fn push_bytes(&mut self, data: &[u8]);
     fn finish(&mut self) -> (&str, ArrayRef);
 }
