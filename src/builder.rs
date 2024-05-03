@@ -72,7 +72,7 @@ pub struct Float16BuilderHandler<'a> {
 }
 
 impl<'a> ColumnBuilder for Float16BuilderHandler<'a> {
-    fn push_bytes(&mut self, data: &[u8]) {
+    fn push_bytes(&mut self, _data: &[u8]) {
         todo!();
     }
 
@@ -89,7 +89,7 @@ pub struct Float32BuilderHandler<'a> {
 }
 
 impl<'a> ColumnBuilder for Float32BuilderHandler<'a> {
-    fn push_bytes(&mut self, data: &[u8]) {
+    fn push_bytes(&mut self, _data: &[u8]) {
         todo!();
     }
 
@@ -106,7 +106,7 @@ pub struct Float64BuilderHandler<'a> {
 }
 
 impl<'a> ColumnBuilder for Float64BuilderHandler<'a> {
-    fn push_bytes(&mut self, data: &[u8]) {
+    fn push_bytes(&mut self, _data: &[u8]) {
         todo!();
     }
 

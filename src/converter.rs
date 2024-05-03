@@ -22,21 +22,29 @@
 * SOFTWARE.
 *
 * File created: 2024-02-17
-* Last updated: 2024-05-02
+* Last updated: 2024-05-03
 */
 
-use crate::builder::{self, ColumnBuilder};
+use crate::builder::ColumnBuilder;
 use crate::schema::FixedSchema;
-use rayon::prelude::*;
+
+use arrow::array::ArrayRef;
+use arrow::record_batch::RecordBatch;
 use crossbeam::channel;
+use parquet::basic::Compression;
+use rayon::prelude::*;
 use log::{debug, error, info};
+use parquet::arrow::ArrowWriter;
+use parquet::file::properties::WriterProperties;
+
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, Read, Write};
+use std::io::{BufReader, Read};
 use std::path::PathBuf;
 use std::slice::Iter;
 
 pub(crate) static DEFAULT_SLICE_BUFFER_LEN: usize = 4 * 1024 * 1024;
 pub(crate) static DEFAULT_SLICER_THREAD_CHANNEL_CAPACITY: usize = 128;
+pub(crate) static DEFAULT_MASTER_THREAD_BATCH_CAPACITY: usize = 128;
 
 ///
 pub struct Converter {
@@ -137,7 +145,8 @@ impl Converter {
         info!("We read {} bytes two times (due to sliding window overlap).", bytes_overlapped);
     }
 
-    fn distribute_worker_thread_workloads(&self, line_indices: &Vec<usize>) -> Vec<&[usize]> {
+    ///
+    fn distribute_worker_thread_workloads<'a>(&'a self, line_indices: &'a Vec<usize>) -> Vec<&'a [usize]> {
         let n_line_indices: usize = line_indices.len();
         let n_rows_per_thread: usize = n_line_indices / (self.n_threads - 1);
 
@@ -150,7 +159,7 @@ impl Converter {
         for idx in 1..self.n_threads - 1 {
             let next_idx = line_indices[n_rows_per_thread * idx];
             workload.push(&line_indices[prev_idx..n_rows_per_thread * idx]);
-            // If this is a window system it should add 2 instead, because of CR+LF!
+            // If this is a Windows system it should add 2 instead, because of CR+LF!
             prev_idx = next_idx + 1;
         }
 
@@ -159,84 +168,93 @@ impl Converter {
     }
 }
 
+///
 pub fn spawn_convert_threads(
     slices: &Vec<&[u8]>,
     thread_workloads: &Vec<&[usize]>,
     schema: FixedSchema,
 ) {
     let (sender, receiver) = channel::bounded(DEFAULT_SLICER_THREAD_CHANNEL_CAPACITY);
+    let mut empty_col_builders = schema
+        .iter()
+        .map(|c| c.as_column_builder())
+        .collect::<Vec<Box<dyn ColumnBuilder>>>();
 
-    slices.into_par_iter().enumerate().for_each_with(&sender,|s, (t, slice)| worker_thread_convert(t, *slice, thread_workloads[t], &schema, s));
+    let col_refs = empty_col_builders
+        .iter_mut()
+        .map(|b| b.finish())
+        .collect::<Vec<(&str, ArrayRef)>>();
 
-    drop(sender);
-    master_thread_convert(&receiver);
-}
-
-pub fn master_thread_convert(
-    channel: &channel::Receiver<Vec<u8>>,
-) {
-    // TODO: write to parquet files, approx 1GB per file might be good
-    let mut file = OpenOptions::new()
+    let out_path = PathBuf::from("output.parquet");
+    let out_file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open("bytes-from-workers.dat")
-        .expect("Could not open target file!");
+        .open(out_path)
+        .expect("Could not create file descriptor!");
 
-    for buff in channel {
-        file.write_all(buff.as_slice())
-            .expect("Got bad buffer from thread, write failed!");
-    }
+    let properties = WriterProperties::builder()
+        .set_compression(Compression::SNAPPY)
+        .build();
+
+    let record_batch = RecordBatch::try_from_iter(col_refs)
+        .expect("Could not create RecordBatch from FixedSchema!");
+
+    let mut writer: ArrowWriter<File> = ArrowWriter::try_new(
+        out_file, record_batch.schema(), Some(properties.clone())
+    ).expect("Could not create ArrowWriter from RecordBatch!");
+
+    slices
+        .into_par_iter()
+        .enumerate()
+        .for_each_with(&sender,|s, (t, slice)| worker_thread_convert(t, *slice, thread_workloads[t], &schema, s));
+
+    drop(sender);
+    master_thread_convert(&receiver, &mut writer);
 }
 
+///
+pub fn master_thread_convert(
+    channel: &channel::Receiver<Box<(&str, ArrayRef)>>,
+    writer: &mut ArrowWriter<File>,
+) {
+    let mut batch: Vec<(&str, ArrayRef)> = Vec::with_capacity(DEFAULT_MASTER_THREAD_BATCH_CAPACITY);
+    let mut accumulated_arrays: usize = 0;
 
-pub fn byte_indices_from_runes(
-    line: &[u8],
-    total_runes: usize,
-    col_lengths: &Vec<usize>,
-) -> Vec<usize> {
+    for worker_box in channel {
+        if accumulated_arrays >= DEFAULT_MASTER_THREAD_BATCH_CAPACITY {
+            let record_batch = RecordBatch::try_from_iter(batch)
+                .expect("Could not create RecordBatch from worker thread channel data!");
 
-    let mut acc_runes: usize = 0;
-    let mut num_bytes: usize = 0;
-    let mut units: usize = 1;
-    let mut iterator: Iter<u8> = line.iter();
-    let mut byte_indices: Vec<usize> = Vec::with_capacity(col_lengths.len());
+            writer.write(&record_batch)
+                .expect("Could not write the contents of RecordBatch to parquet file!");
 
-    while acc_runes < total_runes {
-        let byte = match iterator.nth(units - 1) {
-            None => return byte_indices,
-            Some(b) => *b,
-        };
+            // We can not use vec.clear() here because the Vec is consumed above when we call
+            // RecordBatch::try_from_iter(vec). So we have to reallocate the memory...
+            batch = Vec::with_capacity(DEFAULT_MASTER_THREAD_BATCH_CAPACITY);
+            accumulated_arrays = 0;
+        }
 
-        units = match byte {
-            byte if byte >> 7 == 0 => 1,
-            byte if byte >> 5 == 0b110 => 2,
-            byte if byte >> 4 == 0b1110 => 3,
-            byte if byte >> 3 == 0b1110 => 4,
-            _ => {
-                panic!("Incorrect UTF-8 sequence!");
-            }
-        };
-
-        acc_runes += 1;
-        num_bytes += units;
-        byte_indices.push(num_bytes);
+        let (col_name, array_ref) = *worker_box;
+        batch.push((col_name, array_ref));
+        accumulated_arrays += 1;
     }
 
-    byte_indices
+    writer.finish();
 }
 
-pub fn worker_thread_convert(
+///
+pub fn worker_thread_convert<'a>(
     thread: usize,
     slice: &[u8],
     line_breaks: &[usize],
-    schema: &FixedSchema,
-    sender: &channel::Sender<Vec<u8>>,
+    schema: &'a FixedSchema,
+    sender: &channel::Sender<Box<(&'a str, ArrayRef)>>,
 ) {
     info!("Thread {} converting new slice...", thread);
 
     let col_lengths: Vec<usize> = schema.column_lengths();
     let mut prev_line_idx: usize = 0;
-    let column_builders = schema
+    let mut column_builders = schema
         .iter()
         .map(|c| c.as_column_builder())
         .collect::<Vec<Box<dyn ColumnBuilder>>>();
@@ -244,31 +262,25 @@ pub fn worker_thread_convert(
     for line_break_idx in line_breaks.into_iter() {
 
         let line: &[u8] = &slice[prev_line_idx..*line_break_idx];
-        let mut byte_indices: Vec<usize> = byte_indices_from_runes(
+        let byte_indices: Vec<usize> = byte_indices_from_runes(
             line,
             col_lengths.iter().sum(),
             &col_lengths,
         );
 
         let mut prev_byte_idx: usize = 0;
-        for (byte_idx, builder) in byte_indices.iter_mut().zip(&column_builders) {
-            builder.push_bytes(&line[prev_byte_idx..*byte_idx]);
+        for (builder_idx, byte_idx) in byte_indices.iter().enumerate() {
+            column_builders[builder_idx].push_bytes(&line[prev_byte_idx..*byte_idx]);
             prev_byte_idx = *byte_idx;
         }
 
-
-        // for (col_idx, builder) in column_builders.iter_mut().enumerate() {
-          //   let col_num_bytes = builder.parse_to_bytes();
-        // }
-
-
-        // for (col_idx, (col_offset, col_len)) in schema.column_offsets().iter().zip(schema.column_lengths()).enumerate() {
-            // columns[col_idx].push(line[col_offset..col_offset+col_len]);
-        // }
         prev_line_idx = *line_break_idx;
     }
 
-    let _ = sender.send(vec![0u8;10]);
+    for mut builder in column_builders {
+        let _ = sender.send(Box::new(builder.finish()))
+            .expect("Could not send ColumnBuilder output from worker thread to channel!");
+    }
 }
 
 #[allow(dead_code)]
@@ -315,5 +327,40 @@ pub fn find_line_breaks_unix(bytes: &[u8]) -> Vec<usize> {
     line_breaks
 }
 
-//
+///
+pub fn byte_indices_from_runes(
+    line: &[u8],
+    total_runes: usize,
+    col_lengths: &Vec<usize>,
+) -> Vec<usize> {
+
+    let mut acc_runes: usize = 0;
+    let mut num_bytes: usize = 0;
+    let mut units: usize = 1;
+    let mut iterator: Iter<u8> = line.iter();
+    let mut byte_indices: Vec<usize> = Vec::with_capacity(col_lengths.len());
+
+    while acc_runes < total_runes {
+        let byte = match iterator.nth(units - 1) {
+            None => return byte_indices,
+            Some(b) => *b,
+        };
+
+        units = match byte {
+            byte if byte >> 7 == 0 => 1,
+            byte if byte >> 5 == 0b110 => 2,
+            byte if byte >> 4 == 0b1110 => 3,
+            byte if byte >> 3 == 0b1110 => 4,
+            _ => {
+                panic!("Incorrect UTF-8 sequence!");
+            }
+        };
+
+        acc_runes += 1;
+        num_bytes += units;
+        byte_indices.push(num_bytes);
+    }
+
+    byte_indices
+}
 
