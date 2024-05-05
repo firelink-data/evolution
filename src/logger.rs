@@ -143,7 +143,7 @@ impl Log for Logger {
 }
 
 ///
-pub fn init_logging() -> Result<(), SetLoggerError> {
+fn init_logging() -> Result<(), SetLoggerError> {
     let log_level = get_log_level_from_env();
     let logger = Logger::new(log_level);
     log::set_boxed_logger(Box::new(logger))

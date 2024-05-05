@@ -130,7 +130,7 @@ impl FixedColumn {
 
 ///
 impl FixedColumn {
-    pub fn mock<'a>(&self, rng: &'a mut ThreadRng) -> Result<String, Error> {
+    pub fn mock<'a>(&self, rng: &'a mut ThreadRng) -> String {
         let string = match self.dtype.as_str() {
             "bool" => mock_bool(rng),
             "boolean" => mock_bool(rng),
@@ -144,13 +144,10 @@ impl FixedColumn {
             "string" => mock_string(self.length, rng),
             "lutf8" => mock_string(self.length, rng),
             "lstring" => mock_string(self.length, rng),
-            _ => return Err(Error::ExternalFormat(format!(
-                "Could not find valid dtype for column, dtype: {:?}.",
-                self.dtype,
-            ))),
+            _ => panic!("Could not find valid dtype for column, dtype: {:?}.", self.dtype),
         };
 
-        Ok(string)
+        string
     }
 }
 

@@ -26,8 +26,9 @@
 */
 
 use crossbeam::channel;
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use padder::*;
+use parquet::data_type::AsBytes;
 use rand::rngs::ThreadRng;
 
 use std::fs::OpenOptions;
@@ -40,34 +41,51 @@ use std::{thread, usize};
 use crate::error::ExecutionError;
 use crate::mocking::randomize_file_name;
 use crate::schema::FixedSchema;
+use crate::writer::{Writer, writer_from_file_extension};
 
-// This default value should depend on the memory capacity of the system
-// running the program. Because the workers produce buffers faster than
-// the master can write them to disk we need to bound the worker/master
-// channel. If you have a lot of system memory, you can increase this value,
-// but if you increase it too much the program will run out of system memory.
-pub(crate) static DEFAULT_THREAD_CHANNEL_CAPACITY: usize = 128;
-pub(crate) static DEFAULT_MIN_N_ROWS_FOR_MULTITHREADING: usize = 1000;
-pub(crate) static DEFAULT_MOCKED_FILENAME_LEN: usize = 8;
-pub(crate) static DEFAULT_ROW_BUFFER_LEN: usize = 1024;
+/// If the user wants to only generate a few number of mocked rows,then multithreading
+/// is not a suitable choice, and only introduces extra overhead. This variable specifies
+/// the minimum number of rows to be generated to allow enabling multithreading.
+/// This value takes priority over the CLI settings regarding number of threads etc.
+pub(crate) static MIN_NUM_ROWS_FOR_MULTITHREADING: usize = 1024;
+
+/// The number of messages that can exist in the thread channel at the same time.
+/// If the channel buffer grows to this size, incoming messages will be held until
+/// previous messages have been consumed. Increasing this variable will significantly
+/// increase the amount of system memory allocated by the program.
+pub(crate) static mut MOCKER_THREAD_CHANNEL_CAPACITY: usize = 128;
+
+/// Sets the size of the buffer that the mocker utilizes to store rows of mocked data
+/// before writing to specified location. A smaller number for this variable means that
+/// the program will perform I/O operations more often, which are expensive system calls.
+/// A larger number is advisable, however, the host system must be able to hold all
+/// rows of mocked data in system memory before writing to its location.
+pub(crate) static MOCKER_ROW_BUFFER_SIZE: usize = 1024;
 
 #[cfg(target_os = "windows")]
-static NUM_CHARS_FOR_NEWLINE: usize = 2;
+pub(crate) static NUM_CHARS_FOR_NEWLINE: usize = 2;
 #[cfg(not(target_os = "windows"))]
-static NUM_CHARS_FOR_NEWLINE: usize = 1;
+pub(crate) static NUM_CHARS_FOR_NEWLINE: usize = 1;
 
-#[derive(Debug, Default)]
-///
+// Depending on the target os we need specific handling of newlines.
+// https://doc.rust-lang.org/reference/conditional-compilation.html
+#[cfg(target_os = "windows")]
+fn newline<'a>() -> &'a str { "\r\n" }
+#[cfg(not(target_os = "windows"))]
+fn newline<'a>() -> &'a str { "\n" }
+
+/// A struct for generating mocked data based on a user-defined schema.
+#[derive(Debug)]
 pub(crate) struct Mocker {
     schema: FixedSchema,
     n_rows: usize,
     n_threads: usize,
     multithreaded: bool,
-    output_file: PathBuf,
+    writer: Box<dyn Writer>,
 }
 
+/// A builder struct that simplifies the creation of a valid [`Mocker`] instance.
 #[derive(Debug, Default)]
-///
 pub(crate) struct MockerBuilder {
     schema: Option<FixedSchema>,
     n_rows: Option<usize>,
@@ -77,19 +95,19 @@ pub(crate) struct MockerBuilder {
 }
 
 impl MockerBuilder {
-    ///
+    /// Set the [`FixedSchema`] to generate data according to with the [`Mocker`].
     pub fn schema(mut self, schema: FixedSchema) -> Self {
         self.schema = Some(schema);
         self
     }
 
-    ///
+    /// Set the number of mocked data rows to generate with the [`Mocker`].
     pub fn num_rows(mut self, n_rows: usize) -> Self {
         self.n_rows = Some(n_rows);
         self
     }
 
-    ///
+    /// Set the number of threads to use when generating mocked data with the [`Mocker`].
     pub fn num_threads(mut self, n_threads: usize) -> Self {
         let multithreaded = n_threads > 1;
         self.n_threads = Some(n_threads);
@@ -97,13 +115,18 @@ impl MockerBuilder {
         self
     }
 
-    ///
+    /// Set the target output file name with the [`Mocker`].
+    /// Note: this can be `None`, as this is a CLI option.
     pub fn output_file(mut self, output_file: Option<PathBuf>) -> Self {
         self.output_file = output_file;
         self
     }
 
+    /// Verify that all required fields have been set and explicitly create a new [`Mocker`]
+    /// instance based on the provided fields.
     ///
+    /// # Error
+    /// Iff any of the required fields are `None`.
     pub fn build(self) -> Result<Mocker, ExecutionError> {
 
         let schema = match self.schema {
@@ -144,16 +167,19 @@ impl MockerBuilder {
                 info!("Optional field `output_file` not provided, randomizing a file name.");
                 let mut path: PathBuf = PathBuf::from(randomize_file_name());
                 path.set_extension("flf");
+                info!("Output file name is: {}", path.to_str().unwrap());
                 path
             }
         };
+
+        let writer: Box<dyn Writer> = writer_from_file_extension(output_file);
 
         Ok(Mocker {
             schema,
             n_threads,
             n_rows,
             multithreaded,
-            output_file,
+            writer,
         })
     }
 }
@@ -161,11 +187,71 @@ impl MockerBuilder {
 ///
 impl Mocker {
 
-    ///
+    /// Create a new instance of a [`MockerBuilder`] struct with default values.
     pub fn builder() -> MockerBuilder {
         MockerBuilder { ..Default::default() }
     }
 
+    /// Start generating mocked data rows based on the provided struct fields.
+    /// Checks if the user wants to use multithreading and how many rows they
+    /// intend to generate. If the number of desired rows to generate is less 
+    /// than [`MIN_NUM_ROWS_FOR_MULTITHREADING`] then the program will run in
+    /// single thread mode instead. Employing multithreading when generating
+    /// a few number of rows introduces much more computational overhead than
+    /// necessary, so it is much more efficient to run in a single thread.
+    pub fn generate(&mut self) {
+        if self.n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING  && self.multithreaded {
+            self.generate_multithreaded();
+        } else {
+            if self.multithreaded {
+                warn!(
+                    "You specified to use {} threads, but you only want to mock {} rows.",
+                    self.n_threads,
+                    self.n_rows,
+                );
+                warn!("This is done more efficiently single-threaded, ignoring multithreading!");
+            }
+            self.generate_single_thread();
+        }
+    }
+
+    fn generate_multithreaded(&self) {
+        todo!();
+    }
+
+    fn generate_single_thread(&mut self) {
+        let row_len = self.schema.row_len();
+        let buffer_size: usize = 
+            MOCKER_ROW_BUFFER_SIZE * row_len
+            + MOCKER_ROW_BUFFER_SIZE * NUM_CHARS_FOR_NEWLINE;
+
+        let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
+        let mut rng: ThreadRng = rand::thread_rng();
+
+        for row_idx in 0..self.n_rows {
+            if (row_idx % MOCKER_ROW_BUFFER_SIZE == 0) && (row_idx != 0) {
+                self.writer.write(&buffer);
+                buffer.clear();
+            }
+
+            for column in self.schema.iter() {
+                pad_and_push_to_buffer(
+                    column.mock(&mut rng).as_bytes(),
+                    column.length(),
+                    Alignment::Right,
+                    Symbol::Whitespace,
+                    &mut buffer,
+                );
+            }
+
+            buffer.extend_from_slice(newline().as_bytes());
+        }
+
+        // Write any remaining contents of the buffer to file.
+        self.writer.write(&buffer);
+    }
+
+    /*
     ///
     pub fn generate(&self) {
         if self.multithreaded && self.n_rows > DEFAULT_MIN_N_ROWS_FOR_MULTITHREADING {
@@ -181,52 +267,10 @@ impl Mocker {
             self.generate_single_threaded(self.n_rows);
         }
     }
+    */
+}
 
-    ///
-    fn generate_single_threaded(&self, n_rows: usize) {
-        let rowlen: usize = self.schema.row_len();
-        let buffer_size: usize = DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * NUM_CHARS_FOR_NEWLINE;
-        let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
-
-        let mut file = OpenOptions::new()
-            .create_new(true)
-            .append(true)
-            .open(&self.output_file)
-            .expect("Could not open target file!");
-
-        info!(
-            "Writing to output file: {}",
-            self.output_file
-                .to_str()
-                .expect("Could not get string slice from PathBuf."),
-        );
-
-        let mut rng: ThreadRng = rand::thread_rng();
-
-        for row in 0..n_rows {
-            if row % DEFAULT_ROW_BUFFER_LEN == 0 && row != 0 {
-                file.write_all(&buffer).expect("Bad buffer, write failed!");
-                // Instead of reallocating the memory using Vec::with_capacity(buffer_size)
-                // we use the same allocated memory and simply remove all values.
-                buffer.clear();
-            }
-
-            for col in self.schema.iter() {
-                pad_and_push_to_buffer(
-                    col.mock(&mut rng).expect("Could not mock for dtype.").as_bytes(),
-                    col.length(),
-                    Alignment::Right,
-                    Symbol::Whitespace,
-                    &mut buffer,
-                );
-            }
-            buffer.extend_from_slice(newline().as_bytes());
-        }
-
-        // Write the remaining contents of the buffer to file.
-        file.write_all(&buffer).expect("Bad buffer, write failed!");
-    }
-
+/*
     ///
     fn generate_multithreaded(&self, n_rows: usize) {
         let thread_workload = self.distribute_thread_workload(n_rows);
@@ -357,15 +401,4 @@ pub fn spawn_master(channel: &channel::Receiver<Vec<u8>>, output_file: PathBuf) 
             .expect("Got bad buffer from thread, write failed!");
     }
 }
-
-// Depending on the target os we need specific handling of newlines.
-// https://doc.rust-lang.org/reference/conditional-compilation.html
-#[cfg(target_os = "windows")]
-fn newline<'a>() -> &'a str {
-    "\r\n"
-}
-#[cfg(not(target_os = "windows"))]
-fn newline<'a>() -> &'a str {
-    "\n"
-}
-
+*/

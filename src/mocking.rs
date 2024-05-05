@@ -29,7 +29,9 @@ use rand::distributions::{Alphanumeric, DistString};
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
-use crate::mocker::DEFAULT_MOCKED_FILENAME_LEN;
+pub(crate) static MOCKED_FILENAME_LEN: usize = 8;
+pub(crate) static MOCKED_FLOAT_SIZE: f32 = 1_000.0;
+pub(crate) static MOCKED_INTEGER_SIZE: i32 = 1_000;
 
 ///
 pub fn randomize_file_name() -> String {
@@ -37,28 +39,29 @@ pub fn randomize_file_name() -> String {
     path_name.push('_');
     path_name.push_str(
         Alphanumeric
-            .sample_string(&mut rand::thread_rng(), DEFAULT_MOCKED_FILENAME_LEN)
+            .sample_string(&mut rand::thread_rng(), MOCKED_FILENAME_LEN)
             .as_str(),
     );
     path_name
 }
 
-///
+/// Randomly generate a String `true` or `false` with exactly
+/// 50% chance of either, sampled from a Bernoulli distribution.
 pub fn mock_bool<'a> (rng: &'a mut ThreadRng) -> String {
     rng.gen_bool(0.5).to_string()
 }
 
-///
+/// Uniformly sample a floating point number from a range and return it as a String.
 pub fn mock_float<'a>(rng: &'a mut ThreadRng) -> String {
-    rng.gen_range(-1_000.0..=1_000.0).to_string()
+    rng.gen_range(-MOCKED_FLOAT_SIZE..=MOCKED_FLOAT_SIZE).to_string()
 }
 
-///
+/// Uniformly sample an integer number from a range and return it as a String.
 pub fn mock_integer(rng: &mut ThreadRng) -> String {
-    rng.gen_range(-1_000..=1_000).to_string()
+    rng.gen_range(-MOCKED_INTEGER_SIZE..=MOCKED_INTEGER_SIZE).to_string()
 }
 
-///
+/// Uniformly sample from ASCII characters and numbers to create a String with length `len`.
 pub fn mock_string(len: usize, rng: &mut ThreadRng) -> String {
     Alphanumeric.sample_string(rng, len)
 }

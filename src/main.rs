@@ -30,11 +30,14 @@ use log::{debug, error, info};
 
 mod cli;
 mod converter;
+mod defaults;
 mod error;
 mod logger;
 mod mocker;
 mod mocking;
 mod schema;
+mod threads;
+mod writer;
 
 use cli::Cli;
 

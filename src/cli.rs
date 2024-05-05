@@ -22,16 +22,17 @@
 * SOFTWARE.
 *
 * File created: 2024-02-05
-* Last updated: 2024-02-27
+* Last updated: 2024-05-05
 */
 
 use clap::{value_parser, ArgAction, Parser, Subcommand};
-use log::{info, warn};
+use log::info;
 use std::path::PathBuf;
 
-use crate::{converter, error};
+use crate::error::ExecutionError;
 use crate::mocker::Mocker;
 use crate::schema::FixedSchema;
+use crate::threads::get_available_threads;
 
 #[derive(Parser)]
 #[command(
@@ -88,8 +89,25 @@ enum Commands {
             long = "schema",
             value_name = "SCHEMA",
             action = ArgAction::Set,
+            required = true,
         )]
         schema: PathBuf,
+
+        /*
+        /// Specify how to write mocked data to disk.
+        #[arg(
+            short = 'w',
+            long = "writer",
+            value_name = "WRITER",
+            action = ArgAction::Set,
+            value_parser = PossibleValuesParser::new([
+                 "flf",
+                 "arrow",
+            ]),
+            required = true,
+        )]
+        writer: String,
+        */
 
         /// Specify output (target) file name.
         #[arg(
@@ -97,6 +115,7 @@ enum Commands {
             long = "output-file",
             value_name = "OUTPUT-FILE",
             action = ArgAction::Set,
+            required = false,
         )]
         output_file: Option<PathBuf>,
 
@@ -105,34 +124,15 @@ enum Commands {
             short = 'n',
             long = "n-rows",
             value_name = "NUM-ROWS",
-            default_value = "100"
+            default_value = "100",
+            required = false,
         )]
         n_rows: Option<usize>,
     },
 }
 
-fn get_available_threads(n_wanted_threads: usize) -> usize {
-    let n_logical_threads: usize = num_cpus::get();
-
-    if n_wanted_threads > n_logical_threads {
-        warn!(
-            "You specified to use {} threads, but your CPU only has {} logical threads.",
-            n_wanted_threads, n_logical_threads,
-        );
-        info!(
-            "Will use all available logical threads ({}).",
-            n_logical_threads,
-        );
-        return n_logical_threads;
-    };
-
-    info!("Executing using {} logical threads.", n_wanted_threads);
-
-    n_wanted_threads
-}
-
 impl Cli {
-    pub fn run(&self) -> Result<(), error::ExecutionError> {
+    pub fn run(&self) -> Result<(), ExecutionError> {
         let n_threads: usize = get_available_threads(self.n_threads);
 
         let multithreaded: bool = n_threads > 1;
