@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2024-02-05
-* Last updated: 2024-02-27
+* Last updated: 2024-05-05
 */
 
 use crate::schema::{self, FixedSchema};
@@ -50,7 +50,7 @@ pub(crate) static DEFAULT_ROW_BUFFER_LEN: usize = 1024;
 ///
 pub struct Mocker {
     schema: schema::FixedSchema,
-    target_file: Option<PathBuf>,
+    output_file: PathBuf,
     n_threads: usize,
     multithreaded: bool,
 }
@@ -60,12 +60,26 @@ impl Mocker {
     ///
     pub fn new(
         schema: schema::FixedSchema,
-        target_file: Option<PathBuf>,
+        output_file: Option<PathBuf>,
         n_threads: usize,
     ) -> Self {
+
+        // Randomize the filename of the mocked data if user did
+        // not provide it to the CLI.
+        let output_file = match output_file {
+            Some(p) => p,
+            None => {
+                let mut path = PathBuf::from(randomize_file_name());
+                path.set_extension("flf");
+                path
+            }
+        };
+
+        info!("this is the output file: {:?}", output_file);
+
         Self {
             schema,
-            target_file,
+            output_file,
             n_threads,
             multithreaded: n_threads > 1,
         }
@@ -95,16 +109,13 @@ impl Mocker {
         let buffer_size: usize = DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 1;
         let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
 
-        let mut path: PathBuf = PathBuf::from(randomize_file_name());
-        path.set_extension("flf");
-
         let mut file = OpenOptions::new()
             .create_new(true)
             .append(true)
-            .open(&path)
+            .open(&self.output_file)
             .expect("Could not open target file!");
 
-        info!("Writing to target file: {}", path.to_str().unwrap());
+        info!("Writing to target file: {}", self.output_file.to_str().unwrap());
         for row in 0..n_rows {
             if row % DEFAULT_ROW_BUFFER_LEN == 0 && row != 0 {
                 file.write_all(&buffer).expect("Bad buffer, write failed!");
@@ -136,7 +147,7 @@ impl Mocker {
             thread_workload,
             self.schema.to_owned(),
             self.n_threads,
-            self.target_file.clone(),
+            self.output_file.clone(),
         );
     }
 
@@ -164,10 +175,10 @@ pub fn threaded_mock(
     thread_workload: Vec<usize>,
     schema: FixedSchema,
     n_threads: usize,
-    target_file: Option<PathBuf>,
+    output_file: PathBuf,
 ) {
     let (thread_handles, receiver) = spawn_workers(n_rows, thread_workload, schema, n_threads);
-    spawn_master(&receiver, target_file);
+    spawn_master(&receiver, output_file);
 
     for handle in thread_handles {
         handle.join().expect("Could not join thread handle!");
@@ -243,23 +254,14 @@ pub fn spawn_workers(
     (threads, receiver)
 }
 
-pub fn spawn_master(channel: &channel::Receiver<Vec<u8>>, target_file: Option<PathBuf>) {
-    let path = match target_file {
-        Some(p) => p,
-        None => {
-            let mut path = PathBuf::from(randomize_file_name());
-            path.set_extension("flf");
-            path
-        }
-    };
-
+pub fn spawn_master(channel: &channel::Receiver<Vec<u8>>, output_file: PathBuf) {
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open(&path)
+        .open(&output_file)
         .expect("Could not open target file!");
 
-    info!("Writing to target file: {}", path.to_str().unwrap());
+    info!("Writing to target file: {}", output_file.to_str().unwrap());
     for buff in channel {
         file.write_all(&buff)
             .expect("Got bad buffer from thread, write failed!");
