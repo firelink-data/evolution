@@ -25,17 +25,20 @@
 * Last updated: 2024-05-05
 */
 
-use crate::schema::{self, FixedSchema};
 use crossbeam::channel;
-use log::{info, warn};
+use log::{error, info, warn};
 use padder::*;
 use rand::distributions::{Alphanumeric, DistString};
+
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::{thread, usize};
+
+use crate::error::ExecutionError;
+use crate::schema::FixedSchema;
 
 // This default value should depend on the memory capacity of the system
 // running the program. Because the workers produce buffers faster than
@@ -47,57 +50,129 @@ pub(crate) static DEFAULT_MIN_N_ROWS_FOR_MULTITHREADING: usize = 1000;
 pub(crate) static DEFAULT_MOCKED_FILENAME_LEN: usize = 8;
 pub(crate) static DEFAULT_ROW_BUFFER_LEN: usize = 1024;
 
+#[derive(Debug, Default)]
 ///
 pub struct Mocker {
-    schema: schema::FixedSchema,
-    output_file: PathBuf,
+    schema: FixedSchema,
+    n_rows: usize,
     n_threads: usize,
     multithreaded: bool,
+    output_file: PathBuf,
 }
 
+#[derive(Debug, Default)]
 ///
-impl Mocker {
-    ///
-    pub fn new(
-        schema: schema::FixedSchema,
-        output_file: Option<PathBuf>,
-        n_threads: usize,
-    ) -> Self {
+pub struct MockerBuilder {
+    schema: Option<FixedSchema>,
+    n_rows: Option<usize>,
+    n_threads: Option<usize>,
+    multithreaded: Option<bool>,
+    output_file: Option<PathBuf>,
+}
 
-        // Randomize the filename of the mocked data if user did
-        // not provide it to the CLI.
-        let output_file = match output_file {
-            Some(p) => p,
+impl MockerBuilder {
+    ///
+    pub fn schema(mut self, schema: FixedSchema) -> Self {
+        self.schema = Some(schema);
+        self
+    }
+
+    ///
+    pub fn num_rows(mut self, n_rows: usize) -> Self {
+        self.n_rows = Some(n_rows);
+        self
+    }
+
+    ///
+    pub fn num_threads(mut self, n_threads: usize) -> Self {
+        let multithreaded = n_threads > 1;
+        self.n_threads = Some(n_threads);
+        self.multithreaded = Some(multithreaded);
+        self
+    }
+
+    ///
+    pub fn output_file(mut self, output_file: Option<PathBuf>) -> Self {
+        self.output_file = output_file;
+        self
+    }
+
+    ///
+    pub fn build(self) -> Result<Mocker, ExecutionError> {
+
+        let schema = match self.schema {
+            Some(s) => s,
             None => {
-                let mut path = PathBuf::from(randomize_file_name());
+                error!("Required field `schema` not provided, exiting...");
+                return Err(ExecutionError);
+            },
+        };
+
+        let n_rows = match self.n_rows {
+            Some(n) => n,
+            None => {
+                error!("Required field `n_rows` not provided, exiting...");
+                return Err(ExecutionError);
+            }
+        };
+
+        let n_threads = match self.n_threads {
+            Some(n) => n,
+            None => {
+                error!("Required field `n_threads` not provided, exiting...");
+                return Err(ExecutionError);
+            },
+        };
+
+        let multithreaded = match self.multithreaded {
+            Some(m) => m,
+            None => {
+                error!("Required field `multithreaded` not provided, exiting...");
+                return Err(ExecutionError);
+            },
+        };
+
+        let output_file = match self.output_file {
+            Some(o) => o,
+            None => {
+                info!("Optional field `output_file` not provided, randomizing a file name.");
+                let mut path: PathBuf = PathBuf::from(randomize_file_name());
                 path.set_extension("flf");
                 path
             }
         };
 
-        info!("this is the output file: {:?}", output_file);
-
-        Self {
+        Ok(Mocker {
             schema,
-            output_file,
             n_threads,
-            multithreaded: n_threads > 1,
-        }
+            n_rows,
+            multithreaded,
+            output_file,
+        })
+    }
+}
+
+///
+impl Mocker {
+
+    ///
+    pub fn builder() -> MockerBuilder {
+        MockerBuilder { ..Default::default() }
     }
 
     ///
-    pub fn generate(&self, n_rows: usize) {
-        if self.multithreaded && n_rows > DEFAULT_MIN_N_ROWS_FOR_MULTITHREADING {
-            self.generate_multithreaded(n_rows);
+    pub fn generate(&self) {
+        if self.multithreaded && self.n_rows > DEFAULT_MIN_N_ROWS_FOR_MULTITHREADING {
+            self.generate_multithreaded(self.n_rows);
         } else {
             if self.multithreaded {
                 warn!(
                     "You specified to use multithreading but only want to mock {} rows",
-                    n_rows
+                    self.n_rows
                 );
                 warn!("This is done more efficiently single-threaded, ignoring multithreading...");
             }
-            self.generate_single_threaded(n_rows);
+            self.generate_single_threaded(self.n_rows);
         }
     }
 
@@ -115,7 +190,7 @@ impl Mocker {
             .open(&self.output_file)
             .expect("Could not open target file!");
 
-        info!("Writing to target file: {}", self.output_file.to_str().unwrap());
+        info!("Writing to output file: {}", self.output_file.to_str().unwrap());
         for row in 0..n_rows {
             if row % DEFAULT_ROW_BUFFER_LEN == 0 && row != 0 {
                 file.write_all(&buffer).expect("Bad buffer, write failed!");
@@ -259,9 +334,9 @@ pub fn spawn_master(channel: &channel::Receiver<Vec<u8>>, output_file: PathBuf) 
         .create(true)
         .append(true)
         .open(&output_file)
-        .expect("Could not open target file!");
+        .expect("Could not open output file!");
 
-    info!("Writing to target file: {}", output_file.to_str().unwrap());
+    info!("Writing to output file: {}", output_file.to_str().unwrap());
     for buff in channel {
         file.write_all(&buff)
             .expect("Got bad buffer from thread, write failed!");

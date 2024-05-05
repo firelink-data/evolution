@@ -29,7 +29,9 @@ use clap::{value_parser, ArgAction, Parser, Subcommand};
 use log::{info, warn};
 use std::path::PathBuf;
 
-use crate::{converter, error, mocker, schema};
+use crate::{converter, error};
+use crate::mocker::Mocker;
+use crate::schema::FixedSchema;
 
 #[derive(Parser)]
 #[command(
@@ -89,14 +91,14 @@ enum Commands {
         )]
         schema: PathBuf,
 
-        /// Specify target (output) file name.
+        /// Specify output (target) file name.
         #[arg(
-            short = 't',
-            long = "target-file",
-            value_name = "TARGET-FILE",
+            short = 'o',
+            long = "output-file",
+            value_name = "OUTPUT-FILE",
             action = ArgAction::Set,
         )]
-        target_file: Option<PathBuf>,
+        output_file: Option<PathBuf>,
 
         /// Set the number of rows to generate.
         #[arg(
@@ -124,7 +126,7 @@ fn get_available_threads(n_wanted_threads: usize) -> usize {
         return n_logical_threads;
     };
 
-    info!("Executing using {} logical threads.", n_wanted_threads,);
+    info!("Executing using {} logical threads.", n_wanted_threads);
 
     n_wanted_threads
 }
@@ -135,37 +137,45 @@ impl Cli {
 
         let multithreaded: bool = n_threads > 1;
         if multithreaded {
-            info!("Multithreading enabled!")
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(n_threads)
+                .build_global()
+                .expect("Could not create Rayon thread pool!");
+            info!("Multithreading enabled!");
         };
-
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(n_threads)
-            .build_global()
-            .expect("Could not create Rayon thread pool!");
 
         match &self.command {
             Commands::Convert {
                 file,
                 schema,
             } => {
+                /*
                 converter::Converter::new(
                     file.to_owned(),
                     schema::FixedSchema::from_path(schema.to_owned()),
                     n_threads,
                 )
                 .convert();
+                */
+
             },
             Commands::Mock {
                 schema,
-                target_file,
                 n_rows,
+                output_file,
             } => {
-                mocker::Mocker::new(
-                    schema::FixedSchema::from_path(schema.to_owned()),
-                    target_file.to_owned(),
-                    n_threads,
-                )
-                .generate(n_rows.unwrap());
+
+                let schema = FixedSchema::from_path(schema.to_owned());
+                let n_rows = n_rows.expect("Could not parse n_rows from CLI.");
+                let output_file = output_file.to_owned();
+
+                Mocker::builder()
+                    .schema(schema)
+                    .num_rows(n_rows)
+                    .num_threads(n_threads)
+                    .output_file(output_file)
+                    .build()?
+                    .generate();
             }
         }
 

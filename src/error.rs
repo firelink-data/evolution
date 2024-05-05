@@ -22,8 +22,16 @@
 * SOFTWARE.
 *
 * File created: 2024-02-05
-* Last updated: 2024-02-05
+* Last updated: 2024-05-05
 */
 
+use std::fmt;
+
 #[derive(Debug)]
-pub struct ExecutionError {}
+pub struct ExecutionError;
+
+impl fmt::Display for ExecutionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Execution failed, please refer to the stack-trace for debugging.")
+    }
+}

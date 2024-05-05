@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2023-11-25
-* Last updated: 2024-05-03
+* Last updated: 2024-05-05
 */
 
 use arrow::array::{BooleanBuilder, Float16Builder, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, StringBuilder};
@@ -33,7 +33,6 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::{fs, io};
 
-use crate::builder::{ColumnBuilder, BooleanBuilderHandler, Float16BuilderHandler, Float32BuilderHandler, Float64BuilderHandler, Int16BuilderHandler, Int32BuilderHandler, Int64BuilderHandler, StringBuilderHandler};
 use crate::mocker;
 
 ///
@@ -127,25 +126,6 @@ impl FixedColumn {
             ))),
         }
     }
-    
-    ///
-    pub fn as_column_builder(&self) -> Box<dyn ColumnBuilder + '_> {
-        match self.dtype.as_str() {
-            "bool" => Box::new(BooleanBuilderHandler { builder: BooleanBuilder::new(), runes: self.length(), name: self.name().as_str() }),
-            "boolean" => Box::new(BooleanBuilderHandler { builder: BooleanBuilder::new(), runes: self.length(), name: self.name().as_str() }),
-            "i16" => Box::new(Int16BuilderHandler { builder: Int16Builder::new(), runes: self.length(), name: self.name().as_str() }),
-            "i32" => Box::new(Int32BuilderHandler { builder: Int32Builder::new(), runes: self.length(), name: self.name().as_str() }),
-            "i64" => Box::new(Int64BuilderHandler { builder: Int64Builder::new(), runes: self.length(), name: self.name().as_str() }),
-            "f16" => Box::new(Float16BuilderHandler { builder: Float16Builder::new(), runes: self.length(), name: self.name().as_str() }),
-            "f32" => Box::new(Float32BuilderHandler { builder: Float32Builder::new(), runes: self.length(), name: self.name().as_str() }),
-            "f64" => Box::new(Float64BuilderHandler { builder: Float64Builder::new(), runes: self.length(), name: self.name().as_str() }),
-            "utf8" => Box::new(StringBuilderHandler { builder: StringBuilder::new(), runes: self.length(), name: self.name().as_str() }),
-            "string" => Box::new(StringBuilderHandler { builder: StringBuilder::new(), runes: self.length(), name: self.name().as_str() }),
-            "lutf8" => Box::new(StringBuilderHandler { builder: StringBuilder::new(), runes: self.length(), name: self.name().as_str() }),
-            "lstring" => Box::new(StringBuilderHandler { builder: StringBuilder::new(), runes: self.length(), name: self.name().as_str() }),
-            _ => panic!("Could not find matching FixedColumn dtype when creating ColumnBuilder!"),
-        }
-    }
 }
 
 ///
@@ -173,7 +153,7 @@ impl FixedColumn {
 }
 
 ///
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
 pub struct FixedSchema {
     name: String,
     version: i32,
