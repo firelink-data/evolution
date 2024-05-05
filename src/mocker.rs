@@ -28,7 +28,7 @@
 use crossbeam::channel;
 use log::{error, info, warn};
 use padder::*;
-use rand::distributions::{Alphanumeric, DistString};
+use rand::rngs::ThreadRng;
 
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -38,6 +38,7 @@ use std::thread::JoinHandle;
 use std::{thread, usize};
 
 use crate::error::ExecutionError;
+use crate::mocking::randomize_file_name;
 use crate::schema::FixedSchema;
 
 // This default value should depend on the memory capacity of the system
@@ -50,9 +51,14 @@ pub(crate) static DEFAULT_MIN_N_ROWS_FOR_MULTITHREADING: usize = 1000;
 pub(crate) static DEFAULT_MOCKED_FILENAME_LEN: usize = 8;
 pub(crate) static DEFAULT_ROW_BUFFER_LEN: usize = 1024;
 
+#[cfg(target_os = "windows")]
+static NUM_CHARS_FOR_NEWLINE: usize = 2;
+#[cfg(not(target_os = "windows"))]
+static NUM_CHARS_FOR_NEWLINE: usize = 1;
+
 #[derive(Debug, Default)]
 ///
-pub struct Mocker {
+pub(crate) struct Mocker {
     schema: FixedSchema,
     n_rows: usize,
     n_threads: usize,
@@ -62,7 +68,7 @@ pub struct Mocker {
 
 #[derive(Debug, Default)]
 ///
-pub struct MockerBuilder {
+pub(crate) struct MockerBuilder {
     schema: Option<FixedSchema>,
     n_rows: Option<usize>,
     n_threads: Option<usize>,
@@ -167,10 +173,10 @@ impl Mocker {
         } else {
             if self.multithreaded {
                 warn!(
-                    "You specified to use multithreading but only want to mock {} rows",
+                    "You specified to use multithreading but only want to mock {} rows.",
                     self.n_rows
                 );
-                warn!("This is done more efficiently single-threaded, ignoring multithreading...");
+                warn!("This is done more efficiently single-threaded, ignoring multithreading.");
             }
             self.generate_single_threaded(self.n_rows);
         }
@@ -179,9 +185,7 @@ impl Mocker {
     ///
     fn generate_single_threaded(&self, n_rows: usize) {
         let rowlen: usize = self.schema.row_len();
-        // FOR WINDOWS: We need to add 2 bytes for each row because of "\r\n" (CR-LF)
-        // FOR UNIX: We need to add 1 bytes for each row because of "\n" (LF)
-        let buffer_size: usize = DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 1;
+        let buffer_size: usize = DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * NUM_CHARS_FOR_NEWLINE;
         let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
 
         let mut file = OpenOptions::new()
@@ -190,24 +194,33 @@ impl Mocker {
             .open(&self.output_file)
             .expect("Could not open target file!");
 
-        info!("Writing to output file: {}", self.output_file.to_str().unwrap());
+        info!(
+            "Writing to output file: {}",
+            self.output_file
+                .to_str()
+                .expect("Could not get string slice from PathBuf."),
+        );
+
+        let mut rng: ThreadRng = rand::thread_rng();
+
         for row in 0..n_rows {
             if row % DEFAULT_ROW_BUFFER_LEN == 0 && row != 0 {
                 file.write_all(&buffer).expect("Bad buffer, write failed!");
-                // Here maybe we should just use the same allocated memory?, but overwrite it..
-                // Because re-allocation is slow (::with_capacity will re-allocate on heap).
-                buffer.clear();  // Vec::with_capacity(buffer_size);
+                // Instead of reallocating the memory using Vec::with_capacity(buffer_size)
+                // we use the same allocated memory and simply remove all values.
+                buffer.clear();
             }
+
             for col in self.schema.iter() {
                 pad_and_push_to_buffer(
-                    col.mock().unwrap().as_bytes().to_vec(),
+                    col.mock(&mut rng).expect("Could not mock for dtype.").as_bytes(),
                     col.length(),
                     Alignment::Right,
                     Symbol::Whitespace,
                     &mut buffer,
                 );
             }
-            buffer.extend_from_slice("\n".as_bytes());
+            buffer.extend_from_slice(newline().as_bytes());
         }
 
         // Write the remaining contents of the buffer to file.
@@ -271,6 +284,7 @@ pub fn worker_thread_mock(
     // We need to add 2 bytes for each row because of "\r\n"
     let buffer_size: usize = DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2;
     let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
+    let mut rng: ThreadRng = rand::thread_rng();
 
     for row in 0..n_rows {
         if row % DEFAULT_ROW_BUFFER_LEN == 0 && row != 0 {
@@ -281,9 +295,10 @@ pub fn worker_thread_mock(
             // Because re-allocation is slow (::with_capacity will re-allocate on heap).
             buffer = Vec::with_capacity(buffer_size);
         }
+
         for col in schema.iter() {
             pad_and_push_to_buffer(
-                col.mock().unwrap().as_bytes().to_vec(),
+                col.mock(&mut rng).unwrap().as_bytes().to_vec(),
                 col.length(),
                 Alignment::Right,
                 Symbol::Whitespace,
@@ -343,28 +358,14 @@ pub fn spawn_master(channel: &channel::Receiver<Vec<u8>>, output_file: PathBuf) 
     }
 }
 
-pub fn randomize_file_name() -> String {
-    let mut path_name: String = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
-    path_name.push('_');
-    path_name.push_str(
-        Alphanumeric
-            .sample_string(&mut rand::thread_rng(), DEFAULT_MOCKED_FILENAME_LEN)
-            .as_str(),
-    );
-    path_name
+// Depending on the target os we need specific handling of newlines.
+// https://doc.rust-lang.org/reference/conditional-compilation.html
+#[cfg(target_os = "windows")]
+fn newline<'a>() -> &'a str {
+    "\r\n"
+}
+#[cfg(not(target_os = "windows"))]
+fn newline<'a>() -> &'a str {
+    "\n"
 }
 
-pub(crate) fn mock_bool<'a>(len: usize) -> &'a str {
-    if len > 3 {
-        return "true";
-    }
-    "false"
-}
-
-pub(crate) fn mock_number<'a>(_len: usize) -> &'a str {
-    "3"
-}
-
-pub(crate) fn mock_string<'a>(_len: usize) -> &'a str {
-    "hejj"
-}

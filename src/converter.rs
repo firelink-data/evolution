@@ -22,10 +22,9 @@
 * SOFTWARE.
 *
 * File created: 2024-02-17
-* Last updated: 2024-05-03
+* Last updated: 2024-05-05
 */
 
-use crate::builder::ColumnBuilder;
 use crate::schema::FixedSchema;
 
 use arrow::array::ArrayRef;
@@ -168,6 +167,15 @@ impl Converter {
     }
 }
 
+pub fn spawn_convert_threads(
+    slices: &Vec<&[u8]>,
+    thread_workloads: &Vec<&[usize]>,
+    schema: FixedSchema,
+) {
+    todo!();
+}
+
+/*
 ///
 pub fn spawn_convert_threads(
     slices: &Vec<&[u8]>,
@@ -287,6 +295,7 @@ pub fn worker_thread_convert<'a>(
             .expect("Could not send ColumnBuilder output from worker thread to channel!");
     }
 }
+*/
 
 #[allow(dead_code)]
 /// On windows systems line breaks in files are represented by "\r\n",

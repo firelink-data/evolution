@@ -25,15 +25,15 @@
 * Last updated: 2024-05-05
 */
 
-use arrow::array::{BooleanBuilder, Float16Builder, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, StringBuilder};
 use arrow2::datatypes::{DataType, Field, Schema};
 use arrow2::error::Error;
+use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
 
 use std::path::PathBuf;
 use std::{fs, io};
 
-use crate::mocker;
+use crate::mocking::{mock_bool, mock_float, mock_integer, mock_string};
 
 ///
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
@@ -121,7 +121,7 @@ impl FixedColumn {
             "lutf8" => Ok(DataType::LargeUtf8),
             "lstring" => Ok(DataType::LargeUtf8),
             _ => Err(Error::ExternalFormat(format!(
-                "Could not parse json schema dtype to arrow datatype, dtype: {:?}",
+                "Could not parse json schema dtype to arrow datatype, dtype: {:?}.",
                 self.dtype,
             ))),
         }
@@ -130,22 +130,24 @@ impl FixedColumn {
 
 ///
 impl FixedColumn {
-    pub fn mock<'a>(&self) -> Result<&'a str, Error> {
-        // TODO: properly mock the different datatypes!
+    pub fn mock<'a>(&self, rng: &'a mut ThreadRng) -> Result<String, Error> {
         let string = match self.dtype.as_str() {
-            "bool" => mocker::mock_bool(std::cmp::max(self.length, 0)),
-            "boolean" => mocker::mock_bool(std::cmp::max(self.length, 0)),
-            "i16" => mocker::mock_number(std::cmp::max(self.length, 0)),
-            "i32" => mocker::mock_number(std::cmp::max(self.length, 0)),
-            "i64" => mocker::mock_number(std::cmp::max(self.length, 0)),
-            "f16" => mocker::mock_number(std::cmp::max(self.length, 0)),
-            "f32" => mocker::mock_number(std::cmp::max(self.length, 0)),
-            "f64" => mocker::mock_number(std::cmp::max(self.length, 0)),
-            "utf8" => mocker::mock_string(std::cmp::max(self.length, 0)),
-            "string" => mocker::mock_string(std::cmp::max(self.length, 0)),
-            "lutf8" => mocker::mock_string(std::cmp::max(self.length, 0)),
-            "lstring" => mocker::mock_string(std::cmp::max(self.length, 0)),
-            _ => return Err(Error::ExternalFormat("xd".to_string())),
+            "bool" => mock_bool(rng),
+            "boolean" => mock_bool(rng),
+            "i16" => mock_integer(rng),
+            "i32" => mock_integer(rng),
+            "i64" => mock_integer(rng),
+            "f16" => mock_float(rng),
+            "f32" => mock_float(rng),
+            "f64" => mock_float(rng),
+            "utf8" => mock_string(self.length, rng),
+            "string" => mock_string(self.length, rng),
+            "lutf8" => mock_string(self.length, rng),
+            "lstring" => mock_string(self.length, rng),
+            _ => return Err(Error::ExternalFormat(format!(
+                "Could not find valid dtype for column, dtype: {:?}.",
+                self.dtype,
+            ))),
         };
 
         Ok(string)

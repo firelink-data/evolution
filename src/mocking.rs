@@ -21,34 +21,45 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 * SOFTWARE.
 *
-* File created: 2023-11-21
+* File created: 2024-05-05
 * Last updated: 2024-05-05
 */
 
-use clap::Parser;
-use log::{debug, error, info};
+use rand::distributions::{Alphanumeric, DistString};
+use rand::rngs::ThreadRng;
+use rand::Rng;
 
-mod cli;
-mod converter;
-mod error;
-mod logger;
-mod mocker;
-mod mocking;
-mod schema;
-
-use cli::Cli;
+use crate::mocker::DEFAULT_MOCKED_FILENAME_LEN;
 
 ///
-fn main() {
-    let cli = Cli::parse();
-
-    match logger::setup_log() {
-        Ok(_) => debug!("Logging setup, ok!"),
-        Err(e) => error!("Could not set up env logging: {:?}", e),
-    };
-
-    match cli.run() {
-        Ok(_) => info!("All done! Bye."),
-        Err(e) => error!("Something went wrong during execution: {:?}", e),
-    }
+pub fn randomize_file_name() -> String {
+    let mut path_name: String = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
+    path_name.push('_');
+    path_name.push_str(
+        Alphanumeric
+            .sample_string(&mut rand::thread_rng(), DEFAULT_MOCKED_FILENAME_LEN)
+            .as_str(),
+    );
+    path_name
 }
+
+///
+pub fn mock_bool<'a> (rng: &'a mut ThreadRng) -> String {
+    rng.gen_bool(0.5).to_string()
+}
+
+///
+pub fn mock_float<'a>(rng: &'a mut ThreadRng) -> String {
+    rng.gen_range(-1_000.0..=1_000.0).to_string()
+}
+
+///
+pub fn mock_integer(rng: &mut ThreadRng) -> String {
+    rng.gen_range(-1_000..=1_000).to_string()
+}
+
+///
+pub fn mock_string(len: usize, rng: &mut ThreadRng) -> String {
+    Alphanumeric.sample_string(rng, len)
+}
+
