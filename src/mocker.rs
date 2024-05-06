@@ -29,9 +29,13 @@ use crossbeam::channel;
 use log::{error, info, warn};
 use padder::*;
 use rand::rngs::ThreadRng;
-use rayon::prelude::*;
+#[cfg(feature = "rayon")]
+use rayon::iter::*;
 
 use std::path::PathBuf;
+use std::sync::Arc;
+#[cfg(not(feature = "rayon"))]
+use std::thread::{JoinHandle, spawn};
 
 use crate::error::{Result, SetupError};
 use crate::mocking::randomize_file_name;
@@ -48,14 +52,14 @@ pub(crate) static MIN_NUM_ROWS_FOR_MULTITHREADING: usize = 1024;
 /// If the channel buffer grows to this size, incoming messages will be held until
 /// previous messages have been consumed. Increasing this variable will significantly
 /// increase the amount of system memory allocated by the program.
-pub(crate) static MOCKER_THREAD_CHANNEL_CAPACITY: usize = 1024;
+pub(crate) static MOCKER_THREAD_CHANNEL_CAPACITY: usize = 128;
 
 /// Sets the size of the buffer that the mocker utilizes to store rows of mocked data
 /// before writing to specified location. A smaller number for this variable means that
 /// the program will perform I/O operations more often, which are expensive system calls.
 /// A larger number is advisable, however, the host system must be able to hold all
 /// rows of mocked data in system memory before writing to its location.
-pub(crate) static MOCKER_ROW_BUFFER_SIZE: usize = 2048;
+pub(crate) static MOCKER_BUFFER_NUM_ROWS: usize = 256 * 1024;
 
 #[cfg(target_os = "windows")]
 pub(crate) static NUM_CHARS_FOR_NEWLINE: usize = 2;
@@ -189,14 +193,33 @@ impl MockerBuilder {
             }
         };
 
+        // Here we divide by the number of threads because each thread will allocated 
+        // `MOCKER_BUFFER_NUM_ROWS` amount of memory, meaning, if we are not careful
+        // with the size of this variable then memory allocation might go through the
+        // roof and cause a program crash due to memory overflow and mem-swapping.
         let buffer_size: usize = match self.buffer_size {
-            Some(s) => s,
+            Some(s) => {
+                if n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && multithreaded {
+                    s / (n_threads - 1)
+                } else {
+                    s
+                }
+            },
             None => {
-                info!(
-                    "Optional field `buffer_size` not provided, will use static value MOCKER_ROW_BUFFER_SIZE={}",
-                    MOCKER_ROW_BUFFER_SIZE,
-                );
-                MOCKER_ROW_BUFFER_SIZE
+                if n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && multithreaded {
+                    info!(
+                        "Optional field `buffer_size` not provided, will use static value MOCKER_BUFFER_NUM_ROWS={}",
+                        MOCKER_BUFFER_NUM_ROWS / (n_threads - 1),
+                    );
+                    MOCKER_BUFFER_NUM_ROWS / (n_threads - 1)
+
+                } else {
+                    info!(
+                        "Optional field `buffer_size` not provided, will use static value MOCKER_BUFFER_NUM_ROWS={}",
+                        MOCKER_BUFFER_NUM_ROWS,
+                    );
+                    MOCKER_BUFFER_NUM_ROWS
+                }
             }
         };
 
@@ -263,7 +286,8 @@ impl Mocker {
             .collect::<Vec<usize>>()
     }
 
-    /// Generated mocked data in multithreading mode.
+    /// Generated mocked data in multithreading mode using [`rayon`] and parallel iteration.
+    #[cfg(feature = "rayon")]
     fn generate_multithreaded(&self) {
         // Calculate the workload for each worker thread, if the workload can not evenly
         // be split among the threads, then the last thread will have to take the remainder.
@@ -279,18 +303,72 @@ impl Mocker {
             thread_workloads.len(),
             thread_workloads
         );
+
+
+        let schema = Arc::new(self.schema.clone());
         thread_workloads
             .into_par_iter()
             .enumerate()
             .for_each_with(&sender, |s, (t, workload)| {
-                worker_thread_generate(s.clone(), t, workload, &self.schema, self.buffer_size)
+                let t_schema = Arc::clone(&schema);
+                worker_thread_generate(s.clone(), t, workload, t_schema, self.buffer_size)
             });
 
         drop(sender);
         master_thread_write(reciever, &mut writer);
     }
 
-    // Generated mocked data in single-threaded mode.
+    /// Generate mocked data in multithreading mode using the standard library threads.
+    #[cfg(not(feature = "rayon"))]
+    fn generate_multithreaded(&self) {
+        // Calculate the workload for each worker thread, if the workload can not evenly
+        // be split among the threads, then the last thread will have to take the remainder.
+        let mut thread_workloads: Vec<usize> = self.distribute_thread_workload();
+        let remainder: usize = self.n_rows - thread_workloads.iter().sum::<usize>();
+        thread_workloads.push(remainder);
+
+        let mut writer: Box<dyn Writer> = writer_from_file_extension(&self.output_file);
+        let (sender, reciever) = channel::bounded(self.thread_channel_capacity);
+
+        info!(
+            "Starting {} worker threads with workload: {:?}",
+            thread_workloads.len(),
+            thread_workloads
+        );
+
+        let schema = Arc::new(self.schema.clone());
+        let threads = thread_workloads
+            .into_iter()
+            .enumerate()
+            .map(|(t, t_workload)| {
+                let t_schema = Arc::clone(&schema);
+                let t_sender = sender.clone();
+                let t_buffer_size = self.buffer_size;
+                spawn(move || worker_thread_generate(
+                    t_sender,
+                    t,
+                    t_workload,
+                    t_schema,
+                    t_buffer_size,
+                ))
+            })
+            .collect::<Vec<JoinHandle<()>>>();
+
+        drop(sender);
+        master_thread_write(reciever, &mut writer);
+
+        for handle in threads {
+            handle
+                .join()
+                .expect("Could not join worker thread handle!");
+        }
+    }
+
+    // Generated mocked data in a single-threaded mode and write to disk.
+    // This will never induce any severe bottleneck due to heavy I/O like
+    // the multithreading mode can do. However, single-threaded mode will
+    // be significantly slower when generating the sweet-spot of rows
+    // which do not introduce long thread waiting times due to I/O.
     fn generate_single_thread(&mut self) {
         let row_len = self.schema.row_len();
         let buffer_size: usize =
@@ -320,17 +398,16 @@ impl Mocker {
             buffer.extend_from_slice(newline().as_bytes());
         }
 
-        // Write any remaining contents of the buffer to file.
+        // Write any remaining contents of the buffer to disk.
         writer.write(&buffer);
     }
 }
 
-///
 fn worker_thread_generate(
     channel: channel::Sender<Vec<u8>>,
     thread: usize,
     n_rows: usize,
-    schema: &FixedSchema,
+    schema: Arc<FixedSchema>,
     n_rows_buffer_size: usize,
 ) {
     let row_len: usize = schema.row_len();
@@ -373,7 +450,11 @@ fn worker_thread_generate(
 }
 
 ///
-fn master_thread_write(channel: channel::Receiver<Vec<u8>>, writer: &mut Box<dyn Writer>) {
+fn master_thread_write(
+    channel: channel::Receiver<Vec<u8>>,
+    writer: &mut Box<dyn Writer>,
+) {
+    // Write buffer contents to disk.
     for buffer in channel {
         writer.write(&buffer);
         drop(buffer);
@@ -382,135 +463,3 @@ fn master_thread_write(channel: channel::Receiver<Vec<u8>>, writer: &mut Box<dyn
     info!("Master thread done, cleaning up resources.");
 }
 
-/*
-    ///
-    fn generate_multithreaded(&self, n_rows: usize) {
-        let thread_workload = self.distribute_thread_workload(n_rows);
-        threaded_mock(
-            n_rows,
-            thread_workload,
-            self.schema.to_owned(),
-            self.n_threads,
-            self.output_file.clone(),
-        );
-    }
-
-    /// Calculate how many rows each thread should work on generating.
-    fn distribute_thread_workload(&self, n_rows: usize) -> Vec<usize> {
-        let n_rows_per_thread = n_rows / self.n_threads;
-        (0..self.n_threads)
-            .map(|_| n_rows_per_thread)
-            .collect::<Vec<usize>>()
-    }
-}
-
-/// Worker threads generate mocked data, and pass it to the master thread which writes it
-/// to disk, but maybe this will become bottleneck?
-///
-/// pub struct Arc<T, A = Global>
-/// where
-///     A: Allocator,
-///     T:  ?Sized,
-///
-/// is a "Thread-safe reference-counting pointer. Arc stands for 'Atomically Reference Counted'."
-///
-pub fn threaded_mock(
-    n_rows: usize,
-    thread_workload: Vec<usize>,
-    schema: FixedSchema,
-    n_threads: usize,
-    output_file: PathBuf,
-) {
-    let (thread_handles, receiver) = spawn_workers(n_rows, thread_workload, schema, n_threads);
-    spawn_master(&receiver, output_file);
-
-    for handle in thread_handles {
-        handle.join().expect("Could not join thread handle!");
-    }
-}
-
-///
-pub fn worker_thread_mock(
-    thread: usize,
-    n_rows: usize,
-    schema: Arc<FixedSchema>,
-    sender: channel::Sender<Vec<u8>>,
-) {
-    let rowlen: usize = schema.row_len();
-    // We need to add 2 bytes for each row because of "\r\n"
-    let buffer_size: usize = DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2;
-    let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
-    let mut rng: ThreadRng = rand::thread_rng();
-
-    for row in 0..n_rows {
-        if row % DEFAULT_ROW_BUFFER_LEN == 0 && row != 0 {
-            sender
-                .send(buffer)
-                .expect("Bad buffer, or something, could not send from worker thread!");
-            // Here maybe we should just use the same allocated memory?, but overwrite it..
-            // Because re-allocation is slow (::with_capacity will re-allocate on heap).
-            buffer = Vec::with_capacity(buffer_size);
-        }
-
-        for col in schema.iter() {
-            pad_and_push_to_buffer(
-                col.mock(&mut rng).unwrap().as_bytes().to_vec(),
-                col.length(),
-                Alignment::Right,
-                Symbol::Whitespace,
-                &mut buffer,
-            );
-        }
-        buffer.extend_from_slice("\r\n".as_bytes());
-    }
-
-    // Send the rest of the remaining buffer to the master thread.
-    sender
-        .send(buffer)
-        .expect("Bad buffer, could not send last buffer from worker thread!");
-
-    info!("Thread {} done!", thread);
-    drop(sender);
-}
-
-///
-pub fn spawn_workers(
-    n_rows: usize,
-    thread_workload: Vec<usize>,
-    schema: FixedSchema,
-    n_threads: usize,
-) -> (Vec<JoinHandle<()>>, channel::Receiver<Vec<u8>>) {
-    let remaining_rows = n_rows - thread_workload.iter().sum::<usize>();
-    info!("Distributed thread workload: {:?}", thread_workload);
-    info!("Remaining rows to handle: {}", remaining_rows);
-
-    let arc_schema = Arc::new(schema);
-    let (sender, receiver) = channel::bounded(DEFAULT_THREAD_CHANNEL_CAPACITY);
-
-    let threads: Vec<JoinHandle<()>> = (0..n_threads)
-        .map(|t| {
-            let t_rows = thread_workload[t];
-            let t_schema = Arc::clone(&arc_schema);
-            let t_sender = sender.clone();
-            thread::spawn(move || worker_thread_mock(t, t_rows, t_schema, t_sender))
-        })
-        .collect();
-
-    drop(sender);
-    (threads, receiver)
-}
-
-pub fn spawn_master(channel: &channel::Receiver<Vec<u8>>, output_file: PathBuf) {
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&output_file)
-        .expect("Could not open output file!");
-
-    info!("Writing to output file: {}", output_file.to_str().unwrap());
-    for buff in channel {
-        file.write_all(&buff)
-            .expect("Got bad buffer from thread, write failed!");
-    }
-}
-*/
