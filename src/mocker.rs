@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2024-02-05
-* Last updated: 2024-05-06
+* Last updated: 2024-05-07
 */
 
 use crossbeam::channel;
@@ -208,14 +208,14 @@ impl MockerBuilder {
             None => {
                 if n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && multithreaded {
                     info!(
-                        "Optional field `buffer_size` not provided, will use static value MOCKER_BUFFER_NUM_ROWS={}",
+                        "Optional field `buffer_size` not provided, will use static value MOCKER_BUFFER_NUM_ROWS={}.",
                         MOCKER_BUFFER_NUM_ROWS / (n_threads - 1),
                     );
                     MOCKER_BUFFER_NUM_ROWS / (n_threads - 1)
 
                 } else {
                     info!(
-                        "Optional field `buffer_size` not provided, will use static value MOCKER_BUFFER_NUM_ROWS={}",
+                        "Optional field `buffer_size` not provided, will use static value MOCKER_BUFFER_NUM_ROWS={}.",
                         MOCKER_BUFFER_NUM_ROWS,
                     );
                     MOCKER_BUFFER_NUM_ROWS
@@ -227,7 +227,7 @@ impl MockerBuilder {
             Some(c) => c,
             None => {
                 info!(
-                    "Optional field `thread_channel_capacity` not provided, will use static value MOCKER_THREAD_CHANNEL_CAPACITY={}",
+                    "Optional field `thread_channel_capacity` not provided, will use static value MOCKER_THREAD_CHANNEL_CAPACITY={}.",
                       MOCKER_THREAD_CHANNEL_CAPACITY,
                 );
                 MOCKER_THREAD_CHANNEL_CAPACITY
