@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2024-05-05
-* Last updated: 2024-05-05
+* Last updated: 2024-05-06
 */
 
 use std::fmt::Debug;
@@ -36,18 +36,6 @@ pub(crate) trait Writer: Debug {
     fn finish(&self);
 }
 
-/*
-impl Writer for ArrowWriter<File> {
-    fn write(&self, buffer: Vec<u8>) {
-        todo!();
-    }
-
-    fn finish(&self) {
-        todo!();
-    }
-}
-*/
-
 ///
 #[derive(Debug)]
 pub(crate) struct FixedLengthFileWriter {
@@ -55,11 +43,11 @@ pub(crate) struct FixedLengthFileWriter {
 }
 
 impl FixedLengthFileWriter {
-    pub fn new(out_file: PathBuf) -> Self {
+    pub fn new(file: &PathBuf) -> Self {
         let out_file = OpenOptions::new()
             .create_new(true)
             .append(true)
-            .open(&out_file)
+            .open(file)
             .expect("Could not open target output file!");
 
         Self { out_file }
@@ -78,20 +66,20 @@ impl Writer for FixedLengthFileWriter {
     }
 }
 
-pub(crate) fn writer_from_file_extension(output_file: PathBuf) -> Box<dyn Writer> {
-    match output_file
+pub(crate) fn writer_from_file_extension(file: &PathBuf) -> Box<dyn Writer> {
+    match file
         .extension()
         .expect("No file extension in file name!")
         .to_str()
         .unwrap()
     {
-        "flf" => Box::new(FixedLengthFileWriter::new(output_file)),
+        "flf" => Box::new(FixedLengthFileWriter::new(file)),
         "parquet" => {
             todo!()
         }
         _ => panic!(
             "Could not find a matching writer for file extension: {:?}",
-            output_file.extension().unwrap(),
+            file.extension().unwrap(),
         ),
     }
 }

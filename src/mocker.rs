@@ -25,9 +25,11 @@
 * Last updated: 2024-05-06
 */
 
+use crossbeam::channel;
 use log::{error, info, warn};
 use padder::*;
 use rand::rngs::ThreadRng;
+use rayon::prelude::*;
 
 use std::path::PathBuf;
 
@@ -46,14 +48,14 @@ pub(crate) static MIN_NUM_ROWS_FOR_MULTITHREADING: usize = 1024;
 /// If the channel buffer grows to this size, incoming messages will be held until
 /// previous messages have been consumed. Increasing this variable will significantly
 /// increase the amount of system memory allocated by the program.
-pub(crate) static MOCKER_THREAD_CHANNEL_CAPACITY: usize = 128;
+pub(crate) static MOCKER_THREAD_CHANNEL_CAPACITY: usize = 1024;
 
 /// Sets the size of the buffer that the mocker utilizes to store rows of mocked data
 /// before writing to specified location. A smaller number for this variable means that
 /// the program will perform I/O operations more often, which are expensive system calls.
 /// A larger number is advisable, however, the host system must be able to hold all
 /// rows of mocked data in system memory before writing to its location.
-pub(crate) static MOCKER_ROW_BUFFER_SIZE: usize = 1024;
+pub(crate) static MOCKER_ROW_BUFFER_SIZE: usize = 2048;
 
 #[cfg(target_os = "windows")]
 pub(crate) static NUM_CHARS_FOR_NEWLINE: usize = 2;
@@ -78,7 +80,7 @@ pub(crate) struct Mocker {
     n_rows: usize,
     n_threads: usize,
     multithreaded: bool,
-    writer: Box<dyn Writer>,
+    output_file: PathBuf,
     buffer_size: usize,
     thread_channel_capacity: usize,
 }
@@ -86,7 +88,7 @@ pub(crate) struct Mocker {
 /// A builder struct that simplifies the creation of a valid [`Mocker`] instance.
 #[derive(Debug, Default)]
 pub(crate) struct MockerBuilder {
-    schema: Option<PathBuf>,
+    schema_path: Option<PathBuf>,
     output_file: Option<PathBuf>,
     n_rows: Option<usize>,
     n_threads: Option<usize>,
@@ -96,14 +98,13 @@ pub(crate) struct MockerBuilder {
 }
 
 impl MockerBuilder {
-    /// Set the [`FixedSchema`] to generate data according to with the [`Mocker`].
-    pub fn schema(mut self, schema: PathBuf) -> Self {
-        self.schema = Some(schema);
+    /// Set the [`PathBuf`] for the schema to use when generating data with the [`Mocker`].
+    pub fn schema(mut self, schema_path: PathBuf) -> Self {
+        self.schema_path = Some(schema_path);
         self
     }
 
     /// Set the target output file name with the [`Mocker`].
-    /// Note: this can be `None`, as this is a CLI option.
     pub fn output_file(mut self, output_file: Option<PathBuf>) -> Self {
         self.output_file = output_file;
         self
@@ -142,10 +143,10 @@ impl MockerBuilder {
     /// # Error
     /// Iff any of the required fields are `None`.
     pub fn build(self) -> Result<Mocker> {
-        let schema: FixedSchema = match self.schema {
+        let schema: FixedSchema = match self.schema_path {
             Some(s) => FixedSchema::from_path(s),
             None => {
-                error!("Required field `schema` not provided, exiting...");
+                error!("Required field `schema_path` not provided, exiting...");
                 return Err(Box::new(SetupError));
             }
         };
@@ -188,8 +189,6 @@ impl MockerBuilder {
             }
         };
 
-        let writer: Box<dyn Writer> = writer_from_file_extension(output_file);
-
         let buffer_size: usize = match self.buffer_size {
             Some(s) => s,
             None => {
@@ -205,7 +204,7 @@ impl MockerBuilder {
             Some(c) => c,
             None => {
                 info!(
-                    "Optional field `thread_channel_capacity not provided, will use static value MOCKER_THREAD_CHANNEL_CAPACITY={}",
+                    "Optional field `thread_channel_capacity` not provided, will use static value MOCKER_THREAD_CHANNEL_CAPACITY={}",
                       MOCKER_THREAD_CHANNEL_CAPACITY,
                 );
                 MOCKER_THREAD_CHANNEL_CAPACITY
@@ -217,7 +216,7 @@ impl MockerBuilder {
             n_threads,
             n_rows,
             multithreaded,
-            writer,
+            output_file,
             buffer_size,
             thread_channel_capacity,
         })
@@ -255,10 +254,43 @@ impl Mocker {
         }
     }
 
-    fn generate_multithreaded(&self) {
-        todo!();
+    /// Given n threads, the mocker will use n - 1 for generating data,
+    /// and 1 thread for writing data to disk.
+    fn distribute_thread_workload(&self) -> Vec<usize> {
+        let n_rows_per_thread = self.n_rows / (self.n_threads - 1);
+        (0..(self.n_threads - 2))
+            .map(|_| n_rows_per_thread)
+            .collect::<Vec<usize>>()
     }
 
+    /// Generated mocked data in multithreading mode.
+    fn generate_multithreaded(&self) {
+        // Calculate the workload for each worker thread, if the workload can not evenly
+        // be split among the threads, then the last thread will have to take the remainder.
+        let mut thread_workloads: Vec<usize> = self.distribute_thread_workload();
+        let remainder: usize = self.n_rows - thread_workloads.iter().sum::<usize>();
+        thread_workloads.push(remainder);
+
+        let mut writer: Box<dyn Writer> = writer_from_file_extension(&self.output_file);
+        let (sender, reciever) = channel::bounded(self.thread_channel_capacity);
+
+        info!(
+            "Starting {} worker threads with workload: {:?}",
+            thread_workloads.len(),
+            thread_workloads
+        );
+        thread_workloads
+            .into_par_iter()
+            .enumerate()
+            .for_each_with(&sender, |s, (t, workload)| {
+                worker_thread_generate(s.clone(), t, workload, &self.schema, self.buffer_size)
+            });
+
+        drop(sender);
+        master_thread_write(reciever, &mut writer);
+    }
+
+    // Generated mocked data in single-threaded mode.
     fn generate_single_thread(&mut self) {
         let row_len = self.schema.row_len();
         let buffer_size: usize =
@@ -267,9 +299,11 @@ impl Mocker {
         let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
         let mut rng: ThreadRng = rand::thread_rng();
 
+        let mut writer: Box<dyn Writer> = writer_from_file_extension(&self.output_file);
+
         for row_idx in 0..self.n_rows {
             if (row_idx % self.buffer_size == 0) && (row_idx != 0) {
-                self.writer.write(&buffer);
+                writer.write(&buffer);
                 buffer.clear();
             }
 
@@ -287,26 +321,65 @@ impl Mocker {
         }
 
         // Write any remaining contents of the buffer to file.
-        self.writer.write(&buffer);
+        writer.write(&buffer);
+    }
+}
+
+///
+fn worker_thread_generate(
+    channel: channel::Sender<Vec<u8>>,
+    thread: usize,
+    n_rows: usize,
+    schema: &FixedSchema,
+    n_rows_buffer_size: usize,
+) {
+    let row_len: usize = schema.row_len();
+    let buffer_size: usize =
+        n_rows_buffer_size * row_len + n_rows_buffer_size * NUM_CHARS_FOR_NEWLINE;
+
+    let mut rng: ThreadRng = rand::thread_rng();
+    let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
+
+    info!("Worker thread {} starting.", thread);
+
+    for row_idx in 0..n_rows {
+        if (row_idx % buffer_size == 0) && (row_idx != 0) {
+            channel
+                .send(buffer)
+                .expect("Could not send buffer from worker to master thread!");
+
+            buffer = Vec::with_capacity(buffer_size);
+        }
+
+        for column in schema.iter() {
+            pad_and_push_to_buffer(
+                column.mock(&mut rng).as_bytes(),
+                column.length(),
+                Alignment::Right,
+                Symbol::Whitespace,
+                &mut buffer,
+            );
+        }
+
+        buffer.extend_from_slice(newline().as_bytes());
     }
 
-    /*
-    ///
-    pub fn generate(&self) {
-        if self.multithreaded && self.n_rows > DEFAULT_MIN_N_ROWS_FOR_MULTITHREADING {
-            self.generate_multithreaded(self.n_rows);
-        } else {
-            if self.multithreaded {
-                warn!(
-                    "You specified to use multithreading but only want to mock {} rows.",
-                    self.n_rows
-                );
-                warn!("This is done more efficiently single-threaded, ignoring multithreading.");
-            }
-            self.generate_single_threaded(self.n_rows);
-        }
+    channel
+        .send(buffer)
+        .expect("Could not send buffer from worker thread to master thread!");
+
+    info!("Worker thread {} done!", thread);
+    drop(channel);
+}
+
+///
+fn master_thread_write(channel: channel::Receiver<Vec<u8>>, writer: &mut Box<dyn Writer>) {
+    for buffer in channel {
+        writer.write(&buffer);
+        drop(buffer);
     }
-    */
+
+    info!("Master thread done, cleaning up resources.");
 }
 
 /*

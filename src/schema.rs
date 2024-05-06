@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2023-11-25
-* Last updated: 2024-05-05
+* Last updated: 2024-05-06
 */
 
 use arrow2::datatypes::{DataType, Field, Schema};
@@ -176,7 +176,8 @@ impl FixedSchema {
 
     /// Implicitly create a new [`FixedSchema`] by reading a json path
     /// and deserializing the schema into the epxected struct fields.
-    /// # Error
+    ///
+    /// # Panics
     /// If the file does not exist or if the schema in the file
     /// does not adhere to the above struct definition.
     pub fn from_path(path: PathBuf) -> Self {
