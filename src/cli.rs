@@ -26,6 +26,7 @@
 */
 
 use clap::{value_parser, ArgAction, Parser, Subcommand};
+#[cfg(feature = "rayon")]
 use log::info;
 
 use std::path::PathBuf;
@@ -136,14 +137,17 @@ impl Cli {
     pub fn run(&self) -> Result<()> {
         let n_threads: usize = get_available_threads(self.n_threads);
 
-        let multithreaded: bool = n_threads > 1;
-        if multithreaded {
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(n_threads)
-                .build_global()
-                .expect("Could not create Rayon thread pool!");
-            info!("Multithreading enabled!");
-        };
+        #[cfg(feature = "rayon")]
+        {
+            let multithreaded: bool = n_threads > 1;
+            if multithreaded {
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(n_threads)
+                    .build_global()
+                    .expect("Could not create Rayon thread pool!");
+                info!("Multithreading enabled!");
+            };
+        }
 
         match &self.command {
             Commands::Convert { file: _, schema: _ } => {
