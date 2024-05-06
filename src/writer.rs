@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2024-05-05
-* Last updated: 2024-05-06
+* Last updated: 2024-05-07
 */
 
 use std::fmt::Debug;
@@ -51,6 +51,11 @@ impl FixedLengthFileWriter {
             .expect("Could not open target output file!");
 
         Self { out_file }
+    }
+
+    #[allow(dead_code)]
+    pub fn out_file(&self) -> &File {
+        &self.out_file
     }
 }
 
@@ -81,5 +86,64 @@ pub(crate) fn writer_from_file_extension(file: &PathBuf) -> Box<dyn Writer> {
             "Could not find a matching writer for file extension: {:?}",
             file.extension().unwrap(),
         ),
+    }
+}
+
+#[cfg(test)]
+mod tests_writer {
+    use std::fs;
+    use std::io::IsTerminal;
+
+    use super::*;
+
+    #[test]
+    #[should_panic]
+    fn test_new_fixed_length_file_writer_panic() {
+        let _ = FixedLengthFileWriter::new(
+            &PathBuf::from(""),
+        );
+    }
+
+    #[test]
+    fn test_new_fixed_length_file_writer() {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("resources/cool-file.really-cool");
+
+        let flfw = FixedLengthFileWriter::new(&path);
+        let expected = OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .unwrap();
+
+        assert_eq!(expected.is_terminal(), flfw.out_file().is_terminal());
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn test_fixed_length_file_writer_write() {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("resources/this-file-maybe-exists.xd");
+
+        let mut flfw = FixedLengthFileWriter::new(&path);
+        flfw.write(&vec![0u8; 64]);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_fixed_length_file_writer_file_already_exists_panic() {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("resources/this-file-will-already-exist.haha");
+
+        let _a = FixedLengthFileWriter::new(&path);
+        let _ = match OpenOptions::new()
+            .create(true)
+            .open(&path) {
+            Ok(f) => f,
+            Err(_) => {
+                fs::remove_file(path).unwrap();
+                panic!();
+            },
+        };
     }
 }
