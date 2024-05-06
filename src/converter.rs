@@ -30,11 +30,11 @@ use crate::schema::FixedSchema;
 use arrow::array::ArrayRef;
 use arrow::record_batch::RecordBatch;
 use crossbeam::channel;
-use parquet::basic::Compression;
-use rayon::prelude::*;
 use log::{debug, error, info};
 use parquet::arrow::ArrowWriter;
+use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
+use rayon::prelude::*;
 
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read};
@@ -55,7 +55,6 @@ pub struct Converter {
 
 ///
 impl Converter {
-
     ///
     pub fn new(file: PathBuf, schema: FixedSchema, n_threads: usize) -> Self {
         Self {
@@ -83,7 +82,11 @@ impl Converter {
 
     ///
     fn convert_multithreaded(&mut self) {
-        let bytes_to_read = self.file.metadata().expect("Could not read file metadata").len() as usize;
+        let bytes_to_read = self
+            .file
+            .metadata()
+            .expect("Could not read file metadata")
+            .len() as usize;
         info!("File is {} bytes total!", bytes_to_read);
         let mut remaining_bytes = bytes_to_read;
         let mut bytes_processed: usize = 0;
@@ -95,31 +98,39 @@ impl Converter {
         loop {
             // When we have read all the bytes we break.
             // We know about this cus we reach EOF in the BufReader.
-            if bytes_processed >= bytes_to_read { break; }
+            if bytes_processed >= bytes_to_read {
+                break;
+            }
 
-            if remaining_bytes < DEFAULT_SLICE_BUFFER_LEN { buff_capacity = remaining_bytes; };
+            if remaining_bytes < DEFAULT_SLICE_BUFFER_LEN {
+                buff_capacity = remaining_bytes;
+            };
 
             // Read part of the file and find index of where to slice the file.
             let mut buffer: Vec<u8> = vec![0u8; buff_capacity];
             match file_reader.read_exact(&mut buffer).is_ok() {
-                true => {},
+                true => {}
                 false => {
                     debug!("EOF, this is the last time reading to buffer...");
                 }
             };
 
             let line_indices: Vec<usize> = find_line_breaks_unix(&buffer);
-            let byte_idx_last_line_break = line_indices.last().expect("The line index list was empty!");
+            let byte_idx_last_line_break =
+                line_indices.last().expect("The line index list was empty!");
             let n_bytes_left_after_line_break = buff_capacity - 1 - byte_idx_last_line_break;
 
             // We want to move the file descriptor cursor back N bytes so
             // that the next reed starts on a new row! Otherwise we will
             // miss data, however, this means that we are reading some
             // of the data multiple times. A little bit of an overlap but that's fine...
-            match file_reader.seek_relative(-(n_bytes_left_after_line_break as i64)).is_ok() {
-                true => {},
+            match file_reader
+                .seek_relative(-(n_bytes_left_after_line_break as i64))
+                .is_ok()
+            {
+                true => {}
                 false => {
-                   error!("Could not move BufReader cursor back!"); 
+                    error!("Could not move BufReader cursor back!");
                 }
             };
 
@@ -129,23 +140,26 @@ impl Converter {
 
             let mut slices: Vec<&[u8]> = Vec::with_capacity(self.n_threads - 1);
 
-            let thread_workloads: Vec<&[usize]> = self.distribute_worker_thread_workloads(&line_indices);
+            let thread_workloads: Vec<&[usize]> =
+                self.distribute_worker_thread_workloads(&line_indices);
             debug!("Thread workload: {:?}", thread_workloads);
             for range in thread_workloads.iter() {
                 slices.push(&buffer[range[0]..range[range.len() - 1]]);
             }
 
-            spawn_convert_threads(
-                &slices,
-                &thread_workloads,
-                self.schema.to_owned(),
-            );
+            spawn_convert_threads(&slices, &thread_workloads, self.schema.to_owned());
         }
-        info!("We read {} bytes two times (due to sliding window overlap).", bytes_overlapped);
+        info!(
+            "We read {} bytes two times (due to sliding window overlap).",
+            bytes_overlapped
+        );
     }
 
     ///
-    fn distribute_worker_thread_workloads<'a>(&'a self, line_indices: &'a Vec<usize>) -> Vec<&'a [usize]> {
+    fn distribute_worker_thread_workloads<'a>(
+        &'a self,
+        line_indices: &'a Vec<usize>,
+    ) -> Vec<&'a [usize]> {
         let n_line_indices: usize = line_indices.len();
         let n_rows_per_thread: usize = n_line_indices / (self.n_threads - 1);
 
@@ -304,10 +318,14 @@ pub fn worker_thread_convert<'a>(
 ///
 /// TODO: this should be used whenever host system is windows!
 pub fn find_line_breaks_windows(bytes: &[u8]) -> Vec<(usize, usize)> {
-    if bytes.is_empty() { panic!("Empty bytes slice!"); }
+    if bytes.is_empty() {
+        panic!("Empty bytes slice!");
+    }
 
     let n_bytes = bytes.len();
-    if n_bytes == 0 { panic!("No bytes in buffer!"); }
+    if n_bytes == 0 {
+        panic!("No bytes in buffer!");
+    }
 
     let mut line_breaks: Vec<(usize, usize)> = vec![];
     let mut last_idx: usize = 0;
@@ -324,13 +342,17 @@ pub fn find_line_breaks_windows(bytes: &[u8]) -> Vec<(usize, usize)> {
 /// On *nix systems line breaks in files are represented by "\n",
 /// also called LF (Line Feed), represented by the byte 0x0a.
 pub fn find_line_breaks_unix(bytes: &[u8]) -> Vec<usize> {
-    if bytes.is_empty() { panic!("Empty bytes slice!"); }
+    if bytes.is_empty() {
+        panic!("Empty bytes slice!");
+    }
 
     let n_bytes = bytes.len();
     // The only way we can have only one byte left to read is if we have read everything
     // and then this byte will represent EOF, most likely a "\n"?..
-    if n_bytes == 0 { panic!("No bytes in buffer!"); }
-    
+    if n_bytes == 0 {
+        panic!("No bytes in buffer!");
+    }
+
     let mut line_breaks: Vec<usize> = vec![];
     for idx in 0..n_bytes {
         if bytes[idx] == 0x0a {
@@ -347,7 +369,6 @@ pub fn byte_indices_from_runes(
     total_runes: usize,
     col_lengths: &Vec<usize>,
 ) -> Vec<usize> {
-
     let mut acc_runes: usize = 0;
     let mut num_bytes: usize = 0;
     let mut units: usize = 1;
@@ -377,4 +398,3 @@ pub fn byte_indices_from_runes(
 
     byte_indices
 }
-

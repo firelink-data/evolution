@@ -22,16 +22,16 @@
 * SOFTWARE.
 *
 * File created: 2024-02-05
-* Last updated: 2024-05-05
+* Last updated: 2024-05-06
 */
 
 use clap::{value_parser, ArgAction, Parser, Subcommand};
 use log::info;
+
 use std::path::PathBuf;
 
-use crate::error::ExecutionError;
+use crate::error::Result;
 use crate::mocker::Mocker;
-use crate::schema::FixedSchema;
 use crate::threads::get_available_threads;
 
 #[derive(Parser)]
@@ -48,7 +48,6 @@ pub struct Cli {
 
     /// Set the number of threads (logical cores) to use when multi-threading.
     #[arg(
-        short = 'N',
         long = "n-threads",
         value_name = "NUM-THREADS",
         action = ArgAction::Set,
@@ -93,22 +92,6 @@ enum Commands {
         )]
         schema: PathBuf,
 
-        /*
-        /// Specify how to write mocked data to disk.
-        #[arg(
-            short = 'w',
-            long = "writer",
-            value_name = "WRITER",
-            action = ArgAction::Set,
-            value_parser = PossibleValuesParser::new([
-                 "flf",
-                 "arrow",
-            ]),
-            required = true,
-        )]
-        writer: String,
-        */
-
         /// Specify output (target) file name.
         #[arg(
             short = 'o',
@@ -125,14 +108,32 @@ enum Commands {
             long = "n-rows",
             value_name = "NUM-ROWS",
             default_value = "100",
-            required = false,
+            required = false
         )]
         n_rows: Option<usize>,
+
+        /// Set the size of the buffer (number of rows).
+        #[arg(
+            long = "buffer-size",
+            value_name = "BUFFER-SIZE",
+            action = ArgAction::Set,
+            required = false,
+        )]
+        buffer_size: Option<usize>,
+
+        /// Set the capacity of the thread channel (number of messages).
+        #[arg(
+            long = "thread-channel-capacity",
+            value_name = "THREAD-CHANNEL-CAPACITY",
+            action = ArgAction::Set,
+            required = false,
+        )]
+        thread_channel_capacity: Option<usize>,
     },
 }
 
 impl Cli {
-    pub fn run(&self) -> Result<(), ExecutionError> {
+    pub fn run(&self) -> Result<()> {
         let n_threads: usize = get_available_threads(self.n_threads);
 
         let multithreaded: bool = n_threads > 1;
@@ -145,35 +146,23 @@ impl Cli {
         };
 
         match &self.command {
-            Commands::Convert {
-                file,
-                schema,
-            } => {
-                /*
-                converter::Converter::new(
-                    file.to_owned(),
-                    schema::FixedSchema::from_path(schema.to_owned()),
-                    n_threads,
-                )
-                .convert();
-                */
-
-            },
+            Commands::Convert { file: _, schema: _ } => {
+                todo!();
+            }
             Commands::Mock {
                 schema,
-                n_rows,
                 output_file,
+                n_rows,
+                buffer_size,
+                thread_channel_capacity,
             } => {
-
-                let schema = FixedSchema::from_path(schema.to_owned());
-                let n_rows = n_rows.expect("Could not parse n_rows from CLI.");
-                let output_file = output_file.to_owned();
-
                 Mocker::builder()
-                    .schema(schema)
-                    .num_rows(n_rows)
+                    .schema(schema.to_owned())
+                    .output_file(output_file.to_owned())
+                    .num_rows(*n_rows)
                     .num_threads(n_threads)
-                    .output_file(output_file)
+                    .buffer_size(*buffer_size)
+                    .thread_channel_capacity(*thread_channel_capacity)
                     .build()?
                     .generate();
             }

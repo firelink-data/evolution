@@ -79,11 +79,16 @@ impl Writer for FixedLengthFileWriter {
 }
 
 pub(crate) fn writer_from_file_extension(output_file: PathBuf) -> Box<dyn Writer> {
-    match output_file.extension().expect("No file extension in file name!").to_str().unwrap() {
+    match output_file
+        .extension()
+        .expect("No file extension in file name!")
+        .to_str()
+        .unwrap()
+    {
         "flf" => Box::new(FixedLengthFileWriter::new(output_file)),
         "parquet" => {
             todo!()
-        },
+        }
         _ => panic!(
             "Could not find a matching writer for file extension: {:?}",
             output_file.extension().unwrap(),

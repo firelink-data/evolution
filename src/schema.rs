@@ -144,7 +144,10 @@ impl FixedColumn {
             "string" => mock_string(self.length, rng),
             "lutf8" => mock_string(self.length, rng),
             "lstring" => mock_string(self.length, rng),
-            _ => panic!("Could not find valid dtype for column, dtype: {:?}.", self.dtype),
+            _ => panic!(
+                "Could not find valid dtype for column, dtype: {:?}.",
+                self.dtype
+            ),
         };
 
         string

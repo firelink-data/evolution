@@ -1,4 +1,3 @@
-
 // This default value should depend on the memory capacity of the system
 // running the program. Because the workers produce buffers faster than
 // the master can write them to disk we need to bound the worker/master
@@ -13,4 +12,3 @@ pub(crate) static DEFAULT_ROW_BUFFER_LEN: usize = 1024;
 static NUM_CHARS_FOR_NEWLINE: usize = 2;
 #[cfg(not(target_os = "windows"))]
 static NUM_CHARS_FOR_NEWLINE: usize = 1;
-

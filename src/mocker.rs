@@ -22,26 +22,19 @@
 * SOFTWARE.
 *
 * File created: 2024-02-05
-* Last updated: 2024-05-05
+* Last updated: 2024-05-06
 */
 
-use crossbeam::channel;
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 use padder::*;
-use parquet::data_type::AsBytes;
 use rand::rngs::ThreadRng;
 
-use std::fs::OpenOptions;
-use std::io::Write;
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::thread::JoinHandle;
-use std::{thread, usize};
 
-use crate::error::ExecutionError;
+use crate::error::{Result, SetupError};
 use crate::mocking::randomize_file_name;
 use crate::schema::FixedSchema;
-use crate::writer::{Writer, writer_from_file_extension};
+use crate::writer::{writer_from_file_extension, Writer};
 
 /// If the user wants to only generate a few number of mocked rows,then multithreading
 /// is not a suitable choice, and only introduces extra overhead. This variable specifies
@@ -53,7 +46,7 @@ pub(crate) static MIN_NUM_ROWS_FOR_MULTITHREADING: usize = 1024;
 /// If the channel buffer grows to this size, incoming messages will be held until
 /// previous messages have been consumed. Increasing this variable will significantly
 /// increase the amount of system memory allocated by the program.
-pub(crate) static mut MOCKER_THREAD_CHANNEL_CAPACITY: usize = 128;
+pub(crate) static MOCKER_THREAD_CHANNEL_CAPACITY: usize = 128;
 
 /// Sets the size of the buffer that the mocker utilizes to store rows of mocked data
 /// before writing to specified location. A smaller number for this variable means that
@@ -70,9 +63,13 @@ pub(crate) static NUM_CHARS_FOR_NEWLINE: usize = 1;
 // Depending on the target os we need specific handling of newlines.
 // https://doc.rust-lang.org/reference/conditional-compilation.html
 #[cfg(target_os = "windows")]
-fn newline<'a>() -> &'a str { "\r\n" }
+fn newline<'a>() -> &'a str {
+    "\r\n"
+}
 #[cfg(not(target_os = "windows"))]
-fn newline<'a>() -> &'a str { "\n" }
+fn newline<'a>() -> &'a str {
+    "\n"
+}
 
 /// A struct for generating mocked data based on a user-defined schema.
 #[derive(Debug)]
@@ -82,28 +79,39 @@ pub(crate) struct Mocker {
     n_threads: usize,
     multithreaded: bool,
     writer: Box<dyn Writer>,
+    buffer_size: usize,
+    thread_channel_capacity: usize,
 }
 
 /// A builder struct that simplifies the creation of a valid [`Mocker`] instance.
 #[derive(Debug, Default)]
 pub(crate) struct MockerBuilder {
-    schema: Option<FixedSchema>,
+    schema: Option<PathBuf>,
+    output_file: Option<PathBuf>,
     n_rows: Option<usize>,
     n_threads: Option<usize>,
     multithreaded: Option<bool>,
-    output_file: Option<PathBuf>,
+    buffer_size: Option<usize>,
+    thread_channel_capacity: Option<usize>,
 }
 
 impl MockerBuilder {
     /// Set the [`FixedSchema`] to generate data according to with the [`Mocker`].
-    pub fn schema(mut self, schema: FixedSchema) -> Self {
+    pub fn schema(mut self, schema: PathBuf) -> Self {
         self.schema = Some(schema);
         self
     }
 
+    /// Set the target output file name with the [`Mocker`].
+    /// Note: this can be `None`, as this is a CLI option.
+    pub fn output_file(mut self, output_file: Option<PathBuf>) -> Self {
+        self.output_file = output_file;
+        self
+    }
+
     /// Set the number of mocked data rows to generate with the [`Mocker`].
-    pub fn num_rows(mut self, n_rows: usize) -> Self {
-        self.n_rows = Some(n_rows);
+    pub fn num_rows(mut self, n_rows: Option<usize>) -> Self {
+        self.n_rows = n_rows;
         self
     }
 
@@ -115,53 +123,61 @@ impl MockerBuilder {
         self
     }
 
-    /// Set the target output file name with the [`Mocker`].
-    /// Note: this can be `None`, as this is a CLI option.
-    pub fn output_file(mut self, output_file: Option<PathBuf>) -> Self {
-        self.output_file = output_file;
+    ///
+    pub fn buffer_size(mut self, buffer_size: Option<usize>) -> Self {
+        self.buffer_size = buffer_size;
+        self
+    }
+
+    ///
+    pub fn thread_channel_capacity(mut self, thread_channel_capacity: Option<usize>) -> Self {
+        self.thread_channel_capacity = thread_channel_capacity;
         self
     }
 
     /// Verify that all required fields have been set and explicitly create a new [`Mocker`]
-    /// instance based on the provided fields.
+    /// instance based on the provided fields. Any optional fields are set according to
+    /// either random strategies (like output file name) or global static variables.
     ///
     /// # Error
     /// Iff any of the required fields are `None`.
-    pub fn build(self) -> Result<Mocker, ExecutionError> {
-
-        let schema = match self.schema {
-            Some(s) => s,
+    pub fn build(self) -> Result<Mocker> {
+        let schema: FixedSchema = match self.schema {
+            Some(s) => FixedSchema::from_path(s),
             None => {
                 error!("Required field `schema` not provided, exiting...");
-                return Err(ExecutionError);
-            },
-        };
-
-        let n_rows = match self.n_rows {
-            Some(n) => n,
-            None => {
-                error!("Required field `n_rows` not provided, exiting...");
-                return Err(ExecutionError);
+                return Err(Box::new(SetupError));
             }
         };
 
-        let n_threads = match self.n_threads {
+        let n_rows: usize = match self.n_rows {
+            Some(n) => n,
+            None => {
+                error!("Required field `n_rows` not provided, exiting...");
+                return Err(Box::new(SetupError));
+            }
+        };
+
+        let n_threads: usize = match self.n_threads {
             Some(n) => n,
             None => {
                 error!("Required field `n_threads` not provided, exiting...");
-                return Err(ExecutionError);
-            },
+                return Err(Box::new(SetupError));
+            }
         };
 
-        let multithreaded = match self.multithreaded {
+        let multithreaded: bool = match self.multithreaded {
             Some(m) => m,
             None => {
                 error!("Required field `multithreaded` not provided, exiting...");
-                return Err(ExecutionError);
-            },
+                return Err(Box::new(SetupError));
+            }
         };
 
-        let output_file = match self.output_file {
+        //
+        // Optional configuration below.
+        //
+        let output_file: PathBuf = match self.output_file {
             Some(o) => o,
             None => {
                 info!("Optional field `output_file` not provided, randomizing a file name.");
@@ -174,40 +190,64 @@ impl MockerBuilder {
 
         let writer: Box<dyn Writer> = writer_from_file_extension(output_file);
 
+        let buffer_size: usize = match self.buffer_size {
+            Some(s) => s,
+            None => {
+                info!(
+                    "Optional field `buffer_size` not provided, will use static value MOCKER_ROW_BUFFER_SIZE={}",
+                    MOCKER_ROW_BUFFER_SIZE,
+                );
+                MOCKER_ROW_BUFFER_SIZE
+            }
+        };
+
+        let thread_channel_capacity: usize = match self.thread_channel_capacity {
+            Some(c) => c,
+            None => {
+                info!(
+                    "Optional field `thread_channel_capacity not provided, will use static value MOCKER_THREAD_CHANNEL_CAPACITY={}",
+                      MOCKER_THREAD_CHANNEL_CAPACITY,
+                );
+                MOCKER_THREAD_CHANNEL_CAPACITY
+            }
+        };
+
         Ok(Mocker {
             schema,
             n_threads,
             n_rows,
             multithreaded,
             writer,
+            buffer_size,
+            thread_channel_capacity,
         })
     }
 }
 
 ///
 impl Mocker {
-
     /// Create a new instance of a [`MockerBuilder`] struct with default values.
     pub fn builder() -> MockerBuilder {
-        MockerBuilder { ..Default::default() }
+        MockerBuilder {
+            ..Default::default()
+        }
     }
 
     /// Start generating mocked data rows based on the provided struct fields.
     /// Checks if the user wants to use multithreading and how many rows they
-    /// intend to generate. If the number of desired rows to generate is less 
+    /// intend to generate. If the number of desired rows to generate is less
     /// than [`MIN_NUM_ROWS_FOR_MULTITHREADING`] then the program will run in
     /// single thread mode instead. Employing multithreading when generating
     /// a few number of rows introduces much more computational overhead than
     /// necessary, so it is much more efficient to run in a single thread.
     pub fn generate(&mut self) {
-        if self.n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING  && self.multithreaded {
+        if self.n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && self.multithreaded {
             self.generate_multithreaded();
         } else {
             if self.multithreaded {
                 warn!(
                     "You specified to use {} threads, but you only want to mock {} rows.",
-                    self.n_threads,
-                    self.n_rows,
+                    self.n_threads, self.n_rows,
                 );
                 warn!("This is done more efficiently single-threaded, ignoring multithreading!");
             }
@@ -221,15 +261,14 @@ impl Mocker {
 
     fn generate_single_thread(&mut self) {
         let row_len = self.schema.row_len();
-        let buffer_size: usize = 
-            MOCKER_ROW_BUFFER_SIZE * row_len
-            + MOCKER_ROW_BUFFER_SIZE * NUM_CHARS_FOR_NEWLINE;
+        let buffer_size: usize =
+            self.buffer_size * row_len + self.buffer_size * NUM_CHARS_FOR_NEWLINE;
 
         let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
         let mut rng: ThreadRng = rand::thread_rng();
 
         for row_idx in 0..self.n_rows {
-            if (row_idx % MOCKER_ROW_BUFFER_SIZE == 0) && (row_idx != 0) {
+            if (row_idx % self.buffer_size == 0) && (row_idx != 0) {
                 self.writer.write(&buffer);
                 buffer.clear();
             }

@@ -22,16 +22,32 @@
 * SOFTWARE.
 *
 * File created: 2024-02-05
-* Last updated: 2024-05-05
+* Last updated: 2024-05-06
 */
 
+use std::error;
 use std::fmt;
+use std::result;
+
+/// Generic result type which allows for dynamic dispatch of our custom error variants.
+pub(crate) type Result<T> = result::Result<T, Box<dyn error::Error>>;
 
 #[derive(Debug)]
-pub struct ExecutionError;
+pub(crate) struct SetupError;
 
+impl error::Error for SetupError {}
+impl fmt::Display for SetupError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Setup failed, please refer to any logged error messages or the stack-trace for debugging.")
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct ExecutionError;
+
+impl error::Error for ExecutionError {}
 impl fmt::Display for ExecutionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Execution failed, please refer to the stack-trace for debugging.")
+        write!(f, "Execution failed, please refer to any logged error messages or the stack-trace for debugging.")
     }
 }
