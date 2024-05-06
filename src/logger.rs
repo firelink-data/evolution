@@ -138,7 +138,7 @@ impl Log for Logger {
         };
     }
 
-    ///
+    // This does not need to be implemented, just empty boilerplate for trait.
     fn flush(&self) {}
 }
 
