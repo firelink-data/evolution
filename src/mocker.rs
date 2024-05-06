@@ -35,7 +35,7 @@ use rayon::iter::*;
 use std::path::PathBuf;
 use std::sync::Arc;
 #[cfg(not(feature = "rayon"))]
-use std::thread::{JoinHandle, spawn};
+use std::thread::{spawn, JoinHandle};
 
 use crate::error::{Result, SetupError};
 use crate::mocking::randomize_file_name;
@@ -193,7 +193,7 @@ impl MockerBuilder {
             }
         };
 
-        // Here we divide by the number of threads because each thread will allocated 
+        // Here we divide by the number of threads because each thread will allocated
         // `MOCKER_BUFFER_NUM_ROWS` amount of memory, meaning, if we are not careful
         // with the size of this variable then memory allocation might go through the
         // roof and cause a program crash due to memory overflow and mem-swapping.
@@ -204,7 +204,7 @@ impl MockerBuilder {
                 } else {
                     s
                 }
-            },
+            }
             None => {
                 if n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && multithreaded {
                     info!(
@@ -212,7 +212,6 @@ impl MockerBuilder {
                         MOCKER_BUFFER_NUM_ROWS / (n_threads - 1),
                     );
                     MOCKER_BUFFER_NUM_ROWS / (n_threads - 1)
-
                 } else {
                     info!(
                         "Optional field `buffer_size` not provided, will use static value MOCKER_BUFFER_NUM_ROWS={}.",
@@ -304,7 +303,6 @@ impl Mocker {
             thread_workloads
         );
 
-
         let schema = Arc::new(self.schema.clone());
         thread_workloads
             .into_par_iter()
@@ -344,13 +342,9 @@ impl Mocker {
                 let t_schema = Arc::clone(&schema);
                 let t_sender = sender.clone();
                 let t_buffer_size = self.buffer_size;
-                spawn(move || worker_thread_generate(
-                    t_sender,
-                    t,
-                    t_workload,
-                    t_schema,
-                    t_buffer_size,
-                ))
+                spawn(move || {
+                    worker_thread_generate(t_sender, t, t_workload, t_schema, t_buffer_size)
+                })
             })
             .collect::<Vec<JoinHandle<()>>>();
 
@@ -358,9 +352,7 @@ impl Mocker {
         master_thread_write(reciever, &mut writer);
 
         for handle in threads {
-            handle
-                .join()
-                .expect("Could not join worker thread handle!");
+            handle.join().expect("Could not join worker thread handle!");
         }
     }
 
@@ -450,10 +442,7 @@ fn worker_thread_generate(
 }
 
 ///
-fn master_thread_write(
-    channel: channel::Receiver<Vec<u8>>,
-    writer: &mut Box<dyn Writer>,
-) {
+fn master_thread_write(channel: channel::Receiver<Vec<u8>>, writer: &mut Box<dyn Writer>) {
     // Write buffer contents to disk.
     for buffer in channel {
         writer.write(&buffer);
@@ -462,4 +451,3 @@ fn master_thread_write(
 
     info!("Master thread done, cleaning up resources.");
 }
-

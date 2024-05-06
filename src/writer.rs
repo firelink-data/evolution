@@ -99,9 +99,7 @@ mod tests_writer {
     #[test]
     #[should_panic]
     fn test_new_fixed_length_file_writer_panic() {
-        let _ = FixedLengthFileWriter::new(
-            &PathBuf::from(""),
-        );
+        let _ = FixedLengthFileWriter::new(&PathBuf::from(""));
     }
 
     #[test]
@@ -110,10 +108,7 @@ mod tests_writer {
         path.push("resources/cool-file.really-cool");
 
         let flfw = FixedLengthFileWriter::new(&path);
-        let expected = OpenOptions::new()
-            .append(true)
-            .open(&path)
-            .unwrap();
+        let expected = OpenOptions::new().append(true).open(&path).unwrap();
 
         assert_eq!(expected.is_terminal(), flfw.out_file().is_terminal());
         fs::remove_file(path).unwrap();
@@ -136,14 +131,12 @@ mod tests_writer {
         path.push("resources/this-file-will-already-exist.haha");
 
         let _a = FixedLengthFileWriter::new(&path);
-        let _ = match OpenOptions::new()
-            .create(true)
-            .open(&path) {
+        let _ = match OpenOptions::new().create(true).open(&path) {
             Ok(f) => f,
             Err(_) => {
                 fs::remove_file(path).unwrap();
                 panic!();
-            },
+            }
         };
     }
 }

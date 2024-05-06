@@ -55,7 +55,6 @@ impl fmt::Display for SetupError {
     }
 }
 
-
 #[cfg(test)]
 mod tests_error {
     use super::*;
