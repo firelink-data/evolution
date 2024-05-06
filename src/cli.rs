@@ -139,8 +139,7 @@ impl Cli {
 
         #[cfg(feature = "rayon")]
         {
-            let multithreaded: bool = n_threads > 1;
-            if multithreaded {
+            if n_threads > 1 {
                 rayon::ThreadPoolBuilder::new()
                     .num_threads(n_threads)
                     .build_global()
