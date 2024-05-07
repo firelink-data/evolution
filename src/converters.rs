@@ -55,6 +55,7 @@ pub trait ColumnBuilder<R> {
     fn finish(& mut self) -> R;
     //    fn name(&  self) -> &String;
 }
+
 // (&str, ArrayRef)
 fn column_length_num_rightaligned(data: &[u8], runes: i16) -> (usize, usize) {
     let mut eat = data.iter();

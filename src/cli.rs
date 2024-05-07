@@ -28,6 +28,7 @@
 use std::fs;
 use std::fs::File;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use arrow2::{
     array::{Array, Int32Array},
@@ -39,6 +40,7 @@ use arrow2::{
         WriteOptions,
     },
 };
+use arrow_array::ArrayRef;
 use clap::{Parser, Subcommand};
 use log::info;
 use parquet::arrow::ArrowWriter;
@@ -187,7 +189,7 @@ impl Cli {
 
                 let converter_instance: Box<dyn Converter> = match converter {
                     Converters::Arrow => {
-                        let mut master_builders = MasterBuilders::builders_factory(
+                        let mut master_builders = MasterBuilders::<(String, ArrayRef)>::builders_factory(
                             schema.to_path_buf(),
                             n_threads as i16,
                         );
