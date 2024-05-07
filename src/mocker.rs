@@ -272,9 +272,8 @@ impl MockerBuilder {
 
     /// Set the number of threads to use when generating mocked data with the [`Mocker`].
     pub fn num_threads(mut self, n_threads: usize) -> Self {
-        let multithreaded = n_threads > 1;
         self.n_threads = Some(n_threads);
-        self.multithreaded = Some(multithreaded);
+        self.multithreaded = Some(n_threads > 1);
         self
     }
 
