@@ -83,7 +83,7 @@ pub(crate) struct Mocker {
     schema: FixedSchema,
     n_rows: usize,
     n_threads: usize,
-    multithreaded: bool,
+    multithreading: bool,
     output_file: PathBuf,
     buffer_size: usize,
     thread_channel_capacity: usize,
@@ -106,10 +106,10 @@ impl Mocker {
     /// a few number of rows introduces much more computational overhead than
     /// necessary, so it is much more efficient to run in a single thread.
     pub fn generate(&mut self) {
-        if self.n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && self.multithreaded {
+        if self.n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && self.multithreading {
             self.generate_multithreaded();
         } else {
-            if self.multithreaded {
+            if self.multithreading {
                 warn!(
                     "You specified to use {} threads, but you only want to mock {} rows.",
                     self.n_threads, self.n_rows,
@@ -246,7 +246,7 @@ pub(crate) struct MockerBuilder {
     output_file: Option<PathBuf>,
     n_rows: Option<usize>,
     n_threads: Option<usize>,
-    multithreaded: Option<bool>,
+    multithreading: Option<bool>,
     buffer_size: Option<usize>,
     thread_channel_capacity: Option<usize>,
 }
@@ -273,7 +273,7 @@ impl MockerBuilder {
     /// Set the number of threads to use when generating mocked data with the [`Mocker`].
     pub fn num_threads(mut self, n_threads: usize) -> Self {
         self.n_threads = Some(n_threads);
-        self.multithreaded = Some(n_threads > 1);
+        self.multithreading = Some(n_threads > 1);
         self
     }
 
@@ -320,10 +320,10 @@ impl MockerBuilder {
             }
         };
 
-        let multithreaded: bool = match self.multithreaded {
+        let multithreading: bool = match self.multithreading {
             Some(m) => m,
             None => {
-                error!("Required field `multithreaded` not provided, exiting...");
+                error!("Required field `multithreading` not provided, exiting...");
                 return Err(Box::new(SetupError));
             }
         };
@@ -348,14 +348,14 @@ impl MockerBuilder {
         // roof and cause a program crash due to memory overflow and mem-swapping.
         let buffer_size: usize = match self.buffer_size {
             Some(s) => {
-                if n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && multithreaded {
+                if n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && multithreading {
                     s / (n_threads - 1)
                 } else {
                     s
                 }
             }
             None => {
-                if n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && multithreaded {
+                if n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && multithreading {
                     info!(
                         "Optional field `buffer_size` not provided, will use static value MOCKER_BUFFER_NUM_ROWS={}.",
                         MOCKER_BUFFER_NUM_ROWS / (n_threads - 1),
@@ -386,7 +386,7 @@ impl MockerBuilder {
             schema,
             n_threads,
             n_rows,
-            multithreaded,
+            multithreading,
             output_file,
             buffer_size,
             thread_channel_capacity,
