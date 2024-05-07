@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2023-11-25
-* Last updated: 2024-05-06
+* Last updated: 2024-05-08
 */
 
 use arrow2::datatypes::{DataType, Field, Schema};
@@ -33,6 +33,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::{fs, io};
 
+use crate::builder::{BooleanColumnBuilder, ColumnBuilder};
 use crate::mocking::{mock_bool, mock_float, mock_integer, mock_string};
 
 ///
@@ -101,6 +102,7 @@ impl FixedColumn {
 
     /// Find the matching [`arrow2::datatypes::DataType`]s corresponding
     /// to the [`FixedColumn`]s defined datatypes.
+    ///
     /// # Error
     /// Iff the [`FixedColumn`] datatype is not known.
     ///
@@ -126,10 +128,21 @@ impl FixedColumn {
             ))),
         }
     }
-}
 
-///
-impl FixedColumn {
+    ///
+    ///
+    /// Here it is ok to clone the [`String`] name because the [`ColumnBuilder`]s should
+    /// be allocated for an initialized at the start of the program, and not in any
+    /// loop or thread.
+    pub fn as_column_builder(&self) -> Box<dyn ColumnBuilder> {
+        match self.dtype.as_str() {
+            "bool" => Box::new(BooleanColumnBuilder::new(self.length, self.name.clone())),
+            "boolean" => Box::new(BooleanColumnBuilder::new(self.length, self.name.clone())),
+            _ => panic!("Could not find matching dtype when creating ColumnBuilder!"),
+        }
+    }
+
+    ///
     pub fn mock<'a>(&self, rng: &'a mut ThreadRng) -> String {
         let string = match self.dtype.as_str() {
             "bool" => mock_bool(rng),
@@ -229,6 +242,7 @@ impl FixedSchema {
     /// Consume the [`FixedSchema`] and produce a new [`arrow2::datatypes::Schema`].
     /// All of the [`FixedColumn`]s will tried to be parsed as their
     /// corresponding [`arrow2::datatypes::DataType`]s, but may fail.
+    ///
     /// # Error
     /// Iff any of the column datatypes can not be parsed to its
     /// corresponding [`arrow2::datatypes::DataType`].
@@ -240,6 +254,14 @@ impl FixedSchema {
             .collect();
 
         Schema::from(fields)
+    }
+
+    ///
+    pub fn as_column_builders(&self) -> Vec<Box<dyn ColumnBuilder>> {
+        self.columns
+            .iter()
+            .map(|c| c.as_column_builder())
+            .collect::<Vec<Box<dyn ColumnBuilder>>>()
     }
 
     /// Borrow the stored [`FixedColumn`]s and iterate over them.
