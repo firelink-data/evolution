@@ -89,6 +89,156 @@ pub(crate) struct Mocker {
     thread_channel_capacity: usize,
 }
 
+///
+impl Mocker {
+    /// Create a new instance of a [`MockerBuilder`] struct with default values.
+    pub fn builder() -> MockerBuilder {
+        MockerBuilder {
+            ..Default::default()
+        }
+    }
+
+    /// Start generating mocked data rows based on the provided struct fields.
+    /// Checks if the user wants to use multithreading and how many rows they
+    /// intend to generate. If the number of desired rows to generate is less
+    /// than [`MIN_NUM_ROWS_FOR_MULTITHREADING`] then the program will run in
+    /// single thread mode instead. Employing multithreading when generating
+    /// a few number of rows introduces much more computational overhead than
+    /// necessary, so it is much more efficient to run in a single thread.
+    pub fn generate(&mut self) {
+        if self.n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && self.multithreaded {
+            self.generate_multithreaded();
+        } else {
+            if self.multithreaded {
+                warn!(
+                    "You specified to use {} threads, but you only want to mock {} rows.",
+                    self.n_threads, self.n_rows,
+                );
+                warn!("This is done more efficiently single-threaded, ignoring multithreading!");
+            }
+            self.generate_single_thread();
+        }
+    }
+
+    /// Given n threads, the mocker will use n - 1 for generating data,
+    /// and 1 thread for writing data to disk.
+    fn distribute_thread_workload(&self) -> Vec<usize> {
+        let n_rows_per_thread = self.n_rows / (self.n_threads - 1);
+        (0..(self.n_threads - 2))
+            .map(|_| n_rows_per_thread)
+            .collect::<Vec<usize>>()
+    }
+
+    /// Generated mocked data in multithreading mode using [`rayon`] and parallel iteration.
+    #[cfg(feature = "rayon")]
+    fn generate_multithreaded(&self) {
+        // Calculate the workload for each worker thread, if the workload can not evenly
+        // be split among the threads, then the last thread will have to take the remainder.
+        let mut thread_workloads: Vec<usize> = self.distribute_thread_workload();
+        let remainder: usize = self.n_rows - thread_workloads.iter().sum::<usize>();
+        thread_workloads.push(remainder);
+
+        let mut writer: Box<dyn Writer> = writer_from_file_extension(&self.output_file);
+        let (sender, reciever) = channel::bounded(self.thread_channel_capacity);
+
+        info!(
+            "Starting {} worker threads with workload: {:?}",
+            thread_workloads.len(),
+            thread_workloads
+        );
+
+        let schema = Arc::new(self.schema.clone());
+        thread_workloads
+            .into_par_iter()
+            .enumerate()
+            .for_each_with(&sender, |s, (t, workload)| {
+                let t_schema = Arc::clone(&schema);
+                worker_thread_generate(s.clone(), t, workload, t_schema, self.buffer_size)
+            });
+
+        drop(sender);
+        master_thread_write(reciever, &mut writer);
+    }
+
+    /// Generate mocked data in multithreading mode using the standard library threads.
+    #[cfg(not(feature = "rayon"))]
+    fn generate_multithreaded(&self) {
+        // Calculate the workload for each worker thread, if the workload can not evenly
+        // be split among the threads, then the last thread will have to take the remainder.
+        let mut thread_workloads: Vec<usize> = self.distribute_thread_workload();
+        let remainder: usize = self.n_rows - thread_workloads.iter().sum::<usize>();
+        thread_workloads.push(remainder);
+
+        let mut writer: Box<dyn Writer> = writer_from_file_extension(&self.output_file);
+        let (sender, reciever) = channel::bounded(self.thread_channel_capacity);
+
+        info!(
+            "Starting {} worker threads with workload: {:?}",
+            thread_workloads.len(),
+            thread_workloads
+        );
+
+        let schema = Arc::new(self.schema.clone());
+        let threads = thread_workloads
+            .into_iter()
+            .enumerate()
+            .map(|(t, t_workload)| {
+                let t_schema = Arc::clone(&schema);
+                let t_sender = sender.clone();
+                let t_buffer_size = self.buffer_size;
+                spawn(move || {
+                    worker_thread_generate(t_sender, t, t_workload, t_schema, t_buffer_size)
+                })
+            })
+            .collect::<Vec<JoinHandle<()>>>();
+
+        drop(sender);
+        master_thread_write(reciever, &mut writer);
+
+        for handle in threads {
+            handle.join().expect("Could not join worker thread handle!");
+        }
+    }
+
+    // Generated mocked data in a single-threaded mode and write to disk.
+    // This will never induce any severe bottleneck due to heavy I/O like
+    // the multithreading mode can do. However, single-threaded mode will
+    // be significantly slower when generating the sweet-spot of rows
+    // which do not introduce long thread waiting times due to I/O.
+    fn generate_single_thread(&mut self) {
+        let row_len = self.schema.row_len();
+        let buffer_size: usize =
+            self.buffer_size * row_len + self.buffer_size * NUM_CHARS_FOR_NEWLINE;
+
+        let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
+        let mut rng: ThreadRng = rand::thread_rng();
+
+        let mut writer: Box<dyn Writer> = writer_from_file_extension(&self.output_file);
+
+        for row_idx in 0..self.n_rows {
+            if (row_idx % self.buffer_size == 0) && (row_idx != 0) {
+                writer.write(&buffer);
+                buffer.clear();
+            }
+
+            for column in self.schema.iter() {
+                pad_and_push_to_buffer(
+                    column.mock(&mut rng).as_bytes(),
+                    column.length(),
+                    Alignment::Right,
+                    Symbol::Whitespace,
+                    &mut buffer,
+                );
+            }
+
+            buffer.extend_from_slice(newline().as_bytes());
+        }
+
+        // Write any remaining contents of the buffer to disk.
+        writer.write(&buffer);
+    }
+}
+
 /// A builder struct that simplifies the creation of a valid [`Mocker`] instance.
 #[derive(Debug, Default)]
 pub(crate) struct MockerBuilder {
@@ -246,155 +396,6 @@ impl MockerBuilder {
 }
 
 ///
-impl Mocker {
-    /// Create a new instance of a [`MockerBuilder`] struct with default values.
-    pub fn builder() -> MockerBuilder {
-        MockerBuilder {
-            ..Default::default()
-        }
-    }
-
-    /// Start generating mocked data rows based on the provided struct fields.
-    /// Checks if the user wants to use multithreading and how many rows they
-    /// intend to generate. If the number of desired rows to generate is less
-    /// than [`MIN_NUM_ROWS_FOR_MULTITHREADING`] then the program will run in
-    /// single thread mode instead. Employing multithreading when generating
-    /// a few number of rows introduces much more computational overhead than
-    /// necessary, so it is much more efficient to run in a single thread.
-    pub fn generate(&mut self) {
-        if self.n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && self.multithreaded {
-            self.generate_multithreaded();
-        } else {
-            if self.multithreaded {
-                warn!(
-                    "You specified to use {} threads, but you only want to mock {} rows.",
-                    self.n_threads, self.n_rows,
-                );
-                warn!("This is done more efficiently single-threaded, ignoring multithreading!");
-            }
-            self.generate_single_thread();
-        }
-    }
-
-    /// Given n threads, the mocker will use n - 1 for generating data,
-    /// and 1 thread for writing data to disk.
-    fn distribute_thread_workload(&self) -> Vec<usize> {
-        let n_rows_per_thread = self.n_rows / (self.n_threads - 1);
-        (0..(self.n_threads - 2))
-            .map(|_| n_rows_per_thread)
-            .collect::<Vec<usize>>()
-    }
-
-    /// Generated mocked data in multithreading mode using [`rayon`] and parallel iteration.
-    #[cfg(feature = "rayon")]
-    fn generate_multithreaded(&self) {
-        // Calculate the workload for each worker thread, if the workload can not evenly
-        // be split among the threads, then the last thread will have to take the remainder.
-        let mut thread_workloads: Vec<usize> = self.distribute_thread_workload();
-        let remainder: usize = self.n_rows - thread_workloads.iter().sum::<usize>();
-        thread_workloads.push(remainder);
-
-        let mut writer: Box<dyn Writer> = writer_from_file_extension(&self.output_file);
-        let (sender, reciever) = channel::bounded(self.thread_channel_capacity);
-
-        info!(
-            "Starting {} worker threads with workload: {:?}",
-            thread_workloads.len(),
-            thread_workloads
-        );
-
-        let schema = Arc::new(self.schema.clone());
-        thread_workloads
-            .into_par_iter()
-            .enumerate()
-            .for_each_with(&sender, |s, (t, workload)| {
-                let t_schema = Arc::clone(&schema);
-                worker_thread_generate(s.clone(), t, workload, t_schema, self.buffer_size)
-            });
-
-        drop(sender);
-        master_thread_write(reciever, &mut writer);
-    }
-
-    /// Generate mocked data in multithreading mode using the standard library threads.
-    #[cfg(not(feature = "rayon"))]
-    fn generate_multithreaded(&self) {
-        // Calculate the workload for each worker thread, if the workload can not evenly
-        // be split among the threads, then the last thread will have to take the remainder.
-        let mut thread_workloads: Vec<usize> = self.distribute_thread_workload();
-        let remainder: usize = self.n_rows - thread_workloads.iter().sum::<usize>();
-        thread_workloads.push(remainder);
-
-        let mut writer: Box<dyn Writer> = writer_from_file_extension(&self.output_file);
-        let (sender, reciever) = channel::bounded(self.thread_channel_capacity);
-
-        info!(
-            "Starting {} worker threads with workload: {:?}",
-            thread_workloads.len(),
-            thread_workloads
-        );
-
-        let schema = Arc::new(self.schema.clone());
-        let threads = thread_workloads
-            .into_iter()
-            .enumerate()
-            .map(|(t, t_workload)| {
-                let t_schema = Arc::clone(&schema);
-                let t_sender = sender.clone();
-                let t_buffer_size = self.buffer_size;
-                spawn(move || {
-                    worker_thread_generate(t_sender, t, t_workload, t_schema, t_buffer_size)
-                })
-            })
-            .collect::<Vec<JoinHandle<()>>>();
-
-        drop(sender);
-        master_thread_write(reciever, &mut writer);
-
-        for handle in threads {
-            handle.join().expect("Could not join worker thread handle!");
-        }
-    }
-
-    // Generated mocked data in a single-threaded mode and write to disk.
-    // This will never induce any severe bottleneck due to heavy I/O like
-    // the multithreading mode can do. However, single-threaded mode will
-    // be significantly slower when generating the sweet-spot of rows
-    // which do not introduce long thread waiting times due to I/O.
-    fn generate_single_thread(&mut self) {
-        let row_len = self.schema.row_len();
-        let buffer_size: usize =
-            self.buffer_size * row_len + self.buffer_size * NUM_CHARS_FOR_NEWLINE;
-
-        let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
-        let mut rng: ThreadRng = rand::thread_rng();
-
-        let mut writer: Box<dyn Writer> = writer_from_file_extension(&self.output_file);
-
-        for row_idx in 0..self.n_rows {
-            if (row_idx % self.buffer_size == 0) && (row_idx != 0) {
-                writer.write(&buffer);
-                buffer.clear();
-            }
-
-            for column in self.schema.iter() {
-                pad_and_push_to_buffer(
-                    column.mock(&mut rng).as_bytes(),
-                    column.length(),
-                    Alignment::Right,
-                    Symbol::Whitespace,
-                    &mut buffer,
-                );
-            }
-
-            buffer.extend_from_slice(newline().as_bytes());
-        }
-
-        // Write any remaining contents of the buffer to disk.
-        writer.write(&buffer);
-    }
-}
-
 fn worker_thread_generate(
     channel: channel::Sender<Vec<u8>>,
     thread: usize,
