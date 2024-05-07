@@ -31,6 +31,7 @@ use log::info;
 
 use std::path::PathBuf;
 
+use crate::converter::Converter;
 use crate::error::Result;
 use crate::mocker::Mocker;
 use crate::threads::get_available_threads;
@@ -79,6 +80,24 @@ enum Commands {
             action = ArgAction::Set,
         )]
         schema: PathBuf,
+
+        /// Set the size of the buffer (in bytes).
+        #[arg(
+            long = "buffer-size",
+            value_name = "BUFFER-SIZE",
+            action = ArgAction::Set,
+            required = false,
+        )]
+        buffer_size: Option<usize>,
+
+        /// Set the capacity of the thread channel (number of messages).
+        #[arg(
+            long = "thread-channel-capacity",
+            value_name = "THREAD-CHANNEL-CAPACITY",
+            action = ArgAction::Set,
+            required = false,
+        )]
+        thread_channel_capacity: Option<usize>,
     },
 
     /// Generate mocked fixed-length files (.flf) for testing purposes.
@@ -149,9 +168,21 @@ impl Cli {
         }
 
         match &self.command {
-            Commands::Convert { file: _, schema: _ } => {
-                todo!();
-            }
+            Commands::Convert {
+                file,
+                schema,
+                buffer_size,
+                thread_channel_capacity,
+            } => {
+                Converter::builder()
+                    .file(file.to_owned())
+                    .schema(schema.to_owned())
+                    .num_threads(n_threads)
+                    .buffer_size(*buffer_size)
+                    .thread_channel_capacity(*thread_channel_capacity)
+                    .build()?
+                    .convert();
+            },
             Commands::Mock {
                 schema,
                 output_file,

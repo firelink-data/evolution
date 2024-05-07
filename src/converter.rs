@@ -22,379 +22,311 @@
 * SOFTWARE.
 *
 * File created: 2024-02-17
-* Last updated: 2024-05-05
+* Last updated: 2024-05-07
 */
 
-use crate::schema::FixedSchema;
-
-use arrow::array::ArrayRef;
-use arrow::record_batch::RecordBatch;
-use crossbeam::channel;
+use libc;
 use log::{debug, error, info};
-use parquet::arrow::ArrowWriter;
-use parquet::basic::Compression;
-use parquet::file::properties::WriterProperties;
-use rayon::prelude::*;
 
-use std::fs::{File, OpenOptions};
+use std::fs::File;
+use std::mem;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
-use std::slice::Iter;
 
-pub(crate) static DEFAULT_SLICE_BUFFER_LEN: usize = 4 * 1024 * 1024;
-pub(crate) static DEFAULT_SLICER_THREAD_CHANNEL_CAPACITY: usize = 128;
-pub(crate) static DEFAULT_MASTER_THREAD_BATCH_CAPACITY: usize = 128;
+use crate::builder::ColumnBuilder;
+use crate::error::{Result, SetupError};
+use crate::schema::FixedSchema;
+use crate::slicer::Slicer;
 
 ///
+pub(crate) static CONVERTER_SLICE_BUFFER_SIZE: usize = 2 * 1024 * 1024;
+///
+pub(crate) static CONVERTER_THREAD_CHANNEL_CAPACITY: usize = 128;
+///
+pub(crate) static CONVERTER_LINE_BREAKS_BUFFER_SIZE: usize = 1 * 1024 * 1024;
+
+///
+#[derive(Debug)]
 pub struct Converter {
     file: File,
     schema: FixedSchema,
     n_threads: usize,
-    multithreaded: bool,
+    multithreading: bool,
+    buffer_size: usize,
+    thread_channel_capacity: usize,
+    slicer: Slicer,
 }
 
 ///
 impl Converter {
-    ///
-    pub fn new(file: PathBuf, schema: FixedSchema, n_threads: usize) -> Self {
-        Self {
-            file: File::open(&file).expect("Could not open file"),
-            schema,
-            n_threads,
-            multithreaded: n_threads > 1,
+    /// Create a new instance of a [`Converter`] struct with default values.
+    pub fn builder() -> ConverterBuilder {
+        ConverterBuilder {
+            ..Default::default()
         }
     }
 
     ///
     pub fn convert(&mut self) {
-        info!("Using {} threads.", self.n_threads);
-        if self.multithreaded {
-            self.convert_multithreaded();
+        if self.multithreading {
+            info!("Converting in multithreaded mode using {} threads.", self.n_threads);
+            self.convert_multithreaded()
         } else {
-            self.convert_single_threaded();
+            info!("Converting in single-threaded mode.");
+            self.convert_single_threaded()
         }
-    }
-
-    ///
-    fn convert_single_threaded(&self) {
-        todo!()
     }
 
     ///
     fn convert_multithreaded(&mut self) {
-        let bytes_to_read = self
+        todo!();
+    }
+
+    /// Converts the target file in single-threaded mode.
+    ///
+    /// # Panics
+    /// Thread can panic for the following reasons:
+    ///  - If the file descriptor could not read metadata of the target file.
+    ///  - If there existed no line break characters in the buffer that [`BufReader`] writes to.
+    ///  - If the [`BufReader`] was not able to move the read cursor back relatively.
+    ///
+    /// # Unsafe
+    /// We use [`libc::memset`] to directly write to and 'reset' the buffer in memory.
+    /// This can cause a Segmentation fault if e.g. the memory is not allocated properly,
+    /// or we are trying to write outside of the allocated memory area.
+    fn convert_single_threaded(&mut self) {
+        let bytes_to_read: usize = self
             .file
             .metadata()
-            .expect("Could not read file metadata")
+            .expect("Could not read file metadata!")
             .len() as usize;
-        info!("File is {} bytes total!", bytes_to_read);
-        let mut remaining_bytes = bytes_to_read;
+
+        info!("Target file is {} bytes in total.", bytes_to_read);
+
+        let mut remaining_bytes: usize = bytes_to_read;
         let mut bytes_processed: usize = 0;
         let mut bytes_overlapped: usize = 0;
+        let mut buffer_capacity = self.buffer_size;
 
-        let mut buff_capacity = DEFAULT_SLICE_BUFFER_LEN;
-        let mut file_reader = BufReader::new(&self.file);
+        // We wrap the file descriptor in a [`BufReader`] to improve the syscall
+        // efficiency of small and repeated I/O calls to the same file.
+        let mut reader: BufReader<&File> = BufReader::new(&self.file);
+        let mut buffer: Vec<u8> = vec![0u8; buffer_capacity];
+
+        let mut line_break_indices: Vec<usize> = Vec::with_capacity(CONVERTER_LINE_BREAKS_BUFFER_SIZE);
+        let mut builders: Vec<Box<dyn ColumnBuilder>> = self.schema.as_column_builders();
 
         loop {
-            // When we have read all the bytes we break.
-            // We know about this cus we reach EOF in the BufReader.
-            if bytes_processed >= bytes_to_read {
-                break;
+            if bytes_processed >= bytes_to_read { break; }
+
+            if remaining_bytes < buffer_capacity { buffer_capacity = remaining_bytes; }
+
+            debug!("(UNSAFE) clearing read buffer.");
+            unsafe {
+                libc::memset(buffer.as_mut_ptr() as _, 0, buffer.capacity() * mem::size_of::<u8>());
             }
 
-            if remaining_bytes < DEFAULT_SLICE_BUFFER_LEN {
-                buff_capacity = remaining_bytes;
-            };
+            match reader.read_exact(&mut buffer).is_ok() {
+                true => (),
+                false => debug!("EOF reached, this is the last time reading the buffer."),
+            }
 
-            // Read part of the file and find index of where to slice the file.
-            let mut buffer: Vec<u8> = vec![0u8; buff_capacity];
-            match file_reader.read_exact(&mut buffer).is_ok() {
-                true => {}
-                false => {
-                    debug!("EOF, this is the last time reading to buffer...");
-                }
-            };
-
-            let line_indices: Vec<usize> = find_line_breaks_unix(&buffer);
+            self.slicer.find_line_breaks(&buffer, &mut line_break_indices);
             let byte_idx_last_line_break =
-                line_indices.last().expect("The line index list was empty!");
-            let n_bytes_left_after_line_break = buff_capacity - 1 - byte_idx_last_line_break;
+                line_break_indices.last().expect("No line breaks found in the read buffer!");
+            let n_bytes_left_after_line_break =
+                buffer_capacity - 1 - byte_idx_last_line_break;
 
-            // We want to move the file descriptor cursor back N bytes so
-            // that the next reed starts on a new row! Otherwise we will
-            // miss data, however, this means that we are reading some
-            // of the data multiple times. A little bit of an overlap but that's fine...
-            match file_reader
-                .seek_relative(-(n_bytes_left_after_line_break as i64))
-                .is_ok()
-            {
-                true => {}
-                false => {
-                    error!("Could not move BufReader cursor back!");
-                }
+            match reader.seek_relative(-(n_bytes_left_after_line_break as i64)).is_ok() {
+                true => {},
+                false => panic!("Could not move cursor back in BufReader!"),
             };
 
-            bytes_processed += buff_capacity - n_bytes_left_after_line_break;
+            bytes_processed += buffer_capacity - n_bytes_left_after_line_break;
             bytes_overlapped += n_bytes_left_after_line_break;
-            remaining_bytes -= buff_capacity - n_bytes_left_after_line_break;
+            remaining_bytes -= buffer_capacity - n_bytes_left_after_line_break;
 
-            let mut slices: Vec<&[u8]> = Vec::with_capacity(self.n_threads - 1);
+            let mut prev_line_break_idx: usize = 0;
+            for line_break_idx in line_break_indices.iter() {
+                let line: &[u8] = &buffer[prev_line_break_idx..*line_break_idx];
+                let mut prev_byte_idx: usize = 0;
+                for builder in builders.iter_mut() {
+                    let byte_idx: usize = self.slicer.find_num_bytes_for_num_runes(
+                        &line[prev_byte_idx..],
+                        builder.runes(),
+                    );
 
-            let thread_workloads: Vec<&[usize]> =
-                self.distribute_worker_thread_workloads(&line_indices);
-            debug!("Thread workload: {:?}", thread_workloads);
-            for range in thread_workloads.iter() {
-                slices.push(&buffer[range[0]..range[range.len() - 1]]);
+                    builder.push_bytes(&line[prev_byte_idx..byte_idx]);
+                    prev_byte_idx += byte_idx;
+                }
+                prev_line_break_idx = *line_break_idx;
             }
 
-            spawn_convert_threads(&slices, &thread_workloads, self.schema.to_owned());
+            // TODO: add a writer to the Convert struct which takes the finished builders
+            // and writes to disk.
+
+            debug!("Bytes processed: {}", bytes_processed);
+            debug!("Remaining bytes: {}", remaining_bytes);
+
+            debug!("Clearing line break indices buffer.");
+            line_break_indices.clear();
         }
+
         info!(
-            "We read {} bytes two times (due to sliding window overlap).",
-            bytes_overlapped
+            "Done converting! We read {} bytes two times (due to sliding window overlap)", 
+            bytes_overlapped,
         );
+    }
+}
+
+///
+#[derive(Debug, Default)]
+pub struct ConverterBuilder {
+    file_path: Option<PathBuf>,
+    schema_path: Option<PathBuf>,
+    n_threads: Option<usize>,
+    multithreading: Option<bool>,
+    buffer_size: Option<usize>,
+    thread_channel_capacity: Option<usize>,
+}
+
+///
+impl ConverterBuilder {
+    /// Set the [`PathBuf`] for the target file to convert.
+    pub fn file(mut self, file_path: PathBuf) -> Self {
+        self.file_path = Some(file_path);
+        self
+    }
+
+    /// Set the [`PathBuf`] for the schema of the target file.
+    pub fn schema(mut self, schema_path: PathBuf) -> Self {
+        self.schema_path = Some(schema_path);
+        self
+    }
+
+    /// Set the number of threads to use when converting the target file with the [`Converter`].
+    pub fn num_threads(mut self, n_threads: usize) -> Self {
+        self.n_threads = Some(n_threads);
+        self.multithreading = Some(n_threads > 1);
+        self
     }
 
     ///
-    fn distribute_worker_thread_workloads<'a>(
-        &'a self,
-        line_indices: &'a Vec<usize>,
-    ) -> Vec<&'a [usize]> {
-        let n_line_indices: usize = line_indices.len();
-        let n_rows_per_thread: usize = n_line_indices / (self.n_threads - 1);
-
-        let remainder: usize = line_indices.len() % (self.n_threads - 1);
-        debug!("n rows per thread: {:?}", n_rows_per_thread);
-        debug!("Last thread will get {} extra bytes to process.", remainder);
-
-        let mut workload: Vec<&[usize]> = Vec::with_capacity(self.n_threads);
-        let mut prev_idx: usize = 0;
-        for idx in 1..self.n_threads - 1 {
-            let next_idx = line_indices[n_rows_per_thread * idx];
-            workload.push(&line_indices[prev_idx..n_rows_per_thread * idx]);
-            // If this is a Windows system it should add 2 instead, because of CR+LF!
-            prev_idx = next_idx + 1;
-        }
-
-        workload.push(&line_indices[prev_idx..n_line_indices - 1]);
-        workload
-    }
-}
-
-pub fn spawn_convert_threads(
-    slices: &Vec<&[u8]>,
-    thread_workloads: &Vec<&[usize]>,
-    schema: FixedSchema,
-) {
-    todo!();
-}
-
-/*
-///
-pub fn spawn_convert_threads(
-    slices: &Vec<&[u8]>,
-    thread_workloads: &Vec<&[usize]>,
-    schema: FixedSchema,
-) {
-    let (sender, receiver) = channel::bounded(DEFAULT_SLICER_THREAD_CHANNEL_CAPACITY);
-    let mut empty_column_builders = schema
-        .iter()
-        .map(|c| c.as_column_builder())
-        .collect::<Vec<Box<dyn ColumnBuilder>>>();
-
-    let col_refs = empty_column_builders
-        .iter_mut()
-        .map(|b| b.finish())
-        .collect::<Vec<(&str, ArrayRef)>>();
-
-    let out_path = PathBuf::from("output.parquet");
-    let out_file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(out_path)
-        .expect("Could not create file descriptor!");
-
-    let properties = WriterProperties::builder()
-        .set_compression(Compression::SNAPPY)
-        .build();
-
-    let record_batch = RecordBatch::try_from_iter(col_refs)
-        .expect("Could not create RecordBatch from FixedSchema!");
-
-    let mut writer: ArrowWriter<File> = ArrowWriter::try_new(
-        out_file, record_batch.schema(), Some(properties.clone())
-    ).expect("Could not create ArrowWriter from RecordBatch!");
-
-    let mut thread_column_builders: Vec<Vec<Box<dyn ColumnBuilder>>> = Vec::with_capacity(thread_workloads.len());
-    for _ in 0..thread_workloads.len() {
-        let mut tcb = schema
-            .iter()
-            .map(|c| c.as_column_builder())
-            .collect::<Vec<Box<dyn ColumnBuilder>>>();
-        thread_column_builders.push(tcb);
+    pub fn buffer_size(mut self, buffer_size: Option<usize>) -> Self {
+        self.buffer_size = buffer_size;
+        self
     }
 
-    slices
-        .into_par_iter()
-        .enumerate()
-        .for_each_with(&sender,|s, (t, slice)| worker_thread_convert(t, *slice, thread_workloads[t], &mut thread_column_builders[t], &schema, s));
-
-    drop(sender);
-    master_thread_convert(&receiver, &mut writer);
-}
-
-///
-pub fn master_thread_convert(
-    channel: &channel::Receiver<Box<(&str, ArrayRef)>>,
-    writer: &mut ArrowWriter<File>,
-) {
-    let mut batch: Vec<(&str, ArrayRef)> = Vec::with_capacity(DEFAULT_MASTER_THREAD_BATCH_CAPACITY);
-    let mut accumulated_arrays: usize = 0;
-
-    for worker_box in channel {
-        if accumulated_arrays >= DEFAULT_MASTER_THREAD_BATCH_CAPACITY {
-            let record_batch = RecordBatch::try_from_iter(batch)
-                .expect("Could not create RecordBatch from worker thread channel data!");
-
-            writer.write(&record_batch)
-                .expect("Could not write the contents of RecordBatch to parquet file!");
-
-            // We can not use vec.clear() here because the Vec is consumed above when we call
-            // RecordBatch::try_from_iter(vec). So we have to reallocate the memory...
-            batch = Vec::with_capacity(DEFAULT_MASTER_THREAD_BATCH_CAPACITY);
-            accumulated_arrays = 0;
-        }
-
-        let (col_name, array_ref) = *worker_box;
-        batch.push((col_name, array_ref));
-        accumulated_arrays += 1;
+    ///
+    pub fn thread_channel_capacity(
+        mut self,
+        thread_channel_capacity: Option<usize>,
+    ) -> Self {
+        self.thread_channel_capacity = thread_channel_capacity;
+        self
     }
 
-    writer.finish();
-}
-
-///
-pub fn worker_thread_convert<'a>(
-    thread: usize,
-    slice: &[u8],
-    line_breaks: &[usize],
-    column_builders: &'a mut Vec<Box<dyn ColumnBuilder>>,
-    schema: &'a FixedSchema,
-    sender: &channel::Sender<Box<(&'a str, ArrayRef)>>,
-) {
-    info!("Thread {} converting new slice...", thread);
-
-    let col_lengths: Vec<usize> = schema.column_lengths();
-    let mut prev_line_idx: usize = 0;
-
-    for line_break_idx in line_breaks.into_iter() {
-        let line: &[u8] = &slice[prev_line_idx..*line_break_idx];
-        let byte_indices: Vec<usize> = byte_indices_from_runes(
-            line,
-            col_lengths.iter().sum(),
-            &col_lengths,
-        );
-
-        let mut prev_byte_idx: usize = 0;
-        for (builder_idx, byte_idx) in byte_indices.iter().enumerate() {
-            column_builders[builder_idx].push_bytes(&line[prev_byte_idx..*byte_idx]);
-            prev_byte_idx = *byte_idx;
-        }
-
-        prev_line_idx = *line_break_idx;
-    }
-
-    for builder in column_builders {
-        let _ = sender.send(Box::new(builder.finish()))
-            .expect("Could not send ColumnBuilder output from worker thread to channel!");
-    }
-}
-*/
-
-#[allow(dead_code)]
-/// On windows systems line breaks in files are represented by "\r\n",
-/// also called CR+LF (Carriage Return + Line Feed), represented by
-/// the bytes 0x0d and 0x0a.
-///
-/// TODO: this should be used whenever host system is windows!
-pub fn find_line_breaks_windows(bytes: &[u8]) -> Vec<(usize, usize)> {
-    if bytes.is_empty() {
-        panic!("Empty bytes slice!");
-    }
-
-    let n_bytes = bytes.len();
-    if n_bytes == 0 {
-        panic!("No bytes in buffer!");
-    }
-
-    let mut line_breaks: Vec<(usize, usize)> = vec![];
-    let mut last_idx: usize = 0;
-    for idx in 1..n_bytes {
-        if bytes[idx - 1] == 0x0d && bytes[idx] == 0x0a {
-            line_breaks.push((last_idx, idx));
-            last_idx = idx;
-        }
-    }
-
-    line_breaks
-}
-
-/// On *nix systems line breaks in files are represented by "\n",
-/// also called LF (Line Feed), represented by the byte 0x0a.
-pub fn find_line_breaks_unix(bytes: &[u8]) -> Vec<usize> {
-    if bytes.is_empty() {
-        panic!("Empty bytes slice!");
-    }
-
-    let n_bytes = bytes.len();
-    // The only way we can have only one byte left to read is if we have read everything
-    // and then this byte will represent EOF, most likely a "\n"?..
-    if n_bytes == 0 {
-        panic!("No bytes in buffer!");
-    }
-
-    let mut line_breaks: Vec<usize> = vec![];
-    for idx in 0..n_bytes {
-        if bytes[idx] == 0x0a {
-            line_breaks.push(idx);
-        }
-    }
-
-    line_breaks
-}
-
-///
-pub fn byte_indices_from_runes(
-    line: &[u8],
-    total_runes: usize,
-    col_lengths: &Vec<usize>,
-) -> Vec<usize> {
-    let mut acc_runes: usize = 0;
-    let mut num_bytes: usize = 0;
-    let mut units: usize = 1;
-    let mut iterator: Iter<u8> = line.iter();
-    let mut byte_indices: Vec<usize> = Vec::with_capacity(col_lengths.len());
-
-    while acc_runes < total_runes {
-        let byte = match iterator.nth(units - 1) {
-            None => return byte_indices,
-            Some(b) => *b,
+    /// Verify that all required fields have been set approriately and then
+    /// create a new [`Converter`] instance based on the provided fields.
+    /// Any optional fields not provided will be set according to either
+    /// random strategies or assigned global static variables.
+    ///
+    /// # Error
+    /// Iff any of the required fields are `None`.
+    pub fn build(self) -> Result<Converter> {
+        let file: File = match self.file_path {
+            Some(path) => {
+                match File::open(path) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        error!("Could not open target `file_path`, reason: {}", e);
+                        return Err(Box::new(SetupError));
+                    },
+                }
+            },
+            None => {
+                error!("Required field `file_path` not provided, exiting...");
+                return Err(Box::new(SetupError));
+            },
         };
 
-        units = match byte {
-            byte if byte >> 7 == 0 => 1,
-            byte if byte >> 5 == 0b110 => 2,
-            byte if byte >> 4 == 0b1110 => 3,
-            byte if byte >> 3 == 0b1110 => 4,
-            _ => {
-                panic!("Incorrect UTF-8 sequence!");
+        // The call to [`FixedSchema::from_path`] might panic.
+        let schema: FixedSchema = match self.schema_path {
+            Some(path) => FixedSchema::from_path(path),
+            None => {
+                error!("Required field `schema_path` not provided, exiting...");
+                return Err(Box::new(SetupError));
+            },
+        };
+
+        let n_threads: usize = match self.n_threads {
+            Some(n) => n,
+            None => {
+                error!("Required field `n_threads` not provided, exiting...");
+                return Err(Box::new(SetupError));
+            },
+        };
+
+        let multithreading: bool = match self.multithreading {
+            Some(b) => b,
+            None => {
+                error!("Required field `multithreading` not provided, exiting...");
+                return Err(Box::new(SetupError));
+            },
+        };
+
+        //
+        // Optional configuration below.
+        //
+        let buffer_size: usize = match self.buffer_size {
+            Some(s) => {
+                if multithreading {
+                    s / (n_threads - 1)
+                } else {
+                    s
+                }
+            }
+            None => {
+                if multithreading {
+                    info!(
+                        "Optional field `buffer_size` not provided, will use static value CONVERTER_SLICE_BUFFER_SIZE={}.",
+                        CONVERTER_SLICE_BUFFER_SIZE / (n_threads - 1),
+                    );
+                    CONVERTER_SLICE_BUFFER_SIZE / (n_threads - 1)
+                } else {
+                    info!(
+                        "Optional field `buffer_size` not provided, will use static value CONVERTER_SLICE_BUFFER_SIZE={}.",
+                        CONVERTER_SLICE_BUFFER_SIZE,
+                    );
+                    CONVERTER_SLICE_BUFFER_SIZE
+                }
             }
         };
 
-        acc_runes += 1;
-        num_bytes += units;
-        byte_indices.push(num_bytes);
-    }
+        let thread_channel_capacity: usize = match self.thread_channel_capacity {
+            Some(c) => c,
+            None => {
+                info!(
+                    "Optional field `thread_channel_capacity` not provided, will use static value CONVERTER_THREAD_CHANNEL_CAPACITY={}.",
+                      CONVERTER_THREAD_CHANNEL_CAPACITY,
+                );
+                CONVERTER_THREAD_CHANNEL_CAPACITY
+            }
+        };
 
-    byte_indices
+        let slicer = Slicer::builder()
+            .num_threads(n_threads)
+            .build()?;
+
+        Ok(Converter {
+            file,
+            schema,
+            n_threads,
+            multithreading,
+            buffer_size,
+            thread_channel_capacity,
+            slicer,
+        })
+    }
 }
+
