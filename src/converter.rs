@@ -22,11 +22,15 @@
 * SOFTWARE.
 *
 * File created: 2024-02-17
-* Last updated: 2024-05-08
+* Last updated: 2024-05-09
 */
 
+use arrow::array::ArrayRef;
+use arrow::record_batch::RecordBatch;
 use libc;
 use log::{debug, error, info};
+use parquet::basic::Compression;
+use parquet::file::properties::WriterProperties;
 
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -35,8 +39,10 @@ use std::path::PathBuf;
 
 use crate::builder::ColumnBuilder;
 use crate::error::{Result, SetupError};
+use crate::mocker::NUM_CHARS_FOR_NEWLINE;
 use crate::schema::FixedSchema;
 use crate::slicer::Slicer;
+use crate::writer::{ParquetWriter, Writer};
 
 ///
 pub(crate) static CONVERTER_SLICE_BUFFER_SIZE: usize = 2 * 1024 * 1024;
@@ -48,7 +54,8 @@ pub(crate) static CONVERTER_LINE_BREAKS_BUFFER_SIZE: usize = 1 * 1024 * 1024;
 ///
 #[derive(Debug)]
 pub struct Converter {
-    file: File,
+    output_path: PathBuf,
+    target_file: File,
     schema: FixedSchema,
     n_threads: usize,
     multithreading: bool,
@@ -99,7 +106,7 @@ impl Converter {
     /// or we are trying to write outside of the allocated memory area.
     fn convert_single_threaded(&mut self) {
         let bytes_to_read: usize = self
-            .file
+            .target_file
             .metadata()
             .expect("Could not read file metadata!")
             .len() as usize;
@@ -113,13 +120,38 @@ impl Converter {
 
         // We wrap the file descriptor in a [`BufReader`] to improve the syscall
         // efficiency of small and repeated I/O calls to the same file.
-        let mut reader: BufReader<&File> = BufReader::new(&self.file);
+        let mut reader: BufReader<&File> = BufReader::new(&self.target_file);
         let mut buffer: Vec<u8> = vec![0u8; buffer_capacity];
 
         let mut line_break_indices: Vec<usize> =
             Vec::with_capacity(CONVERTER_LINE_BREAKS_BUFFER_SIZE);
         let mut builders: Vec<Box<dyn ColumnBuilder>> = self.schema.as_column_builders();
 
+        // Setup writer configuration for specific target schema.
+        let mut empty_column_builders = self.schema
+            .iter()
+            .map(|col| col.as_column_builder())
+            .collect::<Vec<Box<dyn ColumnBuilder>>>();
+
+        let column_refs = empty_column_builders
+            .iter_mut()
+            .map(|builder| builder.finish())
+            .collect::<Vec<(&str, ArrayRef)>>();
+
+        let writer_record_batch = RecordBatch::try_from_iter(column_refs)
+            .expect("Could not create RecordBatch from FixedSchema columns!");
+
+        let writer_properties = WriterProperties::builder()
+            .set_compression(Compression::SNAPPY)
+            .build();
+
+        debug!("Creating and setting up ParquetWriter.");
+        let mut writer: ParquetWriter = ParquetWriter::new(&self.output_path);
+        writer.set_properties(writer_properties);
+        writer.set_record_batch(writer_record_batch);
+        writer.setup_arrow_writer();
+
+        // Here we start processing the target file.
         loop {
             if bytes_processed >= bytes_to_read {
                 break;
@@ -164,35 +196,78 @@ impl Converter {
 
             let mut prev_line_break_idx: usize = 0;
             for line_break_idx in line_break_indices.iter() {
+
                 let line: &[u8] = &buffer[prev_line_break_idx..*line_break_idx];
                 let mut prev_byte_idx: usize = 0;
+
                 for builder in builders.iter_mut() {
                     let byte_idx: usize = self
                         .slicer
                         .find_num_bytes_for_num_runes(&line[prev_byte_idx..], builder.runes());
 
-                    builder.parse_and_push_bytes(&line[prev_byte_idx..byte_idx + prev_byte_idx]);
-                    prev_byte_idx += byte_idx;
+                    let next_byte_idx: usize = prev_byte_idx + byte_idx;
+
+                    builder.parse_and_push_bytes(&line[prev_byte_idx..next_byte_idx]);
+                    prev_byte_idx = next_byte_idx;
                 }
-                prev_line_break_idx = *line_break_idx;
+                prev_line_break_idx = *line_break_idx + NUM_CHARS_FOR_NEWLINE;
             }
 
-            // TODO: add a writer to the Convert struct which takes the finished builders
-            // and writes to disk.
-            
+            line_break_indices.clear();
+
+            // IF WE DO THIS WE CAN COMPILE, BUT HERE WE ALLOCATE MEMORY
+            // FOR A NEW VEC EVERY ITERATION OF THE LOOP. WE WANT TO REUSE
+            // MEMORY PREFERABLY, but can't find a way to do that with the
+            // required mutable borrows going on...
+            //
+            // I think I understand why...
+            // Because we allocated the mutable buffer outside of the loop
+            // and then push mutably borrowed items from inside the loop
+            // the borrow checker sees that we might have access to that
+            // mutably borrowed memory after the loop, i.e., two mutable
+            // references at the same time. This is not ok.
+            //
+            // // Create the mutable builders and buffers.
+            // let mut builders = Vec::with_capacity();
+            // let mut buffer = Vec::with_capacity();
+            // loop {
+            //     // Mutably borrow the builders in iterator
+            //     for builder in builders.iter_mut() {
+            //         ...
+            //     }
+            //
+            //     for builder in builders.iter_mut() {
+            //         // Try add push mutable reference to buffer outside of the
+            //         // scope of the loop, this is not ok!
+            //         buffer.push(builder.finish());
+            //     }
+            // 
+            // }
+            //
+            // // Here we still MIGHT have access to the mutable references
+            // // created inside the loop.
+            // let _ = buffer[0];  <- here we can access mutably borrowed memory
+            //
+            // NOTE: THIS REALLOCATES THE MEMORY ON THE HEAP!
+            let mut builder_write_buffer: Vec<(&str, ArrayRef)> = vec![];
+
             for builder in builders.iter_mut() {
-                builder.finish();
+                builder_write_buffer.push(builder.finish());
             }
+
+            let batch = RecordBatch::try_from_iter(builder_write_buffer)
+                .expect("Could not create RecordBatch from finished ArrayRefs!");
+
+            writer.write_batch(&batch);
 
             debug!("Bytes processed: {}", bytes_processed);
             debug!("Remaining bytes: {}", remaining_bytes);
-
-            debug!("Clearing line break indices buffer.");
-            line_break_indices.clear();
         }
 
+        writer.finish();
+
         info!(
-            "Done converting! We read {} bytes two times (due to sliding window overlap)",
+            "Done converting! We read {} bytes two times (due to sliding window overlap).",
             bytes_overlapped,
         );
     }
@@ -201,7 +276,8 @@ impl Converter {
 ///
 #[derive(Debug, Default)]
 pub struct ConverterBuilder {
-    file_path: Option<PathBuf>,
+    target_file_path: Option<PathBuf>,
+    output_file_path: Option<PathBuf>,
     schema_path: Option<PathBuf>,
     n_threads: Option<usize>,
     multithreading: Option<bool>,
@@ -212,8 +288,14 @@ pub struct ConverterBuilder {
 ///
 impl ConverterBuilder {
     /// Set the [`PathBuf`] for the target file to convert.
-    pub fn file(mut self, file_path: PathBuf) -> Self {
-        self.file_path = Some(file_path);
+    pub fn target_file(mut self, file_path: PathBuf) -> Self {
+        self.target_file_path = Some(file_path);
+        self
+    }
+
+    /// Set the [`PathBuf`] for the output file of the converted data.
+    pub fn output_file(mut self, file_path: PathBuf) -> Self {
+        self.output_file_path = Some(file_path);
         self
     }
 
@@ -250,16 +332,24 @@ impl ConverterBuilder {
     /// # Error
     /// Iff any of the required fields are `None`.
     pub fn build(self) -> Result<Converter> {
-        let file: File = match self.file_path {
-            Some(path) => match File::open(path) {
+        let target_file: File = match self.target_file_path {
+            Some(p) => match File::open(&p) {
                 Ok(f) => f,
                 Err(e) => {
-                    error!("Could not open target `file_path`, reason: {}", e);
+                    error!("Could not open target file path, reason: {}", e);
                     return Err(Box::new(SetupError));
                 }
             },
             None => {
-                error!("Required field `file_path` not provided, exiting...");
+                error!("Required field target_file_path not provided, exiting...");
+                return Err(Box::new(SetupError));
+            }
+        };
+
+        let output_path: PathBuf = match self.output_file_path {
+            Some(p) => p,
+            None => {
+                error!("Required field target_file_path not provided, exiting...");
                 return Err(Box::new(SetupError));
             }
         };
@@ -331,7 +421,8 @@ impl ConverterBuilder {
         let slicer = Slicer::builder().num_threads(n_threads).build()?;
 
         Ok(Converter {
-            file,
+            output_path,
+            target_file,
             schema,
             n_threads,
             multithreading,
