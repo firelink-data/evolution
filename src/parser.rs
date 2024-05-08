@@ -21,39 +21,46 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 * SOFTWARE.
 *
-* File created: 2023-11-21
+* File created: 2024-05-08
 * Last updated: 2024-05-08
 */
 
-use clap::Parser;
-use log::{debug, error, info};
+use padder::{Alignment, Symbol};
 
-mod builder;
-mod cli;
-mod converter;
-mod error;
-mod logger;
-mod mocker;
-mod mocking;
-mod parser;
-mod schema;
-mod slicer;
-mod threads;
-mod writer;
+use std::str::from_utf8;
 
-use cli::Cli;
+use crate::error::Result;
 
 ///
-fn main() {
-    let cli = Cli::parse();
+#[derive(Debug)]
+pub(crate) struct BooleanParser {
+    alignment: Alignment,
+    trim_symbol: Symbol,
+}
 
-    match logger::setup_log() {
-        Ok(_) => debug!("Logging setup, ok!"),
-        Err(e) => error!("Could not set up env logging: {:?}", e),
-    };
+///
+impl BooleanParser {
+    ///
+    pub fn new(alignment: Alignment, trim_symbol: Symbol) -> Self {
+        Self {
+            alignment,
+            trim_symbol,
+        }
+    }
 
-    match cli.run() {
-        Ok(_) => info!("All done! Bye. 👋🥳"),
-        Err(e) => error!("Something went wrong during execution: {:?}", e),
+    ///
+    pub fn parse(&self, bytes: &[u8]) -> Result<bool> {
+        let text: &str = from_utf8(bytes)?;
+        let trimmed: &str = self.trim(text);
+        Ok(trimmed.parse::<bool>()?)
+    }
+
+    ///
+    fn trim<'a>(&self, text: &'a str) -> &'a str {
+        match self.alignment {
+            Alignment::Left => text.trim_end_matches::<char>(self.trim_symbol.into()),
+            Alignment::Right => text.trim_start_matches::<char>(self.trim_symbol.into()),
+            Alignment::Center => text.trim_matches::<char>(self.trim_symbol.into()),
+        }
     }
 }

@@ -182,7 +182,7 @@ impl Cli {
                     .thread_channel_capacity(*thread_channel_capacity)
                     .build()?
                     .convert();
-            },
+            }
             Commands::Mock {
                 schema,
                 output_file,

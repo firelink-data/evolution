@@ -25,16 +25,19 @@
 * Last updated: 2024-05-08
 */
 
-use arrow::array::BooleanBuilder;
-use log::{debug, warn};
+use arrow::array::{ArrayRef, BooleanBuilder};
+use log::warn;
 
 use std::fmt::Debug;
-use std::str::from_utf8_unchecked;
+use std::sync::Arc;
+
+use crate::parser::BooleanParser;
 
 ///
 pub(crate) trait ColumnBuilder: Debug {
-    fn push_bytes(&mut self, bytes: &[u8]);
+    fn parse_and_push_bytes(&mut self, bytes: &[u8]);
     fn runes(&self) -> usize;
+    fn finish(&mut self) -> (&str, ArrayRef);
 }
 
 ///
@@ -43,24 +46,27 @@ pub(crate) struct BooleanColumnBuilder {
     inner: BooleanBuilder,
     runes: usize,
     name: String,
+    parser: BooleanParser,
 }
 
 ///
 impl BooleanColumnBuilder {
     ///
-    pub fn new(runes: usize, name: String) -> Self {
-        Self { inner: BooleanBuilder::new(), runes, name }
+    pub fn new(runes: usize, name: String, parser: BooleanParser) -> Self {
+        Self {
+            inner: BooleanBuilder::new(),
+            runes,
+            name,
+            parser,
+        }
     }
 }
 
 ///
 impl ColumnBuilder for BooleanColumnBuilder {
     ///
-    fn push_bytes(&mut self, bytes: &[u8]) {
-        debug!("Builder got bytes: {:?}", bytes);
-        let text: &str = unsafe { from_utf8_unchecked(&bytes) };
-        debug!("bytes as utf-8: {:?}", text);
-        match text.parse::<bool>() {
+    fn parse_and_push_bytes(&mut self, bytes: &[u8]) {
+        match self.parser.parse(bytes) {
             Ok(b) => self.inner.append_value(b),
             Err(e) => {
                 warn!("Could not convert utf-8 text to bool: {:?}", e);
@@ -72,6 +78,14 @@ impl ColumnBuilder for BooleanColumnBuilder {
     ///
     fn runes(&self) -> usize {
         self.runes
+    }
+
+    ///
+    fn finish(&mut self) -> (&str, ArrayRef) {
+        (
+            &self.name,
+            Arc::new(self.inner.finish()) as ArrayRef,
+        )
     }
 }
 
@@ -123,4 +137,3 @@ pub(crate) struct StringBuilder {
     pub runes: usize,
     pub name: String,
 }
-

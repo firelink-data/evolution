@@ -50,11 +50,7 @@ impl Slicer {
     ///
     /// # Panics
     /// Iff the byte slice is not a valid utf-8 sequence.
-    pub fn find_num_bytes_for_num_runes(
-        &self,
-        bytes: &[u8],
-        num_runes: usize,
-    ) -> usize {
+    pub fn find_num_bytes_for_num_runes(&self, bytes: &[u8], num_runes: usize) -> usize {
         let mut found_runes: usize = 0;
         let mut num_bytes: usize = 0;
         let mut byte_units: usize = 1;
@@ -77,7 +73,7 @@ impl Slicer {
 
             found_runes += 1;
             num_bytes += byte_units;
-        };
+        }
 
         num_bytes
     }
@@ -94,13 +90,16 @@ impl Slicer {
             panic!("Byte slice was empty!");
         }
 
-        (0..bytes.len())
-            .for_each(|idx| if bytes[idx] == 0x0a { buffer.push(idx); } );
+        (0..bytes.len()).for_each(|idx| {
+            if bytes[idx] == 0x0a {
+                buffer.push(idx);
+            }
+        });
     }
 
     /// Find all line breaks in a slice of bytes representing utf-8 encoded data.
     /// This method looks for windows OS specific line break characters called
-    /// carriage-return (CR) and line-feed (LF). They are represented as the 
+    /// carriage-return (CR) and line-feed (LF). They are represented as the
     /// `\r` and `\n` utf-8 characters. The hexadecimal code for `\r` is 0x0d
     /// and `\n` is 0x0a.
     ///
@@ -112,12 +111,11 @@ impl Slicer {
             panic!("Byte slice was empty!");
         }
 
-        (1..bytes.len())
-            .for_each(|idx| {
-                if (bytes[idx - 1] == 0x0d) && (bytes[idx] == 0x0a) {
-                    buffer.push(idx);
-                } 
-            });
+        (1..bytes.len()).for_each(|idx| {
+            if (bytes[idx - 1] == 0x0d) && (bytes[idx] == 0x0a) {
+                buffer.push(idx);
+            }
+        });
     }
 }
 
@@ -144,6 +142,9 @@ impl SlicerBuilder {
 
         let multithreading = n_threads > 1;
 
-        Ok(Slicer { n_threads, multithreading })
+        Ok(Slicer {
+            n_threads,
+            multithreading,
+        })
     }
 }

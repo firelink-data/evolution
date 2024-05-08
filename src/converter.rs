@@ -179,6 +179,10 @@ impl Converter {
 
             // TODO: add a writer to the Convert struct which takes the finished builders
             // and writes to disk.
+            
+            for builder in builders.iter_mut() {
+                builder.finish();
+            }
 
             debug!("Bytes processed: {}", bytes_processed);
             debug!("Remaining bytes: {}", remaining_bytes);

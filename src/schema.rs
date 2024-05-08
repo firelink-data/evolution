@@ -27,6 +27,7 @@
 
 use arrow2::datatypes::{DataType, Field, Schema};
 use arrow2::error::Error;
+use padder::{Alignment, Symbol};
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
 
@@ -35,6 +36,7 @@ use std::{fs, io};
 
 use crate::builder::{BooleanColumnBuilder, ColumnBuilder};
 use crate::mocking::{mock_bool, mock_float, mock_integer, mock_string};
+use crate::parser::BooleanParser;
 
 ///
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
@@ -47,12 +49,15 @@ pub struct FixedColumn {
     length: usize,
     /// The datatype of the column.
     dtype: String,
+    /// The type of alignment the column has.
+    alignment: String,
+    /// The symbol used to pad the column to its expected length.
+    pad_symbol: char,
     // Whether or not the column can contain [`None`] values.
     is_nullable: bool,
 }
 
 ///
-#[allow(dead_code)]
 impl FixedColumn {
     /// Create a new [`FixedColumn`] providing all its required attributes.
     /// No input sanitation is done in this stage. The user can provide
@@ -63,6 +68,8 @@ impl FixedColumn {
         offset: usize,
         length: usize,
         dtype: String,
+        alignment: String,
+        pad_symbol: char,
         is_nullable: bool,
     ) -> Self {
         Self {
@@ -70,6 +77,8 @@ impl FixedColumn {
             offset,
             length,
             dtype,
+            alignment,
+            pad_symbol,
             is_nullable,
         }
     }
@@ -129,6 +138,24 @@ impl FixedColumn {
         }
     }
 
+    fn get_alignment(&self) -> Alignment {
+        match self.alignment.as_str() {
+            "left" => Alignment::Left,
+            "right" => Alignment::Right,
+            "center" => Alignment::Center,
+            _ => panic!(""),
+        }
+    }
+
+    fn get_pad_symbol(&self) -> Symbol {
+        match self.pad_symbol {
+            ' ' => Symbol::Whitespace,
+            '0' => Symbol::Zero,
+            '-' => Symbol::Hyphen,
+            _ => panic!(""),
+        }
+    }
+
     ///
     ///
     /// Here it is ok to clone the [`String`] name because the [`ColumnBuilder`]s should
@@ -136,8 +163,22 @@ impl FixedColumn {
     /// loop or thread.
     pub fn as_column_builder(&self) -> Box<dyn ColumnBuilder> {
         match self.dtype.as_str() {
-            "bool" => Box::new(BooleanColumnBuilder::new(self.length, self.name.clone())),
-            "boolean" => Box::new(BooleanColumnBuilder::new(self.length, self.name.clone())),
+            "bool" => Box::new(BooleanColumnBuilder::new(
+                self.length,
+                self.name.clone(),
+                BooleanParser::new(
+                    self.get_alignment(),
+                    self.get_pad_symbol(),
+                ),
+            )),
+            "boolean" => Box::new(BooleanColumnBuilder::new(
+                self.length,
+                self.name.clone(),
+                BooleanParser::new(
+                    self.get_alignment(),
+                    self.get_pad_symbol(),
+                ),
+            )),
             _ => panic!("Could not find matching dtype when creating ColumnBuilder!"),
         }
     }
@@ -309,6 +350,8 @@ mod tests_schema {
             5,
             20,
             "utf8".to_string(),
+            "left".to_string(),
+            ' ',
             false,
         );
         assert_eq!(DataType::Utf8, schema.arrow_dtype().unwrap());
