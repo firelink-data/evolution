@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2024-02-05
-* Last updated: 2024-05-07
+* Last updated: 2024-05-09
 */
 
 use crossbeam::channel;
@@ -334,10 +334,10 @@ impl MockerBuilder {
         let output_file: PathBuf = match self.output_file {
             Some(o) => o,
             None => {
-                info!("Optional field `output_file` not provided, randomizing a file name.");
+                info!("Optional field '--output-file' not provided, randomizing a file name.");
                 let mut path: PathBuf = PathBuf::from(randomize_file_name());
                 path.set_extension("flf");
-                info!("Output file name is: {}", path.to_str().unwrap());
+                info!("Output file name is now '{}'.", path.to_str().unwrap());
                 path
             }
         };
@@ -356,16 +356,13 @@ impl MockerBuilder {
             }
             None => {
                 if n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && multithreading {
-                    info!(
-                        "Optional field `buffer_size` not provided, will use static value MOCKER_BUFFER_NUM_ROWS={}.",
-                        MOCKER_BUFFER_NUM_ROWS / (n_threads - 1),
-                    );
-                    MOCKER_BUFFER_NUM_ROWS / (n_threads - 1)
+                    let mocker_buffer_size = MOCKER_BUFFER_NUM_ROWS / (n_threads - 1);
+                    info!("Optional field '--buffer-size' not provided.");
+                    info!("Mocker buffer size is now {} rows.", mocker_buffer_size);
+                    mocker_buffer_size
                 } else {
-                    info!(
-                        "Optional field `buffer_size` not provided, will use static value MOCKER_BUFFER_NUM_ROWS={}.",
-                        MOCKER_BUFFER_NUM_ROWS,
-                    );
+                    info!("Optional field '--buffer-size' not provided.");
+                    info!("Mocker buffer size is now {} rows.", MOCKER_BUFFER_NUM_ROWS);
                     MOCKER_BUFFER_NUM_ROWS
                 }
             }
@@ -374,10 +371,8 @@ impl MockerBuilder {
         let thread_channel_capacity: usize = match self.thread_channel_capacity {
             Some(c) => c,
             None => {
-                info!(
-                    "Optional field `thread_channel_capacity` not provided, will use static value MOCKER_THREAD_CHANNEL_CAPACITY={}.",
-                      MOCKER_THREAD_CHANNEL_CAPACITY,
-                );
+                info!("Optional field `--thread-channel-capacity' not provided.");
+                info!("Mocker thread channel capacity is now {} messages.", MOCKER_THREAD_CHANNEL_CAPACITY);
                 MOCKER_THREAD_CHANNEL_CAPACITY
             }
         };
