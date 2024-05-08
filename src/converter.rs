@@ -22,15 +22,15 @@
 * SOFTWARE.
 *
 * File created: 2024-02-17
-* Last updated: 2024-05-07
+* Last updated: 2024-05-08
 */
 
 use libc;
 use log::{debug, error, info};
 
 use std::fs::File;
-use std::mem;
 use std::io::{BufReader, Read};
+use std::mem;
 use std::path::PathBuf;
 
 use crate::builder::ColumnBuilder;
@@ -69,7 +69,10 @@ impl Converter {
     ///
     pub fn convert(&mut self) {
         if self.multithreading {
-            info!("Converting in multithreaded mode using {} threads.", self.n_threads);
+            info!(
+                "Converting in multithreaded mode using {} threads.",
+                self.n_threads
+            );
             self.convert_multithreaded()
         } else {
             info!("Converting in single-threaded mode.");
@@ -113,17 +116,26 @@ impl Converter {
         let mut reader: BufReader<&File> = BufReader::new(&self.file);
         let mut buffer: Vec<u8> = vec![0u8; buffer_capacity];
 
-        let mut line_break_indices: Vec<usize> = Vec::with_capacity(CONVERTER_LINE_BREAKS_BUFFER_SIZE);
+        let mut line_break_indices: Vec<usize> =
+            Vec::with_capacity(CONVERTER_LINE_BREAKS_BUFFER_SIZE);
         let mut builders: Vec<Box<dyn ColumnBuilder>> = self.schema.as_column_builders();
 
         loop {
-            if bytes_processed >= bytes_to_read { break; }
+            if bytes_processed >= bytes_to_read {
+                break;
+            }
 
-            if remaining_bytes < buffer_capacity { buffer_capacity = remaining_bytes; }
+            if remaining_bytes < buffer_capacity {
+                buffer_capacity = remaining_bytes;
+            }
 
             debug!("(UNSAFE) clearing read buffer.");
             unsafe {
-                libc::memset(buffer.as_mut_ptr() as _, 0, buffer.capacity() * mem::size_of::<u8>());
+                libc::memset(
+                    buffer.as_mut_ptr() as _,
+                    0,
+                    buffer.capacity() * mem::size_of::<u8>(),
+                );
             }
 
             match reader.read_exact(&mut buffer).is_ok() {
@@ -131,14 +143,18 @@ impl Converter {
                 false => debug!("EOF reached, this is the last time reading the buffer."),
             }
 
-            self.slicer.find_line_breaks(&buffer, &mut line_break_indices);
-            let byte_idx_last_line_break =
-                line_break_indices.last().expect("No line breaks found in the read buffer!");
-            let n_bytes_left_after_line_break =
-                buffer_capacity - 1 - byte_idx_last_line_break;
+            self.slicer
+                .find_line_breaks(&buffer, &mut line_break_indices);
+            let byte_idx_last_line_break = line_break_indices
+                .last()
+                .expect("No line breaks found in the read buffer!");
+            let n_bytes_left_after_line_break = buffer_capacity - 1 - byte_idx_last_line_break;
 
-            match reader.seek_relative(-(n_bytes_left_after_line_break as i64)).is_ok() {
-                true => {},
+            match reader
+                .seek_relative(-(n_bytes_left_after_line_break as i64))
+                .is_ok()
+            {
+                true => {}
                 false => panic!("Could not move cursor back in BufReader!"),
             };
 
@@ -151,12 +167,11 @@ impl Converter {
                 let line: &[u8] = &buffer[prev_line_break_idx..*line_break_idx];
                 let mut prev_byte_idx: usize = 0;
                 for builder in builders.iter_mut() {
-                    let byte_idx: usize = self.slicer.find_num_bytes_for_num_runes(
-                        &line[prev_byte_idx..],
-                        builder.runes(),
-                    );
+                    let byte_idx: usize = self
+                        .slicer
+                        .find_num_bytes_for_num_runes(&line[prev_byte_idx..], builder.runes());
 
-                    builder.push_bytes(&line[prev_byte_idx..byte_idx]);
+                    builder.parse_and_push_bytes(&line[prev_byte_idx..byte_idx + prev_byte_idx]);
                     prev_byte_idx += byte_idx;
                 }
                 prev_line_break_idx = *line_break_idx;
@@ -173,7 +188,7 @@ impl Converter {
         }
 
         info!(
-            "Done converting! We read {} bytes two times (due to sliding window overlap)", 
+            "Done converting! We read {} bytes two times (due to sliding window overlap)",
             bytes_overlapped,
         );
     }
@@ -218,10 +233,7 @@ impl ConverterBuilder {
     }
 
     ///
-    pub fn thread_channel_capacity(
-        mut self,
-        thread_channel_capacity: Option<usize>,
-    ) -> Self {
+    pub fn thread_channel_capacity(mut self, thread_channel_capacity: Option<usize>) -> Self {
         self.thread_channel_capacity = thread_channel_capacity;
         self
     }
@@ -235,19 +247,17 @@ impl ConverterBuilder {
     /// Iff any of the required fields are `None`.
     pub fn build(self) -> Result<Converter> {
         let file: File = match self.file_path {
-            Some(path) => {
-                match File::open(path) {
-                    Ok(f) => f,
-                    Err(e) => {
-                        error!("Could not open target `file_path`, reason: {}", e);
-                        return Err(Box::new(SetupError));
-                    },
+            Some(path) => match File::open(path) {
+                Ok(f) => f,
+                Err(e) => {
+                    error!("Could not open target `file_path`, reason: {}", e);
+                    return Err(Box::new(SetupError));
                 }
             },
             None => {
                 error!("Required field `file_path` not provided, exiting...");
                 return Err(Box::new(SetupError));
-            },
+            }
         };
 
         // The call to [`FixedSchema::from_path`] might panic.
@@ -256,7 +266,7 @@ impl ConverterBuilder {
             None => {
                 error!("Required field `schema_path` not provided, exiting...");
                 return Err(Box::new(SetupError));
-            },
+            }
         };
 
         let n_threads: usize = match self.n_threads {
@@ -264,7 +274,7 @@ impl ConverterBuilder {
             None => {
                 error!("Required field `n_threads` not provided, exiting...");
                 return Err(Box::new(SetupError));
-            },
+            }
         };
 
         let multithreading: bool = match self.multithreading {
@@ -272,7 +282,7 @@ impl ConverterBuilder {
             None => {
                 error!("Required field `multithreading` not provided, exiting...");
                 return Err(Box::new(SetupError));
-            },
+            }
         };
 
         //
@@ -314,9 +324,7 @@ impl ConverterBuilder {
             }
         };
 
-        let slicer = Slicer::builder()
-            .num_threads(n_threads)
-            .build()?;
+        let slicer = Slicer::builder().num_threads(n_threads).build()?;
 
         Ok(Converter {
             file,
@@ -329,4 +337,3 @@ impl ConverterBuilder {
         })
     }
 }
-
