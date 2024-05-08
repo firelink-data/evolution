@@ -7,6 +7,8 @@
             "offset": 0,
             "length": 9,
             "dtype": "bool",
+            "alignment": "right",
+            "pad_symbol": " ",
             "is_nullable": false
         },
         {
@@ -14,6 +16,8 @@
             "offset": 9,
             "length": 5,
             "dtype": "boolean",
+            "alignment": "right",
+            "pad_symbol": " ",
             "is_nullable": false
         },
         {
@@ -21,6 +25,8 @@
             "offset": 14,
             "length": 32,
             "dtype": "bool",
+            "alignment": "right",
+            "pad_symbol": " ",
             "is_nullable": true
         }
     ]
