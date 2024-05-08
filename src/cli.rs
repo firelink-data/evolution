@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2024-02-05
-* Last updated: 2024-05-06
+* Last updated: 2024-05-09
 */
 
 use clap::{value_parser, ArgAction, Parser, Subcommand};
@@ -71,6 +71,16 @@ enum Commands {
             action = ArgAction::Set,
         )]
         file: PathBuf,
+
+        /// Specify output (target) file name.
+        #[arg(
+            short = 'o',
+            long = "output-file",
+            value_name = "OUTPUT-FILE",
+            action = ArgAction::Set,
+            required = false,
+        )]
+        output_file: PathBuf,
 
         /// Specify the .json schema file to use when converting.
         #[arg(
@@ -170,12 +180,14 @@ impl Cli {
         match &self.command {
             Commands::Convert {
                 file,
+                output_file,
                 schema,
                 buffer_size,
                 thread_channel_capacity,
             } => {
                 Converter::builder()
-                    .file(file.to_owned())
+                    .target_file(file.to_owned())
+                    .output_file(output_file.to_owned())
                     .schema(schema.to_owned())
                     .num_threads(n_threads)
                     .buffer_size(*buffer_size)
