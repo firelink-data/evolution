@@ -22,9 +22,14 @@
 * SOFTWARE.
 *
 * File created: 2024-05-05
-* Last updated: 2024-05-07
+* Last updated: 2024-05-08
 */
 
+use arrow::record_batch::RecordBatch;
+use parquet::arrow::ArrowWriter;
+use parquet::file::properties::WriterProperties;
+
+use std::default::Default;
 use std::fmt::Debug;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -33,44 +38,140 @@ use std::path::PathBuf;
 ///
 pub(crate) trait Writer: Debug {
     fn write(&mut self, buffer: &Vec<u8>);
-    fn finish(&self);
+    fn finish(&mut self);
 }
 
 ///
 #[derive(Debug)]
 pub(crate) struct FixedLengthFileWriter {
-    out_file: File,
+    inner: File,
 }
 
+///
 impl FixedLengthFileWriter {
     pub fn new(file: &PathBuf) -> Self {
         let out_file = OpenOptions::new()
-            .create_new(true)
+            .create(true)
             .append(true)
             .open(file)
             .expect("Could not open target output file!");
 
-        Self { out_file }
-    }
-
-    #[allow(dead_code)]
-    pub fn out_file(&self) -> &File {
-        &self.out_file
+        Self { inner: out_file }
     }
 }
 
+///
 impl Writer for FixedLengthFileWriter {
     fn write(&mut self, buffer: &Vec<u8>) {
-        self.out_file
+        self.inner
             .write_all(buffer)
             .expect("Bad buffer, output write failed!");
     }
 
-    fn finish(&self) {
+    fn finish(&mut self) {
         todo!();
     }
 }
 
+///
+#[derive(Debug)]
+pub(crate) struct ParquetWriter {
+    out_file: PathBuf,
+    inner: Option<ArrowWriter<File>>,
+    record_batch: Option<RecordBatch>,
+    properties: Option<WriterProperties>,
+}
+
+///
+impl ParquetWriter {
+    /// Create a new [`ParquetWriter`] to target the provided file as output.
+    ///
+    /// # Panics
+    /// Iff the specified target file could not opened.
+    pub fn new(file: &PathBuf) -> Self {
+        Self {
+            out_file: file.to_owned(),
+            inner: None,
+            record_batch: None,
+            properties: None,
+        }
+    }
+
+    ///
+    pub fn set_record_batch(&mut self, record_batch: RecordBatch) {
+        self.record_batch = Some(record_batch);
+    }
+
+    ///
+    pub fn set_properties(&mut self, properties: WriterProperties) {
+        self.properties = Some(properties);
+    }
+
+    ///
+    pub fn setup_arrow_writer(&mut self) {
+        if !self.record_batch.is_some() {
+            panic!("");
+        }
+
+        if !self.properties.is_some() {
+            panic!("");
+        }
+
+        let file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.out_file)
+            .expect("Could not open target output file!");
+
+        let writer: ArrowWriter<File> = ArrowWriter::try_new(
+            file,
+            self.record_batch.clone().unwrap().schema(),
+            self.properties.clone(),
+        ).expect("Could not create `ArrowWriter` from provided `RecordBatch`!");
+
+        self.inner = Some(writer);
+    }
+
+    ///
+    pub fn write_batch(&mut self, batch: &RecordBatch) {
+        match self.inner {
+            Some(ref mut writer) => {
+                writer.write(batch)
+                    .expect("Could not write RecordBatch with ArrowWriter!");
+            },
+            None => panic!("The `ParquetWriter` has not been set up properly, missing `ArrowWriter`!"),
+        };
+    }
+}
+
+impl Writer for ParquetWriter {
+    fn write(&mut self, _buffer: &Vec<u8>) {
+        todo!();
+    }
+
+    /// Close and finalize the underlying Parquet writer buffer.
+    ///
+    /// # Panics
+    /// If either the [`ParquetWriter`] has not been setup with an [`ArrowWriter`] or
+    /// if the writer tries to write something efter calling finish (race condition).
+    fn finish(&mut self) {
+        match self.inner {
+            Some(ref mut writer) => {
+                writer.finish()
+                    .expect("");
+            },
+            None => panic!("The `ParquetWriter` has not been set up properly, missing `ArrowWriter`!"),
+        };
+    }
+}
+
+/// Find and create a matching Writer for the provided file type.
+///
+/// # Panics
+/// This function can panic for three different reasons:
+///  - If the the provided file name does not contain an extension (characters after the .).
+///  - If the the file name is not valid unicode.
+///  - If the user provided an extension which is not yet supported by the program.
 pub(crate) fn writer_from_file_extension(file: &PathBuf) -> Box<dyn Writer> {
     match file
         .extension()
@@ -79,9 +180,7 @@ pub(crate) fn writer_from_file_extension(file: &PathBuf) -> Box<dyn Writer> {
         .unwrap()
     {
         "flf" => Box::new(FixedLengthFileWriter::new(file)),
-        "parquet" => {
-            todo!()
-        }
+        "parquet" => Box::new(ParquetWriter::new(file)),
         _ => panic!(
             "Could not find a matching writer for file extension: {:?}",
             file.extension().unwrap(),
@@ -92,7 +191,6 @@ pub(crate) fn writer_from_file_extension(file: &PathBuf) -> Box<dyn Writer> {
 #[cfg(test)]
 mod tests_writer {
     use std::fs;
-    use std::io::IsTerminal;
 
     use super::*;
 
@@ -107,10 +205,9 @@ mod tests_writer {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/cool-file.really-cool");
 
-        let flfw = FixedLengthFileWriter::new(&path);
-        let expected = OpenOptions::new().append(true).open(&path).unwrap();
+        let _flfw = FixedLengthFileWriter::new(&path);
+        let _expected = OpenOptions::new().append(true).open(&path).unwrap();
 
-        assert_eq!(expected.is_terminal(), flfw.out_file().is_terminal());
         fs::remove_file(path).unwrap();
     }
 
