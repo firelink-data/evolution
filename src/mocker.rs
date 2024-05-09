@@ -22,272 +22,427 @@
 * SOFTWARE.
 *
 * File created: 2024-02-05
-* Last updated: 2024-02-27
+* Last updated: 2024-05-09
 */
 
-use crate::schema::{self, FixedSchema};
 use crossbeam::channel;
-use log::{info, warn};
+use log::{error, info, warn};
 use padder::*;
-use rand::distributions::{Alphanumeric, DistString};
-use std::fs::OpenOptions;
-use std::io::Write;
+use rand::rngs::ThreadRng;
+#[cfg(feature = "rayon")]
+use rayon::iter::*;
+
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::thread::JoinHandle;
-use std::{thread, usize};
+#[cfg(not(feature = "rayon"))]
+use std::thread::{spawn, JoinHandle};
 
-// This default value should depend on the memory capacity of the system
-// running the program. Because the workers produce buffers faster than
-// the master can write them to disk we need to bound the worker/master
-// channel. If you have a lot of system memory, you can increase this value,
-// but if you increase it too much the program will run out of system memory.
-pub(crate) static DEFAULT_THREAD_CHANNEL_CAPACITY: usize = 128;
-pub(crate) static DEFAULT_MIN_N_ROWS_FOR_MULTITHREADING: usize = 1000;
-pub(crate) static DEFAULT_MOCKED_FILENAME_LEN: usize = 8;
-pub(crate) static DEFAULT_ROW_BUFFER_LEN: usize = 1024;
+use crate::error::{Result, SetupError};
+use crate::mocking::randomize_file_name;
+use crate::schema::FixedSchema;
+use crate::writer::{writer_from_file_extension, Writer};
 
-///
-pub struct Mocker {
-    schema: schema::FixedSchema,
-    target_file: Option<PathBuf>,
+/// If the user wants to only generate a few number of mocked rows,then multithreading
+/// is not a suitable choice, and only introduces extra overhead. This variable specifies
+/// the minimum number of rows to be generated to allow enabling multithreading.
+/// This value takes priority over the CLI settings regarding number of threads etc.
+pub(crate) static MIN_NUM_ROWS_FOR_MULTITHREADING: usize = 1024;
+
+/// The number of messages that can exist in the thread channel at the same time.
+/// If the channel buffer grows to this size, incoming messages will be held until
+/// previous messages have been consumed. Increasing this variable will significantly
+/// increase the amount of system memory allocated by the program.
+pub(crate) static MOCKER_THREAD_CHANNEL_CAPACITY: usize = 128;
+
+/// Sets the size of the buffer that the mocker utilizes to store rows of mocked data
+/// before writing to specified location. A smaller number for this variable means that
+/// the program will perform I/O operations more often, which are expensive system calls.
+/// A larger number is advisable, however, the host system must be able to hold all
+/// rows of mocked data in system memory before writing to its location.
+pub(crate) static MOCKER_BUFFER_NUM_ROWS: usize = 256 * 1024;
+
+#[cfg(target_os = "windows")]
+pub(crate) static NUM_CHARS_FOR_NEWLINE: usize = 2;
+#[cfg(not(target_os = "windows"))]
+pub(crate) static NUM_CHARS_FOR_NEWLINE: usize = 1;
+
+// Depending on the target os we need specific handling of newlines.
+// https://doc.rust-lang.org/reference/conditional-compilation.html
+#[cfg(target_os = "windows")]
+fn newline<'a>() -> &'a str {
+    "\r\n"
+}
+#[cfg(not(target_os = "windows"))]
+fn newline<'a>() -> &'a str {
+    "\n"
+}
+
+/// A struct for generating mocked data based on a user-defined schema.
+#[derive(Debug)]
+pub(crate) struct Mocker {
+    schema: FixedSchema,
+    n_rows: usize,
     n_threads: usize,
-    multithreaded: bool,
+    multithreading: bool,
+    output_file: PathBuf,
+    buffer_size: usize,
+    thread_channel_capacity: usize,
 }
 
 ///
 impl Mocker {
-    ///
-    pub fn new(
-        schema: schema::FixedSchema,
-        target_file: Option<PathBuf>,
-        n_threads: usize,
-    ) -> Self {
-        Self {
-            schema,
-            target_file,
-            n_threads,
-            multithreaded: n_threads > 1,
+    /// Create a new instance of a [`MockerBuilder`] struct with default values.
+    pub fn builder() -> MockerBuilder {
+        MockerBuilder {
+            ..Default::default()
         }
     }
 
-    ///
-    pub fn generate(&self, n_rows: usize) {
-        if self.multithreaded && n_rows > DEFAULT_MIN_N_ROWS_FOR_MULTITHREADING {
-            self.generate_multithreaded(n_rows);
+    /// Start generating mocked data rows based on the provided struct fields.
+    /// Checks if the user wants to use multithreading and how many rows they
+    /// intend to generate. If the number of desired rows to generate is less
+    /// than [`MIN_NUM_ROWS_FOR_MULTITHREADING`] then the program will run in
+    /// single thread mode instead. Employing multithreading when generating
+    /// a few number of rows introduces much more computational overhead than
+    /// necessary, so it is much more efficient to run in a single thread.
+    pub fn generate(&mut self) {
+        if self.n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && self.multithreading {
+            self.generate_multithreaded();
         } else {
-            if self.multithreaded {
+            if self.multithreading {
                 warn!(
-                    "You specified to use multithreading but only want to mock {} rows",
-                    n_rows
+                    "You specified to use {} threads, but you only want to mock {} rows.",
+                    self.n_threads, self.n_rows,
                 );
-                warn!("This is done more efficiently single-threaded, ignoring multithreading...");
+                warn!("This is done more efficiently single-threaded, ignoring multithreading!");
             }
-            self.generate_single_threaded(n_rows);
+            self.generate_single_thread();
         }
     }
 
-    ///
-    fn generate_single_threaded(&self, n_rows: usize) {
-        let rowlen: usize = self.schema.row_len();
-        // FOR WINDOWS: We need to add 2 bytes for each row because of "\r\n" (CR-LF)
-        // FOR UNIX: We need to add 1 bytes for each row because of "\n" (LF)
-        let buffer_size: usize = DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 1;
+    /// Given n threads, the mocker will use n - 1 for generating data,
+    /// and 1 thread for writing data to disk.
+    fn distribute_thread_workload(&self) -> Vec<usize> {
+        let n_rows_per_thread = self.n_rows / (self.n_threads - 1);
+        (0..(self.n_threads - 2))
+            .map(|_| n_rows_per_thread)
+            .collect::<Vec<usize>>()
+    }
+
+    /// Generated mocked data in multithreading mode using [`rayon`] and parallel iteration.
+    #[cfg(feature = "rayon")]
+    fn generate_multithreaded(&self) {
+        // Calculate the workload for each worker thread, if the workload can not evenly
+        // be split among the threads, then the last thread will have to take the remainder.
+        let mut thread_workloads: Vec<usize> = self.distribute_thread_workload();
+        let remainder: usize = self.n_rows - thread_workloads.iter().sum::<usize>();
+        thread_workloads.push(remainder);
+
+        let mut writer: Box<dyn Writer> = writer_from_file_extension(&self.output_file);
+        let (sender, reciever) = channel::bounded(self.thread_channel_capacity);
+
+        info!(
+            "Starting {} worker threads with workload: {:?}",
+            thread_workloads.len(),
+            thread_workloads
+        );
+
+        let schema = Arc::new(self.schema.clone());
+        thread_workloads
+            .into_par_iter()
+            .enumerate()
+            .for_each_with(&sender, |s, (t, workload)| {
+                let t_schema = Arc::clone(&schema);
+                worker_thread_generate(s.clone(), t, workload, t_schema, self.buffer_size)
+            });
+
+        drop(sender);
+        master_thread_write(reciever, &mut writer);
+    }
+
+    /// Generate mocked data in multithreading mode using the standard library threads.
+    #[cfg(not(feature = "rayon"))]
+    fn generate_multithreaded(&self) {
+        // Calculate the workload for each worker thread, if the workload can not evenly
+        // be split among the threads, then the last thread will have to take the remainder.
+        let mut thread_workloads: Vec<usize> = self.distribute_thread_workload();
+        let remainder: usize = self.n_rows - thread_workloads.iter().sum::<usize>();
+        thread_workloads.push(remainder);
+
+        let mut writer: Box<dyn Writer> = writer_from_file_extension(&self.output_file);
+        let (sender, reciever) = channel::bounded(self.thread_channel_capacity);
+
+        info!(
+            "Starting {} worker threads with workload: {:?}",
+            thread_workloads.len(),
+            thread_workloads
+        );
+
+        let schema = Arc::new(self.schema.clone());
+        let threads = thread_workloads
+            .into_iter()
+            .enumerate()
+            .map(|(t, t_workload)| {
+                let t_schema = Arc::clone(&schema);
+                let t_sender = sender.clone();
+                let t_buffer_size = self.buffer_size;
+                spawn(move || {
+                    worker_thread_generate(t_sender, t, t_workload, t_schema, t_buffer_size)
+                })
+            })
+            .collect::<Vec<JoinHandle<()>>>();
+
+        drop(sender);
+        master_thread_write(reciever, &mut writer);
+
+        for handle in threads {
+            handle.join().expect("Could not join worker thread handle!");
+        }
+    }
+
+    // Generated mocked data in a single-threaded mode and write to disk.
+    // This will never induce any severe bottleneck due to heavy I/O like
+    // the multithreading mode can do. However, single-threaded mode will
+    // be significantly slower when generating the sweet-spot of rows
+    // which do not introduce long thread waiting times due to I/O.
+    fn generate_single_thread(&mut self) {
+        let row_len = self.schema.row_len();
+        let buffer_size: usize =
+            self.buffer_size * row_len + self.buffer_size * NUM_CHARS_FOR_NEWLINE;
+
         let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
+        let mut rng: ThreadRng = rand::thread_rng();
 
-        let mut path: PathBuf = PathBuf::from(randomize_file_name());
-        path.set_extension("flf");
+        let mut writer: Box<dyn Writer> = writer_from_file_extension(&self.output_file);
 
-        let mut file = OpenOptions::new()
-            .create_new(true)
-            .append(true)
-            .open(&path)
-            .expect("Could not open target file!");
-
-        info!("Writing to target file: {}", path.to_str().unwrap());
-        for row in 0..n_rows {
-            if row % DEFAULT_ROW_BUFFER_LEN == 0 && row != 0 {
-                file.write_all(&buffer).expect("Bad buffer, write failed!");
-                // Here maybe we should just use the same allocated memory?, but overwrite it..
-                // Because re-allocation is slow (::with_capacity will re-allocate on heap).
-                buffer.clear(); // Vec::with_capacity(buffer_size);
+        for row_idx in 0..self.n_rows {
+            if (row_idx % self.buffer_size == 0) && (row_idx != 0) {
+                writer.write(&buffer);
+                buffer.clear();
             }
-            for col in self.schema.iter() {
+
+            for column in self.schema.iter() {
                 pad_and_push_to_buffer(
-                    col.mock().unwrap().as_bytes().to_vec(),
-                    col.length(),
+                    column.mock(&mut rng).as_bytes(),
+                    column.length(),
                     Alignment::Right,
                     Symbol::Whitespace,
                     &mut buffer,
                 );
             }
-            buffer.extend_from_slice("\n".as_bytes());
+
+            buffer.extend_from_slice(newline().as_bytes());
         }
 
-        // Write the remaining contents of the buffer to file.
-        file.write_all(&buffer).expect("Bad buffer, write failed!");
+        // Write any remaining contents of the buffer to disk.
+        writer.write(&buffer);
+    }
+}
+
+/// A builder struct that simplifies the creation of a valid [`Mocker`] instance.
+#[derive(Debug, Default)]
+pub(crate) struct MockerBuilder {
+    schema_path: Option<PathBuf>,
+    output_file: Option<PathBuf>,
+    n_rows: Option<usize>,
+    n_threads: Option<usize>,
+    multithreading: Option<bool>,
+    buffer_size: Option<usize>,
+    thread_channel_capacity: Option<usize>,
+}
+
+impl MockerBuilder {
+    /// Set the [`PathBuf`] for the schema to use when generating data with the [`Mocker`].
+    pub fn schema(mut self, schema_path: PathBuf) -> Self {
+        self.schema_path = Some(schema_path);
+        self
+    }
+
+    /// Set the target output file name with the [`Mocker`].
+    pub fn output_file(mut self, output_file: Option<PathBuf>) -> Self {
+        self.output_file = output_file;
+        self
+    }
+
+    /// Set the number of mocked data rows to generate with the [`Mocker`].
+    pub fn num_rows(mut self, n_rows: Option<usize>) -> Self {
+        self.n_rows = n_rows;
+        self
+    }
+
+    /// Set the number of threads to use when generating mocked data with the [`Mocker`].
+    pub fn num_threads(mut self, n_threads: usize) -> Self {
+        self.n_threads = Some(n_threads);
+        self.multithreading = Some(n_threads > 1);
+        self
     }
 
     ///
-    fn generate_multithreaded(&self, n_rows: usize) {
-        let thread_workload = self.distribute_thread_workload(n_rows);
-        threaded_mock(
+    pub fn buffer_size(mut self, buffer_size: Option<usize>) -> Self {
+        self.buffer_size = buffer_size;
+        self
+    }
+
+    ///
+    pub fn thread_channel_capacity(mut self, thread_channel_capacity: Option<usize>) -> Self {
+        self.thread_channel_capacity = thread_channel_capacity;
+        self
+    }
+
+    /// Verify that all required fields have been set and explicitly create a new [`Mocker`]
+    /// instance based on the provided fields. Any optional fields are set according to
+    /// either random strategies (like output file name) or global static variables.
+    ///
+    /// # Error
+    /// Iff any of the required fields are `None`.
+    pub fn build(self) -> Result<Mocker> {
+        let schema: FixedSchema = match self.schema_path {
+            Some(s) => FixedSchema::from_path(s),
+            None => {
+                error!("Required field `schema_path` not provided, exiting...");
+                return Err(Box::new(SetupError));
+            }
+        };
+
+        let n_rows: usize = match self.n_rows {
+            Some(n) => n,
+            None => {
+                error!("Required field `n_rows` not provided, exiting...");
+                return Err(Box::new(SetupError));
+            }
+        };
+
+        let n_threads: usize = match self.n_threads {
+            Some(n) => n,
+            None => {
+                error!("Required field `n_threads` not provided, exiting...");
+                return Err(Box::new(SetupError));
+            }
+        };
+
+        let multithreading: bool = match self.multithreading {
+            Some(m) => m,
+            None => {
+                error!("Required field `multithreading` not provided, exiting...");
+                return Err(Box::new(SetupError));
+            }
+        };
+
+        //
+        // Optional configuration below.
+        //
+        let output_file: PathBuf = match self.output_file {
+            Some(o) => o,
+            None => {
+                info!("Optional field '--output-file' not provided, randomizing a file name.");
+                let mut path: PathBuf = PathBuf::from(randomize_file_name());
+                path.set_extension("flf");
+                info!("Output file name is now '{}'.", path.to_str().unwrap());
+                path
+            }
+        };
+
+        // Here we divide by the number of threads because each thread will allocated
+        // `MOCKER_BUFFER_NUM_ROWS` amount of memory, meaning, if we are not careful
+        // with the size of this variable then memory allocation might go through the
+        // roof and cause a program crash due to memory overflow and mem-swapping.
+        let buffer_size: usize = match self.buffer_size {
+            Some(s) => {
+                if n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && multithreading {
+                    s / (n_threads - 1)
+                } else {
+                    s
+                }
+            }
+            None => {
+                if n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && multithreading {
+                    let mocker_buffer_size = MOCKER_BUFFER_NUM_ROWS / (n_threads - 1);
+                    info!("Optional field '--buffer-size' not provided.");
+                    info!("Mocker buffer size is now {} rows.", mocker_buffer_size);
+                    mocker_buffer_size
+                } else {
+                    info!("Optional field '--buffer-size' not provided.");
+                    info!("Mocker buffer size is now {} rows.", MOCKER_BUFFER_NUM_ROWS);
+                    MOCKER_BUFFER_NUM_ROWS
+                }
+            }
+        };
+
+        let thread_channel_capacity: usize = match self.thread_channel_capacity {
+            Some(c) => c,
+            None => {
+                info!("Optional field `--thread-channel-capacity' not provided.");
+                info!("Mocker thread channel capacity is now {} messages.", MOCKER_THREAD_CHANNEL_CAPACITY);
+                MOCKER_THREAD_CHANNEL_CAPACITY
+            }
+        };
+
+        Ok(Mocker {
+            schema,
+            n_threads,
             n_rows,
-            thread_workload,
-            self.schema.to_owned(),
-            self.n_threads,
-            self.target_file.clone(),
-        );
-    }
-
-    /// Calculate how many rows each thread should work on generating.
-    fn distribute_thread_workload(&self, n_rows: usize) -> Vec<usize> {
-        let n_rows_per_thread = n_rows / self.n_threads;
-        (0..self.n_threads)
-            .map(|_| n_rows_per_thread)
-            .collect::<Vec<usize>>()
-    }
-}
-
-/// Worker threads generate mocked data, and pass it to the master thread which writes it
-/// to disk, but maybe this will become bottleneck?
-///
-/// pub struct Arc<T, A = Global>
-/// where
-///     A: Allocator,
-///     T:  ?Sized,
-///
-/// is a "Thread-safe reference-counting pointer. Arc stands for 'Atomically Reference Counted'."
-///
-pub fn threaded_mock(
-    n_rows: usize,
-    thread_workload: Vec<usize>,
-    schema: FixedSchema,
-    n_threads: usize,
-    target_file: Option<PathBuf>,
-) {
-    let (thread_handles, receiver) = spawn_workers(n_rows, thread_workload, schema, n_threads);
-    spawn_master(&receiver, target_file);
-
-    for handle in thread_handles {
-        handle.join().expect("Could not join thread handle!");
+            multithreading,
+            output_file,
+            buffer_size,
+            thread_channel_capacity,
+        })
     }
 }
 
 ///
-pub fn worker_thread_mock(
+fn worker_thread_generate(
+    channel: channel::Sender<Vec<u8>>,
     thread: usize,
     n_rows: usize,
     schema: Arc<FixedSchema>,
-    sender: channel::Sender<Vec<u8>>,
+    n_rows_buffer_size: usize,
 ) {
-    let rowlen: usize = schema.row_len();
-    // We need to add 2 bytes for each row because of "\r\n"
-    let buffer_size: usize = DEFAULT_ROW_BUFFER_LEN * rowlen + DEFAULT_ROW_BUFFER_LEN * 2;
+    let row_len: usize = schema.row_len();
+    let buffer_size: usize =
+        n_rows_buffer_size * row_len + n_rows_buffer_size * NUM_CHARS_FOR_NEWLINE;
+
+    let mut rng: ThreadRng = rand::thread_rng();
     let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
 
-    for row in 0..n_rows {
-        if row % DEFAULT_ROW_BUFFER_LEN == 0 && row != 0 {
-            sender
+    info!("Worker thread {} starting.", thread);
+
+    for row_idx in 0..n_rows {
+        if (row_idx % buffer_size == 0) && (row_idx != 0) {
+            channel
                 .send(buffer)
-                .expect("Bad buffer, or something, could not send from worker thread!");
-            // Here maybe we should just use the same allocated memory?, but overwrite it..
-            // Because re-allocation is slow (::with_capacity will re-allocate on heap).
+                .expect("Could not send buffer from worker to master thread!");
+
             buffer = Vec::with_capacity(buffer_size);
         }
-        for col in schema.iter() {
+
+        for column in schema.iter() {
             pad_and_push_to_buffer(
-                col.mock().unwrap().as_bytes().to_vec(),
-                col.length(),
+                column.mock(&mut rng).as_bytes(),
+                column.length(),
                 Alignment::Right,
                 Symbol::Whitespace,
                 &mut buffer,
             );
         }
-        buffer.extend_from_slice("\r\n".as_bytes());
+
+        buffer.extend_from_slice(newline().as_bytes());
     }
 
-    // Send the rest of the remaining buffer to the master thread.
-    sender
+    channel
         .send(buffer)
-        .expect("Bad buffer, could not send last buffer from worker thread!");
+        .expect("Could not send buffer from worker thread to master thread!");
 
-    info!("Thread {} done!", thread);
-    drop(sender);
+    info!("Worker thread {} done!", thread);
+    drop(channel);
 }
 
 ///
-pub fn spawn_workers(
-    n_rows: usize,
-    thread_workload: Vec<usize>,
-    schema: FixedSchema,
-    n_threads: usize,
-) -> (Vec<JoinHandle<()>>, channel::Receiver<Vec<u8>>) {
-    let remaining_rows = n_rows - thread_workload.iter().sum::<usize>();
-    info!("Distributed thread workload: {:?}", thread_workload);
-    info!("Remaining rows to handle: {}", remaining_rows);
-
-    let arc_schema = Arc::new(schema);
-    let (sender, receiver) = channel::bounded(DEFAULT_THREAD_CHANNEL_CAPACITY);
-
-    let threads: Vec<JoinHandle<()>> = (0..n_threads)
-        .map(|t| {
-            let t_rows = thread_workload[t];
-            let t_schema = Arc::clone(&arc_schema);
-            let t_sender = sender.clone();
-            thread::spawn(move || worker_thread_mock(t, t_rows, t_schema, t_sender))
-        })
-        .collect();
-
-    drop(sender);
-    (threads, receiver)
-}
-
-pub fn spawn_master(channel: &channel::Receiver<Vec<u8>>, target_file: Option<PathBuf>) {
-    let path = match target_file {
-        Some(p) => p,
-        None => {
-            let mut path = PathBuf::from(randomize_file_name());
-            path.set_extension("flf");
-            path
-        }
-    };
-
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-        .expect("Could not open target file!");
-
-    info!("Writing to target file: {}", path.to_str().unwrap());
-    for buff in channel {
-        file.write_all(&buff)
-            .expect("Got bad buffer from thread, write failed!");
+fn master_thread_write(channel: channel::Receiver<Vec<u8>>, writer: &mut Box<dyn Writer>) {
+    // Write buffer contents to disk.
+    for buffer in channel {
+        writer.write(&buffer);
+        drop(buffer);
     }
-}
 
-pub fn randomize_file_name() -> String {
-    let mut path_name: String = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
-    path_name.push('_');
-    path_name.push_str(
-        Alphanumeric
-            .sample_string(&mut rand::thread_rng(), DEFAULT_MOCKED_FILENAME_LEN)
-            .as_str(),
-    );
-    path_name
-}
-
-pub(crate) fn mock_bool<'a>(len: usize) -> &'a str {
-    if len > 3 {
-        return "true";
-    }
-    "false"
-}
-
-pub(crate) fn mock_number<'a>(_len: usize) -> &'a str {
-    "3"
-}
-
-pub(crate) fn mock_string<'a>(_len: usize) -> &'a str {
-    "hejj"
+    info!("Master thread done, cleaning up resources.");
 }

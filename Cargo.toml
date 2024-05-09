@@ -1,10 +1,12 @@
 [package]
 name = "evolution"
-version = "0.2.2"
+version = "0.3.5"
 edition = "2021"
 description = "🦖 Evolve your fixed length data files into Apache Arrow tables, fully parallelized!"
 authors = [
     "Wilhelm Ågren <wilhelmagren98@gmail.com>",
+    "Ted Hammarlund <TedHammarlund@gmail.com>",
+    "Rickard Lundin <rickard@x14.se>",
 ]
 
 readme = "README.md"
@@ -28,19 +30,19 @@ arrow-schema = "51.0.0"
 arrow-array = "51.0.0"
 parquet = "51.0.0"
 atoi_simd = "0.15.6"
-chrono = "0.4.35"
-clap = { version = "4.5.3", features = ["default", "derive"] }
+chrono = "0.4.38"
+clap = { version = "4.5.4", features = ["default", "derive"] }
 crossbeam = "0.8.4"
 colored = "2.1.0"
 env_logger = "0.11.3"
-half = "2.4.0"
+half = "2.4.1"
 log = "0.4.21"
 num_cpus = "1.16.0"
-padder = "1.0.0"
-rand = "0.8.5"
-rayon = "1.9.0"
-serde = { version = "1.0.197", features = ["derive"] }
-serde_json = "1.0.114"
+padder = "1.1.0"
+rand = { version = "0.8.5"  }
+rayon = { version = "1.10.0" }
+serde = { version = "1.0.201", features = ["derive"] }
+serde_json = "1.0.117"
 threadpool = "1.8.1"
 substring = "1.4.5"
 tempfile = "3.10.1"

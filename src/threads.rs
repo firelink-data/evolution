@@ -21,51 +21,28 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 * SOFTWARE.
 *
-* File created: 2023-11-21
-* Last updated: 2024-02-28
+* File created: 2024-05-07
+* Last updated: 2024-05-09
 */
 
-use clap::Parser;
-use log::{debug, error, info};
+use log::{info, warn};
 
-mod cli;
-mod error;
-mod logger;
-mod mocker;
-mod schema;
-use crate::slicers::old_slicer::{IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE};
-use crate::slicers::ChunkAndResidue;
-use cli::Cli;
-mod threads;
-mod writer;
-mod builder;
-mod parser;
+pub(crate) fn get_available_threads(mut n_wanted_threads: usize) -> usize {
+    let n_logical_threads: usize = num_cpus::get();
 
-mod converters;
-mod dump;
-mod slicers;
-mod mocking;
-///
-fn main() {
-    let cli = Cli::parse();
-
-    match logger::setup_log() {
-        Ok(_) => debug!("Logging setup, ok!"),
-        Err(e) => error!("Could not set up env logging: {:?}", e),
+    if n_wanted_threads > n_logical_threads {
+        warn!(
+            "You specified to use {} threads, but your CPU only has {} logical threads.",
+            n_wanted_threads, n_logical_threads,
+        );
+        warn!(
+            "Will instead use all of the systems available logical threads ({}).",
+            n_logical_threads,
+        );
+        n_wanted_threads = n_logical_threads;
     };
 
-    // Effektiv med fixa buffrar men fult att allokeringen ligger här ...känns banalt.
-    let in_out_buffers: &mut [ChunkAndResidue; IN_MAX_CHUNKS] = &mut [
-        ChunkAndResidue {
-            chunk: Box::new([0_u8; SLICER_IN_CHUNK_SIZE]),
-        },
-        ChunkAndResidue {
-            chunk: Box::new([0_u8; SLICER_IN_CHUNK_SIZE]),
-        },
-    ];
+    info!("Executing using {} logical threads.", n_wanted_threads);
 
-    match cli.run(in_out_buffers) {
-        Ok(_) => info!("All done! Bye."),
-        Err(e) => error!("Something went wrong during execution: {:?}", e),
-    }
+    n_wanted_threads
 }
