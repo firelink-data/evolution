@@ -22,18 +22,21 @@
 * SOFTWARE.
 *
 * File created: 2023-11-25
-* Last updated: 2023-12-14
+* Last updated: 2024-05-08
 */
 
-use arrow::datatypes::Field;
-use arrow::datatypes::{DataType, Schema};
-use arrow::error::ArrowError;
+use arrow2::datatypes::{DataType, Field, Schema};
+use arrow2::error::Error;
+use padder::{Alignment, Symbol};
+use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
 
 use std::path::PathBuf;
 use std::{fs, io};
 
-use crate::mocker;
+use crate::builder::{BooleanColumnBuilder, ColumnBuilder};
+use crate::mocking::{mock_bool, mock_float, mock_integer, mock_string};
+use crate::parser::BooleanParser;
 
 ///
 #[derive(Default, Debug, Deserialize, Serialize, Clone)]
@@ -42,16 +45,19 @@ pub struct FixedColumn {
     name: String,
     /// The starting offset index for the column.
     offset: usize,
-    /// column length as cardinal of Rusts char type. Dont mix with byte lenght
+    /// The length of the column value.
     length: usize,
     /// The datatype of the column.
     dtype: String,
+    /// The type of alignment the column has.
+    alignment: String,
+    /// The symbol used to pad the column to its expected length.
+    pad_symbol: char,
     // Whether or not the column can contain [`None`] values.
     is_nullable: bool,
 }
 
 ///
-#[allow(dead_code)]
 impl FixedColumn {
     /// Create a new [`FixedColumn`] providing all its required attributes.
     /// No input sanitation is done in this stage. The user can provide
@@ -62,6 +68,8 @@ impl FixedColumn {
         offset: usize,
         length: usize,
         dtype: String,
+        alignment: String,
+        pad_symbol: char,
         is_nullable: bool,
     ) -> Self {
         Self {
@@ -69,6 +77,8 @@ impl FixedColumn {
             offset,
             length,
             dtype,
+            alignment,
+            pad_symbol,
             is_nullable,
         }
     }
@@ -101,12 +111,13 @@ impl FixedColumn {
 
     /// Find the matching [`arrow2::datatypes::DataType`]s corresponding
     /// to the [`FixedColumn`]s defined datatypes.
+    ///
     /// # Error
     /// Iff the [`FixedColumn`] datatype is not known.
     ///
     /// For a full list of defined datatype mappings, see the documentation
     /// or the file "resources/schema/valid_schema_dtypes.json".
-    pub fn arrow_dtype(&self) -> Result<DataType, ArrowError> {
+    pub fn arrow_dtype(&self) -> Result<DataType, Error> {
         match self.dtype.as_str() {
             "bool" => Ok(DataType::Boolean),
             "boolean" => Ok(DataType::Boolean),
@@ -120,39 +131,85 @@ impl FixedColumn {
             "string" => Ok(DataType::Utf8),
             "lutf8" => Ok(DataType::LargeUtf8),
             "lstring" => Ok(DataType::LargeUtf8),
-            _ => Err(ArrowError::ExternalError(Box::from(format!(
-                "Could not parse json schema dtype to arrow datatype, dtype: {:?}",
+            _ => Err(Error::ExternalFormat(format!(
+                "Could not parse json schema dtype to arrow datatype, dtype: {:?}.",
                 self.dtype,
-            )))),
+            ))),
         }
     }
-}
 
-///
-impl FixedColumn {
-    pub fn mock<'a>(&self) -> Result<&'a str, ArrowError> {
+    fn get_alignment(&self) -> Alignment {
+        match self.alignment.as_str() {
+            "left" => Alignment::Left,
+            "right" => Alignment::Right,
+            "center" => Alignment::Center,
+            _ => panic!(""),
+        }
+    }
+
+    fn get_pad_symbol(&self) -> Symbol {
+        match self.pad_symbol {
+            ' ' => Symbol::Whitespace,
+            '0' => Symbol::Zero,
+            '-' => Symbol::Hyphen,
+            _ => panic!(""),
+        }
+    }
+
+    ///
+    ///
+    /// Here it is ok to clone the [`String`] name because the [`ColumnBuilder`]s should
+    /// be allocated for an initialized at the start of the program, and not in any
+    /// loop or thread.
+    pub fn as_column_builder(&self) -> Box<dyn ColumnBuilder> {
+        match self.dtype.as_str() {
+            "bool" => Box::new(BooleanColumnBuilder::new(
+                self.length,
+                self.name.clone(),
+                BooleanParser::new(
+                    self.get_alignment(),
+                    self.get_pad_symbol(),
+                ),
+            )),
+            "boolean" => Box::new(BooleanColumnBuilder::new(
+                self.length,
+                self.name.clone(),
+                BooleanParser::new(
+                    self.get_alignment(),
+                    self.get_pad_symbol(),
+                ),
+            )),
+            _ => panic!("Could not find matching dtype when creating ColumnBuilder!"),
+        }
+    }
+
+    ///
+    pub fn mock<'a>(&self, rng: &'a mut ThreadRng) -> String {
         let string = match self.dtype.as_str() {
-            "bool" => mocker::mock_bool(std::cmp::max(self.length, 0)),
-            "boolean" => mocker::mock_bool(std::cmp::max(self.length, 0)),
-            "i16" => mocker::mock_number(std::cmp::max(self.length, 0)),
-            "i32" => mocker::mock_number(std::cmp::max(self.length, 0)),
-            "i64" => mocker::mock_number(std::cmp::max(self.length, 0)),
-            "f16" => mocker::mock_number(std::cmp::max(self.length, 0)),
-            "f32" => mocker::mock_number(std::cmp::max(self.length, 0)),
-            "f64" => mocker::mock_number(std::cmp::max(self.length, 0)),
-            "utf8" => mocker::mock_string(std::cmp::max(self.length, 0)),
-            "string" => mocker::mock_string(std::cmp::max(self.length, 0)),
-            "lutf8" => mocker::mock_string(std::cmp::max(self.length, 0)),
-            "lstring" => mocker::mock_string(std::cmp::max(self.length, 0)),
-            _ => return Err(ArrowError::ExternalError(Box::from("xd".to_string()))),
+            "bool" => mock_bool(rng),
+            "boolean" => mock_bool(rng),
+            "i16" => mock_integer(rng),
+            "i32" => mock_integer(rng),
+            "i64" => mock_integer(rng),
+            "f16" => mock_float(rng),
+            "f32" => mock_float(rng),
+            "f64" => mock_float(rng),
+            "utf8" => mock_string(self.length, rng),
+            "string" => mock_string(self.length, rng),
+            "lutf8" => mock_string(self.length, rng),
+            "lstring" => mock_string(self.length, rng),
+            _ => panic!(
+                "Could not find valid dtype for column, dtype: {:?}.",
+                self.dtype
+            ),
         };
 
-        Ok(string)
+        string
     }
 }
 
 ///
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
 pub struct FixedSchema {
     name: String,
     version: i32,
@@ -173,7 +230,8 @@ impl FixedSchema {
 
     /// Implicitly create a new [`FixedSchema`] by reading a json path
     /// and deserializing the schema into the epxected struct fields.
-    /// # Error
+    ///
+    /// # Panics
     /// If the file does not exist or if the schema in the file
     /// does not adhere to the above struct definition.
     pub fn from_path(path: PathBuf) -> Self {
@@ -225,6 +283,7 @@ impl FixedSchema {
     /// Consume the [`FixedSchema`] and produce a new [`arrow2::datatypes::Schema`].
     /// All of the [`FixedColumn`]s will tried to be parsed as their
     /// corresponding [`arrow2::datatypes::DataType`]s, but may fail.
+    ///
     /// # Error
     /// Iff any of the column datatypes can not be parsed to its
     /// corresponding [`arrow2::datatypes::DataType`].
@@ -235,7 +294,15 @@ impl FixedSchema {
             .map(|c| Field::new(c.name.to_owned(), c.arrow_dtype().unwrap(), c.is_nullable))
             .collect();
 
-        Schema::new(fields)
+        Schema::from(fields)
+    }
+
+    ///
+    pub fn as_column_builders(&self) -> Vec<Box<dyn ColumnBuilder>> {
+        self.columns
+            .iter()
+            .map(|c| c.as_column_builder())
+            .collect::<Vec<Box<dyn ColumnBuilder>>>()
     }
 
     /// Borrow the stored [`FixedColumn`]s and iterate over them.
@@ -283,6 +350,8 @@ mod tests_schema {
             5,
             20,
             "utf8".to_string(),
+            "left".to_string(),
+            ' ',
             false,
         );
         assert_eq!(DataType::Utf8, schema.arrow_dtype().unwrap());

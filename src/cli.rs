@@ -38,9 +38,12 @@ use crate::slicers::old_slicer::{OldSlicer, IN_MAX_CHUNKS};
 use crate::slicers::Slicer;
 use crate::slicers::{find_last_nl, line_break_len_cr, ChunkAndResidue};
 use crate::{error, mocker, schema};
-use clap::{Parser, Subcommand};
+use clap::{value_parser, ArgAction, Parser, Subcommand};
 use log::info;
 use parquet::arrow::ArrowWriter;
+use crate::mocker::Mocker;
+use crate::error::Result;
+use crate::threads::get_available_threads;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -77,13 +80,32 @@ enum Commands {
     /// does testing things
     Mock {
         /// Sets schema file
-        #[arg(short, long, value_name = "SCHEMA")]
+        #[arg(short = 's', long="schema", value_name = "SCHEMA",required = true)]
         schema: PathBuf,
         /// Sets input file
-        #[arg(short, long, value_name = "FILE")]
-        file: Option<PathBuf>,
-        #[arg(short, long, value_name = "n-rows", default_value = "100")]
-        n_rows: Option<i64>,
+        #[arg(short='o', long="output-file", value_name = "OUTPUT-FILE",required = false)]
+        output_file: Option<PathBuf>,
+        #[arg(short='n', long="n-rows", value_name = "NUM-ROWS", default_value = "100",required = false)]
+        n_rows: Option<usize>,
+
+        /// Set the size of the buffer (number of rows).
+        #[arg(
+            long = "buffer-size",
+            value_name = "BUFFER-SIZE",
+            action = ArgAction::Set,
+            required = false,
+        )]
+        buffer_size: Option<usize>,
+
+        /// Set the capacity of the thread channel (number of messages).
+        #[arg(
+            long = "thread-channel-capacity",
+            value_name = "THREAD-CHANNEL-CAPACITY",
+            action = ArgAction::Set,
+            required = false,
+        )]
+        thread_channel_capacity: Option<usize>,
+
     },
     Convert {
         /// Sets schema file
@@ -119,7 +141,7 @@ impl Cli {
     pub fn run<'a>(
         &self,
         in_buffers: &mut [ChunkAndResidue; IN_MAX_CHUNKS],
-    ) -> Result<(), error::ExecutionError> {
+    ) -> Result<()> {
         let n_logical_threads = num_cpus::get();
         let mut n_threads: usize = self.n_threads as usize;
 
@@ -139,17 +161,23 @@ impl Cli {
         match &self.command {
             Some(Commands::Mock {
                 schema,
-                file,
+                output_file,
                 n_rows,
-            }) => {
-                print!("target file {:?}", file.as_ref());
+                buffer_size,
+                thread_channel_capacity,
+                 }) => {
+                print!("target file {:?}", output_file.as_ref());
 
-                mocker::Mocker::new(
-                    schema::FixedSchema::from_path(schema.into()),
-                    file.clone(),
-                    n_threads,
-                )
-                .generate(n_rows.unwrap() as usize);
+                Mocker::builder()
+                    .schema(schema.to_owned())
+                    .output_file(output_file.to_owned())
+                    .num_rows(*n_rows)
+                    .num_threads(n_threads)
+                    .buffer_size(*buffer_size)
+                    .thread_channel_capacity(*thread_channel_capacity)
+                    .build()?
+                    .generate();
+
                 Ok(())
             }
 
