@@ -46,6 +46,7 @@ serde_json = "1.0.117"
 threadpool = "1.8.1"
 substring = "1.4.5"
 tempfile = "3.10.1"
+libc = "0.2.154"
 
 [dev-dependencies]
 glob = "0.3.1"

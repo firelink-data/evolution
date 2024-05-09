@@ -25,11 +25,11 @@
 * Last updated: 2023-12-14
 */
 use crate::converters::Converter;
-use crate::slicers::old_slicer::{IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE};
+use crate::slicers::chunked_slicer::{IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE};
 use std::fs;
 
 
-pub mod old_slicer;
+pub mod chunked_slicer;
 //pub mod new_slicer;
 
 pub(crate) struct ChunkAndResidue {

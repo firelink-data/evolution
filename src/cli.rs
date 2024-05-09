@@ -34,10 +34,10 @@ use crate::converters::arrow_converter::{MasterBuilders, Slice2Arrow};
 use crate::converters::self_converter::SampleSliceAggregator;
 use crate::converters::Converter;
 use crate::dump::dump;
-use crate::slicers::old_slicer::{OldSlicer, IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE};
+use crate::slicers::chunked_slicer::{OldSlicer, IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE};
 use crate::slicers::Slicer;
 use crate::slicers::{find_last_nl, line_break_len_cr, ChunkAndResidue};
-use crate::{error, mocker, schema};
+use crate::{converter, error, mocker, schema};
 use clap::{value_parser, ArgAction, Parser, Subcommand};
 use log::info;
 use parquet::arrow::ArrowWriter;
@@ -71,8 +71,8 @@ enum Converters {
 
 #[derive(clap::ValueEnum, Clone)]
 enum Slicers {
-    Old,
-    New,
+    Chunks,
+    Lines,
 }
 
 #[derive(Subcommand)]
@@ -107,7 +107,7 @@ enum Commands {
         thread_channel_capacity: Option<usize>,
 
     },
-    Convert {
+    ConvertChunked {
         /// Sets schema file
 
         #[clap(value_enum, value_name = "CONVERTER")]
@@ -127,6 +127,54 @@ enum Commands {
         #[arg(short, long, value_name = "OUT-FILE")]
         out_file: PathBuf,
     },
+    Convert {
+        /// The fixed-length file to convert.
+        #[arg(
+            short = 'f',
+            long = "file",
+            value_name = "FILE",
+            action = ArgAction::Set,
+        )]
+        file: PathBuf,
+
+        /// Specify output (target) file name.
+        #[arg(
+            short = 'o',
+            long = "output-file",
+            value_name = "OUTPUT-FILE",
+            action = ArgAction::Set,
+            required = false,
+        )]
+        output_file: PathBuf,
+
+        /// Specify the .json schema file to use when converting.
+        #[arg(
+            short = 's',
+            long = "schema",
+            value_name = "SCHEMA",
+            action = ArgAction::Set,
+        )]
+        schema: PathBuf,
+
+        /// Set the size of the buffer (in bytes).
+        #[arg(
+            long = "buffer-size",
+            value_name = "BUFFER-SIZE",
+            action = ArgAction::Set,
+            required = false,
+        )]
+        buffer_size: Option<usize>,
+
+        /// Set the capacity of the thread channel (number of messages).
+        #[arg(
+            long = "thread-channel-capacity",
+            value_name = "THREAD-CHANNEL-CAPACITY",
+            action = ArgAction::Set,
+            required = false,
+        )]
+        thread_channel_capacity: Option<usize>,
+    },
+
     Dump {
         /// Sets schema file
         #[clap(value_enum, value_name = "CONVERTER")]
@@ -192,7 +240,28 @@ impl Cli {
 
                 Ok(())
             }
-            Some(Commands::Convert {
+            Some (Commands::Convert {
+                file,
+                output_file,
+                schema,
+                buffer_size,
+                thread_channel_capacity,
+            }) => {
+                converter::Converter::builder()
+                    .target_file(file.to_owned())
+                    .output_file(output_file.to_owned())
+                    .schema(schema.to_owned())
+                    .num_threads(n_threads)
+                    .buffer_size(*buffer_size)
+                    .thread_channel_capacity(*thread_channel_capacity)
+                    .build()?
+                    .convert();
+                  Ok(())
+            }
+
+
+
+            Some(Commands::ConvertChunked {
                 converter,
                 slicer: _,
                 schema,
