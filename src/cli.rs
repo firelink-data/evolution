@@ -107,10 +107,10 @@ enum Commands {
         thread_channel_capacity: Option<usize>,
 
     },
-    ConvertChunked {
+    CConvert {
         /// Sets schema file
 
-        #[clap(value_enum, value_name = "CONVERTER")]
+        #[clap(value_enum, value_name = "CCONVERTER")]
         converter: Converters,
 
         #[clap(value_enum, value_name = "SLICER")]
@@ -261,7 +261,7 @@ impl Cli {
 
 
 
-            Some(Commands::ConvertChunked {
+            Some(Commands::CConvert {
                 converter,
                 slicer: _,
                 schema,
