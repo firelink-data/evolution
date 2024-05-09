@@ -28,7 +28,7 @@ use crate::converters::Converter;
 use crate::slicers::old_slicer::{IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE};
 use std::fs;
 
-pub mod new_slicer;
+
 pub mod old_slicer;
 //pub mod new_slicer;
 
@@ -39,7 +39,6 @@ pub(crate) trait Slicer<'a> {
     fn slice_and_convert(
         &mut self,
         converter: Box<dyn 'a + Converter<'a>>,
-        in_buffers: &'a mut [ChunkAndResidue; IN_MAX_CHUNKS],
         infile: fs::File,
         n_threads: usize,
     ) -> Result<Stats, &str>;

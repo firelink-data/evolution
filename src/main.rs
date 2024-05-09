@@ -54,17 +54,8 @@ fn main() {
         Err(e) => error!("Could not set up env logging: {:?}", e),
     };
 
-    // Effektiv med fixa buffrar men fult att allokeringen ligger här ...känns banalt.
-    let in_out_buffers: &mut [ChunkAndResidue; IN_MAX_CHUNKS] = &mut [
-        ChunkAndResidue {
-            chunk: Box::new([0_u8; SLICER_IN_CHUNK_SIZE]),
-        },
-        ChunkAndResidue {
-            chunk: Box::new([0_u8; SLICER_IN_CHUNK_SIZE]),
-        },
-    ];
 
-    match cli.run(in_out_buffers) {
+    match cli.run() {
         Ok(_) => info!("All done! Bye."),
         Err(e) => error!("Something went wrong during execution: {:?}", e),
     }

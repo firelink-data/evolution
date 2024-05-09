@@ -34,7 +34,7 @@ use crate::converters::arrow_converter::{MasterBuilders, Slice2Arrow};
 use crate::converters::self_converter::SampleSliceAggregator;
 use crate::converters::Converter;
 use crate::dump::dump;
-use crate::slicers::old_slicer::{OldSlicer, IN_MAX_CHUNKS};
+use crate::slicers::old_slicer::{OldSlicer, IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE};
 use crate::slicers::Slicer;
 use crate::slicers::{find_last_nl, line_break_len_cr, ChunkAndResidue};
 use crate::{error, mocker, schema};
@@ -140,10 +140,10 @@ enum Commands {
 impl Cli {
     pub fn run<'a>(
         &self,
-        in_buffers: &mut [ChunkAndResidue; IN_MAX_CHUNKS],
     ) -> Result<()> {
         let n_logical_threads = num_cpus::get();
         let mut n_threads: usize = self.n_threads as usize;
+
 
         if n_threads > n_logical_threads {
             info!(
@@ -152,6 +152,8 @@ impl Cli {
             );
             n_threads = n_logical_threads;
         }
+
+        // Effektiv med fixa buffrar men fult att allokeringen ligger här ...känns banalt.
 
         let multithreaded: bool = n_threads > 1;
         if multithreaded {
@@ -197,6 +199,8 @@ impl Cli {
                 in_file,
                 out_file,
             }) => {
+
+
                 let _in_file = fs::File::open(&in_file).expect("bbb");
 
                 let mut slicer_instance: Box<dyn Slicer> = Box::new(OldSlicer {
@@ -254,7 +258,6 @@ impl Cli {
 
                 let r = slicer_instance.slice_and_convert(
                     converter_instance,
-                    in_buffers,
                     _in_file,
                     n_threads as usize,
                 );

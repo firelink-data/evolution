@@ -73,10 +73,20 @@ impl<'a> Slicer<'a> for OldSlicer<'a> {
     fn slice_and_convert(
         &mut self,
         mut converter: Box<dyn 'a + Converter<'a>>,
-        in_buffers: &'a mut [ChunkAndResidue; IN_MAX_CHUNKS],
         infile: fs::File,
         n_threads: usize,
     ) -> Result<Stats, &str> {
+
+
+        let mut in_buffers: &mut [ChunkAndResidue; IN_MAX_CHUNKS] = &mut [
+            ChunkAndResidue {
+                chunk: Box::new([0_u8; SLICER_IN_CHUNK_SIZE]),
+            },
+            ChunkAndResidue {
+                chunk: Box::new([0_u8; SLICER_IN_CHUNK_SIZE]),
+            },
+        ];
+
         let mut bytes_in = 0;
         let mut bytes_out = 0;
 
