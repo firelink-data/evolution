@@ -7,28 +7,36 @@
             "offset": 0,
             "length": 9,
             "dtype": "i32",
-            "is_nullable": false
+            "is_nullable": false,
+            "alignment": "mid",
+            "pad_symbol": ""
         },
         {
             "name": "name",
             "offset": 9,
             "length": 32,
             "dtype": "utf8",
-            "is_nullable": false
+            "is_nullable": false,
+            "alignment": "mid",
+            "pad_symbol": ""
         },
         {
             "name": "city",
             "offset": 41,
             "length": 32,
             "dtype": "utf8",
-            "is_nullable": true
+            "is_nullable": true,
+            "alignment": "mid",
+            "pad_symbol": ""
         },
         {
             "name": "employed",
             "offset": 73,
             "length": 5,
             "dtype": "boolean",
-            "is_nullable": true 
+            "is_nullable": true,
+            "alignment": "mid",
+            "pad_symbol": ""
         }
     ]
 }
