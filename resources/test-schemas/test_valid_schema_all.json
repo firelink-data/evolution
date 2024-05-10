@@ -1,6 +1,6 @@
 {
-    "name": "EvolutionTestSchema",
-    "version": 418901,
+    "name": "ValidTestSchema",
+    "version": 1234567890,
     "columns": [
         {
             "name": "id",
@@ -37,6 +37,13 @@
             "alignment": "Right",
             "pad_symbol": "Whitespace",
             "is_nullable": true 
+        },
+        {
+            "name": "salary",
+            "offset": 78,
+            "length": 10,
+            "dtype": "f32",
+            "is_nullable": false
         }
     ]
 }

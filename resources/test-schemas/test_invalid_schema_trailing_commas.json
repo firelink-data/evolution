@@ -1,14 +1,12 @@
 {
-    "name": "EvolutionTestSchema",
-    "version": 418901,
+    "name": "InvalidTestSchema",
+    "version": 2,
     "columns": [
         {
             "name": "id",
             "offset": 0,
             "length": 9,
             "dtype": "i32",
-            "alignment": "left",
-            "pad_symbol": "0",
             "is_nullable": false
         },
         {
@@ -16,8 +14,6 @@
             "offset": 9,
             "length": 32,
             "dtype": "utf8",
-            "alignment": "left",
-            "pad_symbol": " ",
             "is_nullable": false
         },
         {
@@ -25,8 +21,8 @@
             "offset": 41,
             "length": 32,
             "dtype": "utf8",
-            "alignment": "center",
-            "pad_symbol": " ",
+            "alignment": "Center",
+            "pad_symbol": "Five",
             "is_nullable": false,
         },
         {
@@ -34,8 +30,6 @@
             "offset": 73,
             "length": 1,
             "dtype": "boolean",
-            "alignment": "right",
-            "pad_symbol": " ",
             "is_nullable": false,
         }
     ]

@@ -34,7 +34,18 @@
                     },
                     "dtype": {
                         "description": "The datatype of the column.",
-                        "type": "string"
+                        "type": "string",
+                        "enum": [
+                            "Boolean",
+                            "Float16",
+                            "Float32",
+                            "Float64",
+                            "Int16",
+                            "Int32",
+                            "Int64",
+                            "Utf8",
+                            "LargeUtf8"
+                        ]
                     },
                     "alignment": {
                         "description": "The alignment mode of the column.",

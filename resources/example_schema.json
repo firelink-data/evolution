@@ -6,7 +6,7 @@
             "name": "id",
             "offset": 0,
             "length": 9,
-            "dtype": "i32",
+            "dtype": "Int32",
             "alignment": "Right",
             "pad_symbol": "Zero",
             "is_nullable": false
@@ -15,14 +15,14 @@
             "name": "name",
             "offset": 9,
             "length": 32,
-            "dtype": "utf8",
+            "dtype": "Utf8",
             "is_nullable": true
         },
         {
             "name": "city",
             "offset": 41,
             "length": 32,
-            "dtype": "utf8",
+            "dtype": "Utf8",
             "alignment": "Right",
             "pad_symbol": "Backslash",
             "is_nullable": false
@@ -31,7 +31,7 @@
             "name": "employed",
             "offset": 73,
             "length": 5,
-            "dtype": "boolean",
+            "dtype": "Boolean",
             "alignment": "Center",
             "pad_symbol": "Asterisk",
             "is_nullable": false
