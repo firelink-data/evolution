@@ -39,6 +39,7 @@ use parquet::format;
 use rayon::iter::IndexedParallelIterator;
 use rayon::prelude::*;
 
+use crate::datatype::DataType;
 use crate::converters::{ColumnBuilder, Converter};
 use crate::slicers::{FnFindLastLineBreak, FnLineBreakLen};
 use crate::{converters, schema};
@@ -92,31 +93,38 @@ impl MasterBuilders {
         for _i in 1..=instances {
             let mut buildersmut: Vec<Box<dyn ColumnBuilder + Sync + Send>> =
                 Vec::with_capacity(antal_col);
-            for val in schema.iter() {
-                match val.dtype().as_str() {
-                    "i32" => buildersmut.push(Box::new(HandlerInt32Builder {
-                        int32builder: Int32Builder::new(),
-                        runes_in_column: val.length(),
-                        name: val.name().clone(),
-                    })),
-                    "i64" => buildersmut.push(Box::new(HandlerInt64Builder {
-                        int64builder: Int64Builder::new(),
-                        runes_in_column: val.length(),
-                        name: val.name().clone(),
-                    })),
-                    "boolean" => buildersmut.push(Box::new(HandlerBooleanBuilder {
+            for col in schema.iter() {
+                match col.dtype() {
+                    DataType::Boolean => buildersmut.push(Box::new(HandlerBooleanBuilder {
                         boolean_builder: BooleanBuilder::new(),
-                        runes_in_column: val.length(),
-                        name: val.name().clone(),
+                        runes_in_column: col.length(),
+                        name: col.name().clone(),
                     })),
-                    "utf8" => buildersmut.push(Box::new(HandlerStringBuilder {
+                    DataType::Float16 => todo!(),
+                    DataType::Float32 => todo!(),
+                    DataType::Float64 => todo!(),
+                    DataType::Int16 => todo!(),
+                    DataType::Int32 => buildersmut.push(Box::new(HandlerInt32Builder {
+                        int32builder: Int32Builder::new(),
+                        runes_in_column: col.length(),
+                        name: col.name().clone(),
+                    })),
+                    DataType::Int64 => buildersmut.push(Box::new(HandlerInt64Builder {
+                        int64builder: Int64Builder::new(),
+                        runes_in_column: col.length(),
+                        name: col.name().clone(),
+                    })),
+                    DataType::Utf8 => buildersmut.push(Box::new(HandlerStringBuilder {
                         string_builder: StringBuilder::new(),
-                        runes_in_column: val.length(),
-                        name: val.name().clone(),
+                        runes_in_column: col.length(),
+                        name: col.name().clone(),
                     })),
-
-                    &_ => {}
-                };
+                    DataType::LargeUtf8 => buildersmut.push(Box::new(HandlerStringBuilder {
+                        string_builder: StringBuilder::new(),
+                        runes_in_column: col.length(),
+                        name: col.name().clone(),
+                    })),
+                }
             }
             builders.push(buildersmut);
         }

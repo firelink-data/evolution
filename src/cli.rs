@@ -29,7 +29,7 @@ use std::fs;
 use std::fs::File;
 use std::path::PathBuf;
 
-use crate::converters::arrow2_converter::{MasterBuilder, Slice2Arrow2};
+// use crate::converters::arrow2_converter::{MasterBuilder, Slice2Arrow2};
 use crate::converters::arrow_converter::{MasterBuilders, Slice2Arrow};
 use crate::converters::self_converter::SampleSliceAggregator;
 use crate::converters::Converter;
@@ -294,6 +294,7 @@ impl Cli {
                         s2a
                     }
                     Converters::Arrow2 => {
+                        /*
                         let _out_file = fs::OpenOptions::new()
                             .create(true)
                             .append(true)
@@ -308,6 +309,8 @@ impl Cli {
                         });
 
                         s2a
+                        */
+                        todo!()
                     }
 
                     Converters::None => {

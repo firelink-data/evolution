@@ -29,6 +29,7 @@ use clap::Parser;
 use log::{debug, error, info};
 
 mod cli;
+mod datatype;
 mod error;
 mod logger;
 mod mocker;

@@ -30,7 +30,7 @@ use arrow::array::ArrayRef;
 use parquet::format;
 use std::cmp::min;
 
-pub(crate) mod arrow2_converter;
+// pub(crate) mod arrow2_converter;
 pub(crate) mod self_converter;
 
 pub mod arrow_converter;

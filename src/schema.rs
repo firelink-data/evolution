@@ -61,9 +61,19 @@ pub struct FixedColumn {
 
 ///
 impl FixedColumn {
+    ///
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+
     /// Get the length of the column.
     pub fn length(&self) -> usize {
         self.length
+    }
+
+    ///
+    pub fn dtype(&self) -> DataType {
+        self.dtype
     }
 
     /// Get the alignment mode of the column.
