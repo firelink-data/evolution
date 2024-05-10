@@ -8,7 +8,7 @@
             "length": 9,
             "dtype": "Int32",
             "alignment": "Right",
-            "pad_symbol": "Zero",
+            "pad_symbol": "Whitespace",
             "is_nullable": false
         },
         {
@@ -35,7 +35,7 @@
             "length": 5,
             "dtype": "Boolean",
             "alignment": "Right",
-            "pad_symbol": "Whitespace",
+            "pad_symbol": "Hyphen",
             "is_nullable": true 
         },
         {
