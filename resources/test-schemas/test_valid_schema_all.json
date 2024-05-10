@@ -1,12 +1,12 @@
 {
-    "name": "ValidTestSchema",
+    "name": "ValidTestSchemaAll",
     "version": 1234567890,
     "columns": [
         {
             "name": "id",
             "offset": 0,
             "length": 9,
-            "dtype": "i32",
+            "dtype": "Int32",
             "alignment": "Right",
             "pad_symbol": "Zero",
             "is_nullable": false
@@ -15,7 +15,7 @@
             "name": "name",
             "offset": 9,
             "length": 32,
-            "dtype": "utf8",
+            "dtype": "Utf8",
             "alignment": "Right",
             "pad_symbol": "Whitespace",
             "is_nullable": false
@@ -24,7 +24,7 @@
             "name": "city",
             "offset": 41,
             "length": 32,
-            "dtype": "utf8",
+            "dtype": "Utf8",
             "alignment": "Right",
             "pad_symbol": "Whitespace",
             "is_nullable": true
@@ -33,7 +33,7 @@
             "name": "employed",
             "offset": 73,
             "length": 5,
-            "dtype": "boolean",
+            "dtype": "Boolean",
             "alignment": "Right",
             "pad_symbol": "Whitespace",
             "is_nullable": true 
@@ -42,7 +42,7 @@
             "name": "salary",
             "offset": 78,
             "length": 10,
-            "dtype": "f32",
+            "dtype": "Float32",
             "is_nullable": false
         }
     ]
