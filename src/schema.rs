@@ -50,8 +50,10 @@ pub struct FixedColumn {
     /// The datatype of the column.
     dtype: String,
     /// The type of alignment the column has.
+    #[serde(default)]
     alignment: Alignment,
     /// The symbol used to pad the column to its expected length.
+    #[serde(default)]
     pad_symbol: Symbol,
     /// Whether or not the column can contain [`None`] values.
     is_nullable: bool,
