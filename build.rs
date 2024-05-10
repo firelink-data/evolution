@@ -21,42 +21,16 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-// File created: 2023-11-21
+// File created: 2024-05-10
 // Last updated: 2024-05-10
 //
 
-#![cfg_attr(feature = "nightly", feature(str_internals))]
+use std::env;
 
-use clap::Parser;
-use log::{debug, error, info};
-
-mod builder;
-mod cli;
-mod converter;
-mod datatype;
-mod error;
-mod logger;
-mod mocker;
-mod mocking;
-mod parser;
-mod schema;
-mod slicer;
-mod threads;
-mod writer;
-
-use cli::Cli;
-
-///
 fn main() {
-    let cli = Cli::parse();
-
-    match logger::setup_log() {
-        Ok(_) => debug!("Logging setup ok!"),
-        Err(e) => error!("Could not set up env logging: {:?}", e),
-    };
-
-    match cli.run() {
-        Ok(_) => info!("All done! Bye. 👋🥳"),
-        Err(e) => error!("Something went wrong during execution: {:?}", e),
+    let toolchain: String = env::var("RUSTUP_TOOLCHAIN").unwrap();
+    if toolchain.starts_with("nightly") {
+        println!("cargo:rustc-cfg=feature=\"nightly\"");
     }
 }
+
