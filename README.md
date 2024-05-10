@@ -127,7 +127,7 @@ logical cores**. If this argument is omitted, then the program will run in singl
 An experimental multithreaded implementation exists , it reads chunks of 2 megabytes and splits them into n anmounts of cores in O(1). 
 Run a small conversion test using the "arrow" converter with slicer type "chunked"
 ```
-$ cargo run --package evolution --release --bin evolution -- c-convert --schema resources/schema/test_schema.json --in-file resources/schema/test_schema_mock.txt --out-file out.parquet arrow chunks
+$ cargo run --package evolution --release --bin evolution -- c-convert --schema resources/schema/test_schema.json --in-file resources/test-flf/test_schema_mock.flf --out-file out.parquet arrow chunks
 ```
 
 ## 📋 License
