@@ -285,7 +285,7 @@ mod tests_schema {
     #[test]
     fn test_fixed_to_arrow_schema_ok() {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("resources/test-schemas/test_valid_schema_all.json");
+        path.push("resources/schemas/test_valid_schema_all.json");
 
         let fixed_schema: FixedSchema = FixedSchema::from_path(path);
         let arrow_schema: Schema = fixed_schema.into_arrow_schema();
@@ -296,7 +296,7 @@ mod tests_schema {
     #[test]
     fn test_derive_from_file_ok() {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("resources/test-schemas/test_valid_schema_booleans.json");
+        path.push("resources/schemas/test_valid_schema_booleans.json");
 
         let schema: FixedSchema = FixedSchema::from_path(path);
         let offsets: Vec<usize> = vec![0, 9, 14];
@@ -312,7 +312,7 @@ mod tests_schema {
     #[should_panic]
     fn test_derive_from_file_trailing_commas() {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("resources/test-schemas/test_invalid_schema_trailing_commas.json");
+        path.push("resources/schemas/test_invalid_schema_trailing_commas.json");
 
         let _schema: FixedSchema = FixedSchema::from_path(path);
     }
