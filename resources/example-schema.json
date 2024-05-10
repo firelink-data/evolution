@@ -1,0 +1,40 @@
+{
+    "name": "EvolutionExampleSchema",
+    "version": 1337,
+    "columns": [
+        {
+            "name": "id",
+            "offset": 0,
+            "length": 9,
+            "dtype": "i32",
+            "alignment": "Right",
+            "pad_symbol": "Zero",
+            "is_nullable": false
+        },
+        {
+            "name": "name",
+            "offset": 9,
+            "length": 32,
+            "dtype": "utf8",
+            "is_nullable": true
+        },
+        {
+            "name": "city",
+            "offset": 41,
+            "length": 32,
+            "dtype": "utf8",
+            "alignment": "Right",
+            "pad_symbol": "Backslash",
+            "is_nullable": false
+        },
+        {
+            "name": "employed",
+            "offset": 73,
+            "length": 5,
+            "dtype": "boolean",
+            "alignment": "Center",
+            "pad_symbol": "Asterisk",
+            "is_nullable": false
+        }
+    ]
+}
