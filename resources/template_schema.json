@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://github.com/firelink-data/evolution/tree/main/resources/template-schema.json",
+    "$id": "https://github.com/firelink-data/evolution/tree/main/resources/template_schema.json",
     "title": "Fixed-length file",
     "description": "The specification for a valid fixed-length file (.flf).",
     "type": "object",
