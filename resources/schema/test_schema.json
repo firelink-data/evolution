@@ -7,8 +7,8 @@
             "offset": 0,
             "length": 9,
             "dtype": "i32",
-            "alignment": "right",
-            "pad_symbol": "0",
+            "alignment": "Right",
+            "pad_symbol": "Zero",
             "is_nullable": false
         },
         {
@@ -16,8 +16,8 @@
             "offset": 9,
             "length": 32,
             "dtype": "utf8",
-            "alignment": "right",
-            "pad_symbol": " ",
+            "alignment": "Right",
+            "pad_symbol": "Whitespace",
             "is_nullable": false
         },
         {
@@ -25,8 +25,8 @@
             "offset": 41,
             "length": 32,
             "dtype": "utf8",
-            "alignment": "right",
-            "pad_symbol": " ",
+            "alignment": "Right",
+            "pad_symbol": "Whitespace",
             "is_nullable": true
         },
         {
@@ -34,8 +34,8 @@
             "offset": 73,
             "length": 5,
             "dtype": "boolean",
-            "alignment": "right",
-            "pad_symbol": " ",
+            "alignment": "Right",
+            "pad_symbol": "Whitespace",
             "is_nullable": true 
         }
     ]
