@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2024-02-05
-* Last updated: 2024-05-09
+* Last updated: 2024-05-10
 */
 
 use crossbeam::channel;
@@ -116,7 +116,7 @@ impl Mocker {
                 );
                 warn!("This is done more efficiently single-threaded, ignoring multithreading!");
             }
-            self.generate_single_thread();
+            self.generate_single_threaded();
         }
     }
 
@@ -129,7 +129,7 @@ impl Mocker {
             .collect::<Vec<usize>>()
     }
 
-    /// Generated mocked data in multithreading mode using [`rayon`] and parallel iteration.
+    /// Generate mocked data in multithreading mode using [`rayon`] and parallel iteration.
     #[cfg(feature = "rayon")]
     fn generate_multithreaded(&self) {
         // Calculate the workload for each worker thread, if the workload can not evenly
@@ -205,7 +205,7 @@ impl Mocker {
     // the multithreading mode can do. However, single-threaded mode will
     // be significantly slower when generating the sweet-spot of rows
     // which do not introduce long thread waiting times due to I/O.
-    fn generate_single_thread(&mut self) {
+    fn generate_single_threaded(&mut self) {
         let row_len = self.schema.row_len();
         let buffer_size: usize =
             self.buffer_size * row_len + self.buffer_size * NUM_CHARS_FOR_NEWLINE;
@@ -225,8 +225,8 @@ impl Mocker {
                 pad_and_push_to_buffer(
                     column.mock(&mut rng).as_bytes(),
                     column.length(),
-                    Alignment::Right,
-                    Symbol::Whitespace,
+                    column.alignment(),
+                    column.pad_symbol(),
                     &mut buffer,
                 );
             }
@@ -372,7 +372,10 @@ impl MockerBuilder {
             Some(c) => c,
             None => {
                 info!("Optional field `--thread-channel-capacity' not provided.");
-                info!("Mocker thread channel capacity is now {} messages.", MOCKER_THREAD_CHANNEL_CAPACITY);
+                info!(
+                    "Mocker thread channel capacity is now {} messages.",
+                    MOCKER_THREAD_CHANNEL_CAPACITY
+                );
                 MOCKER_THREAD_CHANNEL_CAPACITY
             }
         };
@@ -419,8 +422,8 @@ fn worker_thread_generate(
             pad_and_push_to_buffer(
                 column.mock(&mut rng).as_bytes(),
                 column.length(),
-                Alignment::Right,
-                Symbol::Whitespace,
+                column.alignment(),
+                column.pad_symbol(),
                 &mut buffer,
             );
         }

@@ -71,7 +71,7 @@ impl ColumnBuilder for BooleanColumnBuilder {
             Err(e) => {
                 warn!("Could not convert utf-8 text to bool: {:?}", e);
                 self.inner.append_null();
-            },
+            }
         };
     }
 
@@ -82,10 +82,7 @@ impl ColumnBuilder for BooleanColumnBuilder {
 
     ///
     fn finish(&mut self) -> (&str, ArrayRef) {
-        (
-            &self.name,
-            Arc::new(self.inner.finish()) as ArrayRef,
-        )
+        (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
     }
 }
 

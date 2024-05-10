@@ -22,7 +22,7 @@
 * SOFTWARE.
 *
 * File created: 2023-11-25
-* Last updated: 2024-05-08
+* Last updated: 2024-05-10
 */
 
 use arrow2::datatypes::{DataType, Field, Schema};
@@ -50,10 +50,10 @@ pub struct FixedColumn {
     /// The datatype of the column.
     dtype: String,
     /// The type of alignment the column has.
-    alignment: String,
+    alignment: Alignment,
     /// The symbol used to pad the column to its expected length.
-    pad_symbol: char,
-    // Whether or not the column can contain [`None`] values.
+    pad_symbol: Symbol,
+    /// Whether or not the column can contain [`None`] values.
     is_nullable: bool,
 }
 
@@ -68,8 +68,8 @@ impl FixedColumn {
         offset: usize,
         length: usize,
         dtype: String,
-        alignment: String,
-        pad_symbol: char,
+        alignment: Alignment,
+        pad_symbol: Symbol,
         is_nullable: bool,
     ) -> Self {
         Self {
@@ -99,9 +99,18 @@ impl FixedColumn {
     }
 
     /// Get the datatype of the column.
-    /// NOTE: not as a [`arrow2::datatypes::DataType`].
     pub fn dtype(&self) -> &String {
         &self.dtype
+    }
+
+    /// Get the alignment mode of the column.
+    pub fn alignment(&self) -> Alignment {
+        self.alignment
+    }
+
+    /// Get the padding symbol for the column.
+    pub fn pad_symbol(&self) -> Symbol {
+        self.pad_symbol
     }
 
     /// Check whether or not the column can contain null values.
@@ -138,24 +147,6 @@ impl FixedColumn {
         }
     }
 
-    fn get_alignment(&self) -> Alignment {
-        match self.alignment.as_str() {
-            "left" => Alignment::Left,
-            "right" => Alignment::Right,
-            "center" => Alignment::Center,
-            _ => panic!(""),
-        }
-    }
-
-    fn get_pad_symbol(&self) -> Symbol {
-        match self.pad_symbol {
-            ' ' => Symbol::Whitespace,
-            '0' => Symbol::Zero,
-            '-' => Symbol::Hyphen,
-            _ => panic!(""),
-        }
-    }
-
     ///
     ///
     /// Here it is ok to clone the [`String`] name because the [`ColumnBuilder`]s should
@@ -166,18 +157,12 @@ impl FixedColumn {
             "bool" => Box::new(BooleanColumnBuilder::new(
                 self.length,
                 self.name.clone(),
-                BooleanParser::new(
-                    self.get_alignment(),
-                    self.get_pad_symbol(),
-                ),
+                BooleanParser::new(self.alignment.clone(), self.pad_symbol.clone()),
             )),
             "boolean" => Box::new(BooleanColumnBuilder::new(
                 self.length,
                 self.name.clone(),
-                BooleanParser::new(
-                    self.get_alignment(),
-                    self.get_pad_symbol(),
-                ),
+                BooleanParser::new(self.alignment.clone(), self.pad_symbol.clone()),
             )),
             _ => panic!("Could not find matching dtype when creating ColumnBuilder!"),
         }
@@ -350,8 +335,8 @@ mod tests_schema {
             5,
             20,
             "utf8".to_string(),
-            "left".to_string(),
-            ' ',
+            Alignment::Left,
+            Symbol::Whitespace,
             false,
         );
         assert_eq!(DataType::Utf8, schema.arrow_dtype().unwrap());

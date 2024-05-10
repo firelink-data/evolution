@@ -128,7 +128,8 @@ impl Converter {
         let mut builders: Vec<Box<dyn ColumnBuilder>> = self.schema.as_column_builders();
 
         // Setup writer configuration for specific target schema.
-        let mut empty_column_builders = self.schema
+        let mut empty_column_builders = self
+            .schema
             .iter()
             .map(|col| col.as_column_builder())
             .collect::<Vec<Box<dyn ColumnBuilder>>>();
@@ -196,7 +197,6 @@ impl Converter {
 
             let mut prev_line_break_idx: usize = 0;
             for line_break_idx in line_break_indices.iter() {
-
                 let line: &[u8] = &buffer[prev_line_break_idx..*line_break_idx];
                 let mut prev_byte_idx: usize = 0;
 
@@ -241,7 +241,7 @@ impl Converter {
             //         // scope of the loop, this is not ok!
             //         buffer.push(builder.finish());
             //     }
-            // 
+            //
             // }
             //
             // // Here we still MIGHT have access to the mutable references

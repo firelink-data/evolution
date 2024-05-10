@@ -127,7 +127,8 @@ impl ParquetWriter {
             file,
             self.record_batch.clone().unwrap().schema(),
             self.properties.clone(),
-        ).expect("Could not create `ArrowWriter` from provided `RecordBatch`!");
+        )
+        .expect("Could not create `ArrowWriter` from provided `RecordBatch`!");
 
         self.inner = Some(writer);
     }
@@ -136,10 +137,13 @@ impl ParquetWriter {
     pub fn write_batch(&mut self, batch: &RecordBatch) {
         match self.inner {
             Some(ref mut writer) => {
-                writer.write(batch)
+                writer
+                    .write(batch)
                     .expect("Could not write RecordBatch with ArrowWriter!");
-            },
-            None => panic!("The `ParquetWriter` has not been set up properly, missing `ArrowWriter`!"),
+            }
+            None => {
+                panic!("The `ParquetWriter` has not been set up properly, missing `ArrowWriter`!")
+            }
         };
     }
 }
@@ -157,10 +161,11 @@ impl Writer for ParquetWriter {
     fn finish(&mut self) {
         match self.inner {
             Some(ref mut writer) => {
-                writer.finish()
-                    .expect("");
-            },
-            None => panic!("The `ParquetWriter` has not been set up properly, missing `ArrowWriter`!"),
+                writer.finish().expect("");
+            }
+            None => {
+                panic!("The `ParquetWriter` has not been set up properly, missing `ArrowWriter`!")
+            }
         };
     }
 }
