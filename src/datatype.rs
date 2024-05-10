@@ -25,11 +25,17 @@
 // Last updated: 2024-05-10
 //
 
-use std::env;
+use serde::{Deserialize, Serialize};
 
-fn main() {
-    let toolchain: String = env::var("RUSTUP_TOOLCHAIN").unwrap();
-    if toolchain.starts_with("nightly") {
-        println!("cargo:rustc-cfg=feature=\"nightly\"");
-    }
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Serialize)]
+pub(crate) enum DataType {
+    Boolean,
+    Float16,
+    Float32,
+    Float64,
+    Int16,
+    Int32,
+    Int64,
+    Utf8,
+    LargeUtf8,
 }
