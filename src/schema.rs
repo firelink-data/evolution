@@ -1,32 +1,31 @@
-/*
-* MIT License
-*
-* Copyright (c) 2024 Firelink Data
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
-*
-* The above copyright notice and this permission notice shall be included in all
-* copies or substantial portions of the Software.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE.
-*
-* File created: 2023-11-25
-* Last updated: 2024-05-08
-*/
+//
+// MIT License
+//
+// Copyright (c) 2024 Firelink Data
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+// File created: 2023-11-25
+// Last updated: 2024-05-10
+//
 
-use arrow2::datatypes::{DataType, Field, Schema};
-use arrow2::error::Error;
+use arrow::datatypes::{DataType as ArrowDataType, Field, Schema};
 use padder::{Alignment, Symbol};
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
@@ -34,12 +33,13 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::{fs, io};
 
-use crate::builder::{BooleanColumnBuilder, ColumnBuilder};
+use crate::builder::{BooleanColumnBuilder, ColumnBuilder, Float16ColumnBuilder, Float32ColumnBuilder, Float64ColumnBuilder, Int16ColumnBuilder, Int32ColumnBuilder, Int64ColumnBuilder, Utf8ColumnBuilder, LargeUtf8ColumnBuilder};
+use crate::datatype::DataType;
 use crate::mocking::{mock_bool, mock_float, mock_integer, mock_string};
-use crate::parser::BooleanParser;
+use crate::parser::{BooleanParser, Float16Parser, Float32Parser, Float64Parser, Int16Parser, Int32Parser, Int64Parser, LargeUtf8Parser, Utf8Parser};
 
 ///
-#[derive(Default, Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct FixedColumn {
     /// The symbolic name of the column.
     name: String,
@@ -48,163 +48,117 @@ pub struct FixedColumn {
     /// The length of the column value.
     length: usize,
     /// The datatype of the column.
-    dtype: String,
+    dtype: DataType,
     /// The type of alignment the column has.
-    alignment: String,
+    #[serde(default)]
+    alignment: Alignment,
     /// The symbol used to pad the column to its expected length.
-    pad_symbol: char,
-    // Whether or not the column can contain [`None`] values.
+    #[serde(default)]
+    pad_symbol: Symbol,
+    /// Whether or not the column can contain null values.
     is_nullable: bool,
 }
 
 ///
 impl FixedColumn {
-    /// Create a new [`FixedColumn`] providing all its required attributes.
-    /// No input sanitation is done in this stage. The user can provide
-    /// an arbitrary datatype but the problem will then later crash when
-    /// trying to call [`FixedColumn::arrow_dtype()`] if it is not known.
-    pub fn new(
-        name: String,
-        offset: usize,
-        length: usize,
-        dtype: String,
-        alignment: String,
-        pad_symbol: char,
-        is_nullable: bool,
-    ) -> Self {
-        Self {
-            name,
-            offset,
-            length,
-            dtype,
-            alignment,
-            pad_symbol,
-            is_nullable,
-        }
-    }
-
-    /// Get the name of the column.
-    pub fn name(&self) -> &String {
-        &self.name
-    }
-
-    /// Get the index offset for where the column starts in each row.
-    pub fn offset(&self) -> usize {
-        self.offset
-    }
-
     /// Get the length of the column.
     pub fn length(&self) -> usize {
         self.length
     }
 
-    /// Get the datatype of the column.
-    /// NOTE: not as a [`arrow2::datatypes::DataType`].
-    pub fn dtype(&self) -> &String {
-        &self.dtype
+    /// Get the alignment mode of the column.
+    pub fn alignment(&self) -> Alignment {
+        self.alignment
     }
 
-    /// Check whether or not the column can contain null values.
-    pub fn is_nullable(&self) -> bool {
-        self.is_nullable
+    /// Get the padding symbol for the column.
+    pub fn pad_symbol(&self) -> Symbol {
+        self.pad_symbol
     }
 
-    /// Find the matching [`arrow2::datatypes::DataType`]s corresponding
-    /// to the [`FixedColumn`]s defined datatypes.
-    ///
-    /// # Error
-    /// Iff the [`FixedColumn`] datatype is not known.
-    ///
-    /// For a full list of defined datatype mappings, see the documentation
-    /// or the file "resources/schema/valid_schema_dtypes.json".
-    pub fn arrow_dtype(&self) -> Result<DataType, Error> {
-        match self.dtype.as_str() {
-            "bool" => Ok(DataType::Boolean),
-            "boolean" => Ok(DataType::Boolean),
-            "i16" => Ok(DataType::Int16),
-            "i32" => Ok(DataType::Int32),
-            "i64" => Ok(DataType::Int64),
-            "f16" => Ok(DataType::Float16),
-            "f32" => Ok(DataType::Float32),
-            "f64" => Ok(DataType::Float64),
-            "utf8" => Ok(DataType::Utf8),
-            "string" => Ok(DataType::Utf8),
-            "lutf8" => Ok(DataType::LargeUtf8),
-            "lstring" => Ok(DataType::LargeUtf8),
-            _ => Err(Error::ExternalFormat(format!(
-                "Could not parse json schema dtype to arrow datatype, dtype: {:?}.",
-                self.dtype,
-            ))),
+    /// Find the matching [`ArrowDataType`] for the [`FixedColumn`]s dtype.
+    pub fn as_arrow_dtype(&self) -> ArrowDataType {
+        match self.dtype {
+            DataType::Boolean => ArrowDataType::Boolean,
+            DataType::Float16 => ArrowDataType::Float16,
+            DataType::Float32 => ArrowDataType::Float32,
+            DataType::Float64 => ArrowDataType::Float64,
+            DataType::Int16 => ArrowDataType::Int16,
+            DataType::Int32 => ArrowDataType::Int32,
+            DataType::Int64 => ArrowDataType::Int64,
+            DataType::Utf8 => ArrowDataType::Utf8,
+            DataType::LargeUtf8 => ArrowDataType::LargeUtf8,
         }
     }
 
-    fn get_alignment(&self) -> Alignment {
-        match self.alignment.as_str() {
-            "left" => Alignment::Left,
-            "right" => Alignment::Right,
-            "center" => Alignment::Center,
-            _ => panic!(""),
-        }
-    }
-
-    fn get_pad_symbol(&self) -> Symbol {
-        match self.pad_symbol {
-            ' ' => Symbol::Whitespace,
-            '0' => Symbol::Zero,
-            '-' => Symbol::Hyphen,
-            _ => panic!(""),
-        }
-    }
-
+    /// Create a new [`ColumnBuilder`] on the heap from the [`FixedColumn`] fields. 
     ///
-    ///
+    /// # Performance 
     /// Here it is ok to clone the [`String`] name because the [`ColumnBuilder`]s should
-    /// be allocated for an initialized at the start of the program, and not in any
-    /// loop or thread.
+    /// be initialized at the start of the program, and not in any loop or thread.
     pub fn as_column_builder(&self) -> Box<dyn ColumnBuilder> {
-        match self.dtype.as_str() {
-            "bool" => Box::new(BooleanColumnBuilder::new(
+         match self.dtype {
+            DataType::Boolean => Box::new(BooleanColumnBuilder::new(
                 self.length,
                 self.name.clone(),
-                BooleanParser::new(
-                    self.get_alignment(),
-                    self.get_pad_symbol(),
-                ),
+                BooleanParser::new(self.alignment, self.pad_symbol),
             )),
-            "boolean" => Box::new(BooleanColumnBuilder::new(
+            DataType::Float16 => Box::new(Float16ColumnBuilder::new(
                 self.length,
                 self.name.clone(),
-                BooleanParser::new(
-                    self.get_alignment(),
-                    self.get_pad_symbol(),
-                ),
+                Float16Parser::new(self.alignment, self.pad_symbol),
             )),
-            _ => panic!("Could not find matching dtype when creating ColumnBuilder!"),
-        }
+            DataType::Float32 => Box::new(Float32ColumnBuilder::new(
+                self.length,
+                self.name.clone(),
+                Float32Parser::new(self.alignment, self.pad_symbol),
+            )),
+            DataType::Float64 => Box::new(Float64ColumnBuilder::new(
+                self.length,
+                self.name.clone(),
+                Float64Parser::new(self.alignment, self.pad_symbol),
+            )),
+            DataType::Int16 => Box::new(Int16ColumnBuilder::new(
+                self.length,
+                self.name.clone(),
+                Int16Parser::new(self.alignment, self.pad_symbol),
+            )),
+            DataType::Int32 => Box::new(Int32ColumnBuilder::new(
+                self.length,
+                self.name.clone(),
+                Int32Parser::new(self.alignment, self.pad_symbol),
+            )),
+            DataType::Int64 => Box::new(Int64ColumnBuilder::new(
+                self.length,
+                self.name.clone(),
+                Int64Parser::new(self.alignment, self.pad_symbol),
+            )),
+            DataType::Utf8 => Box::new(Utf8ColumnBuilder::new(
+                self.length,
+                self.name.clone(),
+                Utf8Parser::new(self.alignment, self.pad_symbol),
+            )),
+            DataType::LargeUtf8 => Box::new(LargeUtf8ColumnBuilder::new(
+                self.length,
+                self.name.clone(),
+                LargeUtf8Parser::new(self.alignment, self.pad_symbol),
+            )),
+        }       
     }
 
-    ///
-    pub fn mock<'a>(&self, rng: &'a mut ThreadRng) -> String {
-        let string = match self.dtype.as_str() {
-            "bool" => mock_bool(rng),
-            "boolean" => mock_bool(rng),
-            "i16" => mock_integer(rng),
-            "i32" => mock_integer(rng),
-            "i64" => mock_integer(rng),
-            "f16" => mock_float(rng),
-            "f32" => mock_float(rng),
-            "f64" => mock_float(rng),
-            "utf8" => mock_string(self.length, rng),
-            "string" => mock_string(self.length, rng),
-            "lutf8" => mock_string(self.length, rng),
-            "lstring" => mock_string(self.length, rng),
-            _ => panic!(
-                "Could not find valid dtype for column, dtype: {:?}.",
-                self.dtype
-            ),
-        };
-
-        string
+    /// 
+    pub fn mock(&self, rng: &mut ThreadRng) -> String {
+        match self.dtype {
+            DataType::Boolean => mock_bool(rng),
+            DataType::Float16 => mock_float(rng),
+            DataType::Float32 => mock_float(rng),
+            DataType::Float64 => mock_float(rng),
+            DataType::Int16 => mock_integer(rng),
+            DataType::Int32 => mock_integer(rng),
+            DataType::Int64 => mock_integer(rng),
+            DataType::Utf8 => mock_string(self.length, rng),
+            DataType::LargeUtf8 => mock_string(self.length, rng),
+        }
     }
 }
 
@@ -219,15 +173,6 @@ pub struct FixedSchema {
 ///
 #[allow(dead_code)]
 impl FixedSchema {
-    /// Explicitly create a new [`FixedSchema`] by providing all its requried attributes.
-    pub fn new(name: String, version: i32, columns: Vec<FixedColumn>) -> Self {
-        Self {
-            name,
-            version,
-            columns,
-        }
-    }
-
     /// Implicitly create a new [`FixedSchema`] by reading a json path
     /// and deserializing the schema into the epxected struct fields.
     ///
@@ -280,24 +225,18 @@ impl FixedSchema {
         self.columns.iter().any(|c| c.is_nullable)
     }
 
-    /// Consume the [`FixedSchema`] and produce a new [`arrow2::datatypes::Schema`].
-    /// All of the [`FixedColumn`]s will tried to be parsed as their
-    /// corresponding [`arrow2::datatypes::DataType`]s, but may fail.
-    ///
-    /// # Error
-    /// Iff any of the column datatypes can not be parsed to its
-    /// corresponding [`arrow2::datatypes::DataType`].
+    /// Consume the [`FixedSchema`] and produce a new [`Schema`].
     pub fn into_arrow_schema(self) -> Schema {
         let fields: Vec<Field> = self
             .columns
             .iter()
-            .map(|c| Field::new(c.name.to_owned(), c.arrow_dtype().unwrap(), c.is_nullable))
+            .map(|c| Field::new(c.name.to_owned(), c.as_arrow_dtype(), c.is_nullable))
             .collect();
 
-        Schema::from(fields)
+        Schema::new(fields)
     }
 
-    ///
+    /// Create a vec of [`ColumnBuilder`]s for each [`FixedColumn`] in the schema.
     pub fn as_column_builders(&self) -> Vec<Box<dyn ColumnBuilder>> {
         self.columns
             .iter()
@@ -305,7 +244,7 @@ impl FixedSchema {
             .collect::<Vec<Box<dyn ColumnBuilder>>>()
     }
 
-    /// Borrow the stored [`FixedColumn`]s and iterate over them.
+    /// Borrow the schemas [`FixedColumn`]s and iterate over them.
     pub fn iter(&self) -> FixedSchemaIterator {
         FixedSchemaIterator {
             columns: &self.columns,
@@ -344,41 +283,27 @@ mod tests_schema {
     use super::*;
 
     #[test]
-    fn test_new_fixed_column_ok() {
-        let schema = FixedColumn::new(
-            "coolSchema2000Elin".to_string(),
-            5,
-            20,
-            "utf8".to_string(),
-            "left".to_string(),
-            ' ',
-            false,
-        );
-        assert_eq!(DataType::Utf8, schema.arrow_dtype().unwrap());
-    }
-
-    #[test]
     fn test_fixed_to_arrow_schema_ok() {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("resources/schema/test_schema.json");
+        path.push("resources/test-schemas/test_valid_schema_all.json");
 
         let fixed_schema: FixedSchema = FixedSchema::from_path(path);
         let arrow_schema: Schema = fixed_schema.into_arrow_schema();
 
-        assert_eq!(4, arrow_schema.fields.len());
+        assert_eq!(5, arrow_schema.fields.len());
     }
 
     #[test]
     fn test_derive_from_file_ok() {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("resources/schema/test_schema.json");
+        path.push("resources/test-schemas/test_valid_schema_booleans.json");
 
         let schema: FixedSchema = FixedSchema::from_path(path);
-        let offsets: Vec<usize> = vec![0, 9, 41, 73];
-        let lengths: Vec<usize> = vec![9, 32, 32, 5];
+        let offsets: Vec<usize> = vec![0, 9, 14];
+        let lengths: Vec<usize> = vec![9, 5, 32];
 
-        assert_eq!(4, schema.num_columns());
-        assert_eq!(78, schema.row_len());
+        assert_eq!(3, schema.num_columns());
+        assert_eq!(46, schema.row_len());
         assert_eq!(offsets, schema.column_offsets());
         assert_eq!(lengths, schema.column_lengths());
     }
@@ -387,7 +312,7 @@ mod tests_schema {
     #[should_panic]
     fn test_derive_from_file_trailing_commas() {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("resources/schema/test_schema_trailing_commas.json");
+        path.push("resources/test-schemas/test_invalid_schema_trailing_commas.json");
 
         let _schema: FixedSchema = FixedSchema::from_path(path);
     }
