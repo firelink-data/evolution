@@ -1,32 +1,35 @@
-/*
-* MIT License
-*
-* Copyright (c) 2024 Firelink Data
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
-*
-* The above copyright notice and this permission notice shall be included in all
-* copies or substantial portions of the Software.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE.
-*
-* File created: 2023-12-11
-* Last updated: 2024-05-08
-*/
+//
+// MIT License
+//
+// Copyright (c) 2024 Firelink Data
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+// File created: 2023-12-11
+// Last updated: 2024-05-10
+//
+
 
 use std::default::Default;
 use std::slice::Iter;
+#[cfg(feature = "nightly")]
+use core::str::utf8_char_width;
 
 use crate::error::Result;
 
@@ -50,6 +53,7 @@ impl Slicer {
     ///
     /// # Panics
     /// Iff the byte slice is not a valid utf-8 sequence.
+    #[cfg(not(feature = "nightly"))]
     pub fn find_num_bytes_for_num_runes(&self, bytes: &[u8], num_runes: usize) -> usize {
         let mut found_runes: usize = 0;
         let mut num_bytes: usize = 0;
@@ -70,6 +74,30 @@ impl Slicer {
                 byte if byte >> 3 == 0b11110 => 4,
                 _ => panic!("Invalid utf-8 sequence!"),
             };
+
+            found_runes += 1;
+            num_bytes += byte_units;
+        }
+
+        num_bytes
+    }
+
+    /// Calculate how many bytes correspond to how many runes in the provided byte slice.
+    #[cfg(feature = "nightly")]
+    pub fn find_num_bytes_for_num_runes(&self, bytes: &[u8], num_runes: usize) -> usize {
+        let mut found_runes: usize = 0;
+        let mut num_bytes: usize = 0;
+        let mut byte_units: usize = 1;
+
+        let mut iterator: Iter<u8> = bytes.iter();
+
+        while found_runes < num_runes {
+            let byte = match iterator.nth(byte_units - 1) {
+                Some(b) => *b,
+                None => break,
+            };
+
+            byte_units = utf8_char_width(byte);
 
             found_runes += 1;
             num_bytes += byte_units;
