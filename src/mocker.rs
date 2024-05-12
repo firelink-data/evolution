@@ -142,7 +142,7 @@ impl Mocker {
         let remainder: usize = self.n_rows - thread_workloads.iter().sum::<usize>();
         thread_workloads.push(remainder);
 
-        let (sender, reciever) = channel::bounded(self.thread_channel_capacity);
+        let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
 
         info!(
             "Starting {} worker threads with workload: {:?}",
@@ -160,7 +160,7 @@ impl Mocker {
             });
 
         drop(sender);
-        master_thread_write(reciever, &mut self.writer)?;
+        master_thread_write(receiver, &mut self.writer)?;
         Ok(())
     }
 
@@ -173,7 +173,7 @@ impl Mocker {
         let remainder: usize = self.n_rows - thread_workloads.iter().sum::<usize>();
         thread_workloads.push(remainder);
 
-        let (sender, reciever) = channel::bounded(self.thread_channel_capacity);
+        let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
 
         info!(
             "Starting {} worker threads.",
@@ -195,7 +195,7 @@ impl Mocker {
             .collect::<Vec<JoinHandle<()>>>();
 
         drop(sender);
-        master_thread_write(reciever, &mut self.writer)?;
+        master_thread_write(receiver, &mut self.writer)?;
 
         for handle in threads {
             handle.join().expect("Could not join worker thread handle!");

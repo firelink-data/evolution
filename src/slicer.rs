@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2023-12-11
-// Last updated: 2024-05-10
+// Last updated: 2024-05-13
 //
 
 
@@ -141,7 +141,7 @@ impl Slicer {
 
         (1..bytes.len()).for_each(|idx| {
             if (bytes[idx - 1] == 0x0d) && (bytes[idx] == 0x0a) {
-                buffer.push(idx);
+                buffer.push(idx - 1);
             }
         });
     }

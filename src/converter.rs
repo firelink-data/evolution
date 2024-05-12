@@ -29,6 +29,10 @@ use arrow::array::ArrayRef;
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
 use arrow::record_batch::RecordBatch;
 use crossbeam::channel;
+#[cfg(not(feature = "rayon"))]
+use crossbeam::scope;
+#[cfg(not(feature = "rayon"))]
+use crossbeam::thread::ScopedJoinHandle;
 use libc;
 use log::{debug, error, info};
 use parquet::basic::Compression;
@@ -41,10 +45,6 @@ use std::io::{BufReader, Read};
 use std::mem;
 use std::path::PathBuf;
 use std::sync::Arc;
-#[cfg(not(feature = "rayon"))]
-use std::thread::spawn;
-#[cfg(not(feature = "rayon"))]
-use std::thread::JoinHandle;
 
 use crate::builder::ColumnBuilder;
 use crate::error::{Result, SetupError};
@@ -130,7 +130,6 @@ impl Converter {
             .collect::<Vec<Vec<Box<dyn ColumnBuilder>>>>();
 
         let mut worker_slice_indices: Vec<(usize, usize)> = Vec::with_capacity(self.n_threads - 1);
-        let mut worker_slices: Vec<&[u8]> = Vec::with_capacity(self.n_threads - 1);
 
         // Start processing the target file to convert.
         loop {
@@ -180,7 +179,6 @@ impl Converter {
             debug!("Line break indices: {:?}", line_break_indices);
             debug!("Worker thread slice indices: {:?}", worker_slice_indices);
 
-
             self.spawn_convert_threads(
                 &buffer,
                 &worker_slice_indices,
@@ -208,8 +206,9 @@ impl Converter {
         builders: &mut Vec<Vec<Box<dyn ColumnBuilder>>>,
     ) -> Result<()> {
         let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
-
         let arc_buffer = Arc::new(buffer);
+
+        info!("Starting {} worker threads.", thread_workloads.len());
 
         thread_workloads
             .into_par_iter()
@@ -218,16 +217,19 @@ impl Converter {
                 let t_sender = sender.clone();
                 let t_buffer = arc_buffer.clone();
                 let mut t_builders = &builders[thread];
-                dummy_worker(t_sender, thread, &t_buffer[*from..*to], &mut t_builders)
+                worker_thread_convert(t_sender, thread, &t_buffer[*from..*to], &mut t_builders)
             });
 
         drop(sender);
-        dummy_master(receiver, &mut self.writer)?;
+        master_thread_write(receiver, &mut self.writer)?;
 
         Ok(())
     }
 
-    /// We can never use [`spawn`] with borrowed data...
+    /// We use scoped threads and associated handles in this implementation.
+    ///
+    /// https://docs.rs/crossbeam/latest/crossbeam/fn.scope.html
+    /// https://docs.rs/crossbeam/latest/crossbeam/thread/struct.ScopedJoinHandle.html
     #[cfg(not(feature = "rayon"))]
     fn spawn_convert_threads(
         &mut self,
@@ -235,32 +237,43 @@ impl Converter {
         thread_workloads: &Vec<(usize, usize)>,
         builders: &mut Vec<Vec<Box<dyn ColumnBuilder>>>,
     ) -> Result<()> {
-        let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
 
+        let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
         let arc_buffer = Arc::new(buffer);
 
-        let threads = thread_workloads
-            .into_iter()
-            .enumerate()
-            .map(|(thread, (from, to))| {
-                let t_sender = sender.clone();
-                let t_buffer = arc_buffer.clone();
-                let mut t_builders = &builders[thread];
-                spawn(move || {
-                    dummy_worker(t_sender, thread, &t_buffer[*from..*to], &mut t_builders)
-                })
-            })
-            .collect::<Vec<JoinHandle<()>>>();
+        info!("Starting {} worker threads.", thread_workloads.len());
 
-        drop(sender);
-        dummy_master(receiver, &mut self.writer)?;
-        
-        for handle in threads {
-            handle.join().unwrap();
-        }
+        let _ = scope(|s| {
+            let threads = thread_workloads
+                .into_iter()
+                .enumerate()
+                .map(|(thread, (from, to))| {
+                    let t_sender = sender.clone();
+                    let t_buffer = arc_buffer.clone();
+                    let mut t_builders = &builders[thread];
+                    s.spawn(move |_| {
+                        worker_thread_convert(
+                            t_sender,
+                            thread,
+                            &t_buffer[*from..*to],
+                            &mut t_builders,
+                        )
+                    })
+                })
+                .collect::<Vec<ScopedJoinHandle<()>>>();
+
+            drop(sender);
+            master_thread_write(receiver, &mut self.writer).expect("Master thread died!");
+
+            for handle in threads {
+                handle.join().expect("Could not join worker thread handle!");
+            }
+
+        });
 
         Ok(())
     }
+
 
     /// Converts the target file in single-threaded mode.
     ///
@@ -359,39 +372,6 @@ impl Converter {
 
             line_break_indices.clear();
 
-            // IF WE DO THIS WE CAN COMPILE, BUT HERE WE ALLOCATE MEMORY
-            // FOR A NEW VEC EVERY ITERATION OF THE LOOP. WE WANT TO REUSE
-            // MEMORY PREFERABLY, but can't find a way to do that with the
-            // required mutable borrows going on...
-            //
-            // I think I understand why...
-            // Because we allocated the mutable buffer outside of the loop
-            // and then push mutably borrowed items from inside the loop
-            // the borrow checker sees that we might have access to that
-            // mutably borrowed memory after the loop, i.e., two mutable
-            // references at the same time. This is not ok.
-            //
-            // // Create the mutable builders and buffers.
-            // let mut builders = Vec::with_capacity();
-            // let mut buffer = Vec::with_capacity();
-            // loop {
-            //     // Mutably borrow the builders in iterator
-            //     for builder in builders.iter_mut() {
-            //         ...
-            //     }
-            //
-            //     for builder in builders.iter_mut() {
-            //         // Try add push mutable reference to buffer outside of the
-            //         // scope of the loop, this is not ok!
-            //         buffer.push(builder.finish());
-            //     }
-            //
-            // }
-            //
-            // // Here we still MIGHT have access to the mutable references
-            // // created inside the loop.
-            // let _ = buffer[0];  <- here we can access mutably borrowed memory
-            //
             // NOTE: THIS REALLOCATES THE MEMORY ON THE HEAP!
             let mut builder_write_buffer: Vec<(&str, ArrayRef)> = vec![];
 
@@ -431,7 +411,7 @@ impl Converter {
         for worker_idx in 1..(self.n_threads - 1) {
             let next_line_break_idx: usize = line_break_indices[n_rows_per_thread * worker_idx];
             thread_workloads.push((prev_line_break_idx, next_line_break_idx));
-            prev_line_break_idx = next_line_break_idx;
+            prev_line_break_idx = next_line_break_idx + NUM_CHARS_FOR_NEWLINE;
         }
 
         thread_workloads.push((
@@ -441,35 +421,20 @@ impl Converter {
     }
 }
 
-pub fn dummy_worker(
-    channel: channel::Sender<(&str, ArrayRef)>,
+///
+pub fn worker_thread_convert(
+    channel: channel::Sender<Vec<(&str, ArrayRef)>>,
     thread: usize,
     slice: &[u8],
     builders: &Vec<Box<dyn ColumnBuilder>>,
 ) {
-    debug!("Hello from worker thread {}.", thread);
 }
 
-pub fn dummy_master(
-    channel: channel::Receiver<(&str, ArrayRef)>,
+///
+pub fn master_thread_write(
+    channel: channel::Receiver<Vec<(&str, ArrayRef)>>,
     writer: &mut Box<dyn Writer>,
 ) -> Result<()> {
-    debug!("Hello from master thread.");
-    Ok(())
-}
-
-///
-pub fn worker_thread_convert<'a>(
-    _channel: channel::Sender<(&str, ArrayRef)>,
-    _thread: usize,
-    _slice: &'a [u8],
-    _builders: &'a Vec<Box<dyn ColumnBuilder>>,
-) {
-    todo!()
-}
-
-///
-pub fn master_thread_write() -> Result<()> {
     Ok(())
 }
 
