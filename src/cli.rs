@@ -1,29 +1,29 @@
-/*
-* MIT License
-*
-* Copyright (c) 2024 Firelink Data
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
-*
-* The above copyright notice and this permission notice shall be included in all
-* copies or substantial portions of the Software.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE.
-*
-* File created: 2024-02-05
-* Last updated: 2024-05-09
-*/
+//
+// MIT License
+//
+// Copyright (c) 2024 Firelink Data
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+// File created: 2024-02-05
+// Last updated: 2024-05-12
+//
 
 use clap::{value_parser, ArgAction, Parser, Subcommand};
 #[cfg(feature = "rayon")]
@@ -125,12 +125,12 @@ enum Commands {
         /// Specify output (target) file name.
         #[arg(
             short = 'o',
-            long = "output-file",
-            value_name = "OUTPUT-FILE",
+            long = "out-file",
+            value_name = "OUT-FILE",
             action = ArgAction::Set,
             required = false,
         )]
-        output_file: Option<PathBuf>,
+        out_file: Option<PathBuf>,
 
         /// Set the number of rows to generate.
         #[arg(
@@ -197,18 +197,18 @@ impl Cli {
             }
             Commands::Mock {
                 schema,
-                output_file,
+                out_file,
                 n_rows,
                 buffer_size,
                 thread_channel_capacity,
             } => {
                 Mocker::builder()
-                    .schema(schema.to_owned())
-                    .output_file(output_file.to_owned())
-                    .num_rows(*n_rows)
-                    .num_threads(n_threads)
-                    .buffer_size(*buffer_size)
-                    .thread_channel_capacity(*thread_channel_capacity)
+                    .with_schema(schema.to_owned())
+                    .with_out_file(out_file.to_owned())
+                    .with_num_rows(*n_rows)
+                    .with_num_threads(n_threads)
+                    .with_buffer_size(*buffer_size)
+                    .with_thread_channel_capacity(*thread_channel_capacity)
                     .build()?
                     .generate();
             }

@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-02-05
-// Last updated: 2024-05-10
+// Last updated: 2024-05-12
 //
 
 use crossbeam::channel;
@@ -105,9 +105,9 @@ impl Mocker {
     /// single thread mode instead. Employing multithreading when generating
     /// a few number of rows introduces much more computational overhead than
     /// necessary, so it is much more efficient to run in a single thread.
-    pub fn generate(&mut self) {
+    pub fn generate(&mut self) -> Result<()> {
         if self.n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && self.multithreading {
-            self.generate_multithreaded();
+            self.generate_multithreaded()?;
         } else {
             if self.multithreading {
                 warn!(
@@ -116,7 +116,7 @@ impl Mocker {
                 );
                 warn!("This is done more efficiently single-threaded, ignoring multithreading!");
             }
-            self.generate_single_threaded();
+            self.generate_single_threaded()?;
         }
     }
 
@@ -162,14 +162,19 @@ impl Mocker {
 
     /// Generate mocked data in multithreading mode using the standard library threads.
     #[cfg(not(feature = "rayon"))]
-    fn generate_multithreaded(&self) {
+    fn generate_multithreaded(&self) -> Result<()> {
         // Calculate the workload for each worker thread, if the workload can not evenly
         // be split among the threads, then the last thread will have to take the remainder.
+
+        use crate::writer::FixedLengthFileWriter;
         let mut thread_workloads: Vec<usize> = self.distribute_thread_workload();
         let remainder: usize = self.n_rows - thread_workloads.iter().sum::<usize>();
         thread_workloads.push(remainder);
 
-        let mut writer: Box<dyn Writer> = writer_from_file_extension(&self.output_file);
+        // let mut writer: Box<dyn Writer> = writer_from_file_extension(&self.output_file);
+        let mut writer: FixedLengthFileWriter = FixedLengthFileWriter::builder()
+            .build()?;
+
         let (sender, reciever) = channel::bounded(self.thread_channel_capacity);
 
         info!(
@@ -197,6 +202,8 @@ impl Mocker {
         for handle in threads {
             handle.join().expect("Could not join worker thread handle!");
         }
+
+        Ok(())
     }
 
     // Generated mocked data in a single-threaded mode and write to disk.
@@ -204,7 +211,7 @@ impl Mocker {
     // the multithreading mode can do. However, single-threaded mode will
     // be significantly slower when generating the sweet-spot of rows
     // which do not introduce long thread waiting times due to I/O.
-    fn generate_single_threaded(&mut self) {
+    fn generate_single_threaded(&mut self) -> Result<()> {
         let row_len = self.schema.row_len();
         let buffer_size: usize =
             self.buffer_size * row_len + self.buffer_size * NUM_CHARS_FOR_NEWLINE;
@@ -235,6 +242,8 @@ impl Mocker {
 
         // Write any remaining contents of the buffer to disk.
         writer.write(&buffer);
+
+        Ok(())
     }
 }
 
@@ -242,7 +251,7 @@ impl Mocker {
 #[derive(Debug, Default)]
 pub(crate) struct MockerBuilder {
     schema_path: Option<PathBuf>,
-    output_file: Option<PathBuf>,
+    out_file: Option<PathBuf>,
     n_rows: Option<usize>,
     n_threads: Option<usize>,
     multithreading: Option<bool>,
@@ -250,40 +259,41 @@ pub(crate) struct MockerBuilder {
     thread_channel_capacity: Option<usize>,
 }
 
+///
 impl MockerBuilder {
     /// Set the [`PathBuf`] for the schema to use when generating data with the [`Mocker`].
-    pub fn schema(mut self, schema_path: PathBuf) -> Self {
+    pub fn with_schema(mut self, schema_path: PathBuf) -> Self {
         self.schema_path = Some(schema_path);
         self
     }
 
     /// Set the target output file name with the [`Mocker`].
-    pub fn output_file(mut self, output_file: Option<PathBuf>) -> Self {
-        self.output_file = output_file;
+    pub fn with_out_file(mut self, out_file: Option<PathBuf>) -> Self {
+        self.out_file = out_file;
         self
     }
 
     /// Set the number of mocked data rows to generate with the [`Mocker`].
-    pub fn num_rows(mut self, n_rows: Option<usize>) -> Self {
+    pub fn with_num_rows(mut self, n_rows: Option<usize>) -> Self {
         self.n_rows = n_rows;
         self
     }
 
     /// Set the number of threads to use when generating mocked data with the [`Mocker`].
-    pub fn num_threads(mut self, n_threads: usize) -> Self {
+    pub fn with_num_threads(mut self, n_threads: usize) -> Self {
         self.n_threads = Some(n_threads);
         self.multithreading = Some(n_threads > 1);
         self
     }
 
     ///
-    pub fn buffer_size(mut self, buffer_size: Option<usize>) -> Self {
+    pub fn with_buffer_size(mut self, buffer_size: Option<usize>) -> Self {
         self.buffer_size = buffer_size;
         self
     }
 
     ///
-    pub fn thread_channel_capacity(mut self, thread_channel_capacity: Option<usize>) -> Self {
+    pub fn with_thread_channel_capacity(mut self, thread_channel_capacity: Option<usize>) -> Self {
         self.thread_channel_capacity = thread_channel_capacity;
         self
     }
