@@ -28,6 +28,7 @@
 use arrow::array::ArrayRef;
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
 use arrow::record_batch::RecordBatch;
+use crossbeam::channel;
 use libc;
 use log::{debug, error, info};
 use parquet::basic::Compression;
@@ -37,6 +38,8 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::mem;
 use std::path::PathBuf;
+use std::thread::spawn;
+use std::thread::JoinHandle;
 
 use crate::builder::ColumnBuilder;
 use crate::error::{Result, SetupError};
@@ -91,8 +94,139 @@ impl Converter {
     }
 
     ///
+    /// # Panics
+    /// If could not move cursor back.
     fn convert_multithreaded(&mut self) -> Result<()> {
-        todo!();
+        let bytes_to_read: usize = self
+            .in_file
+            .metadata()?
+            .len() as usize;
+
+        info!("Target file to convert is {} bytes in total.", bytes_to_read);
+
+        let mut remaining_bytes: usize = bytes_to_read;
+        let mut bytes_processed: usize = 0;
+        let mut bytes_overlapped: usize = 0;
+        let mut buffer_capacity = self.buffer_size;
+
+        let mut reader: BufReader<File> = BufReader::new(self.in_file.try_clone()?);
+        let mut buffer: Vec<u8> = vec![0u8; buffer_capacity];
+
+        let mut line_break_indices: Vec<usize> =
+            Vec::with_capacity(CONVERTER_LINE_BREAKS_BUFFER_SIZE);
+
+        let mut worker_builders = (0..(self.n_threads - 1))
+            .map(|_| {
+                self.schema.as_column_builders()
+            })
+            .collect::<Vec<Vec<Box<dyn ColumnBuilder>>>>();
+
+        let mut worker_slice_indices: Vec<(usize, usize)> = Vec::with_capacity(self.n_threads - 1);
+
+        // Start processing the target file to convert.
+        loop {
+            if bytes_processed >= bytes_to_read {
+                break;
+            }
+
+            if remaining_bytes < buffer_capacity {
+                buffer_capacity = remaining_bytes;
+            }
+
+            debug!("(UNSAFE) clearing read buffer.");
+            unsafe {
+                libc::memset(
+                    buffer.as_mut_ptr() as _,
+                    0,
+                    buffer.capacity() * mem::size_of::<u8>(),
+                );
+            }
+
+            match reader.read_exact(&mut buffer).is_ok() {
+                true => (),
+                false => debug!("EOF reached, this is the last time reading the buffer."),
+            }
+
+            self.slicer
+                .find_line_breaks(&buffer, &mut line_break_indices);
+
+            let byte_idx_last_line_break = line_break_indices
+                .last()
+                .expect("No line breaks found in the read buffer!");
+            let n_bytes_left_after_line_break = buffer_capacity - 1 - byte_idx_last_line_break;
+
+            match reader
+                .seek_relative(-(n_bytes_left_after_line_break as i64))
+                .is_ok()
+            {
+                true => {}
+                false => panic!("Could not move cursor back in BufReader!"),
+            };
+
+            self.distribute_worker_thread_workloads(
+                &line_break_indices,
+                &mut worker_slice_indices,
+            );
+
+            debug!("Line break indices: {:?}", line_break_indices);
+            debug!("Worker thread slice indices: {:?}", worker_slice_indices);
+
+            line_break_indices.clear();
+            worker_slice_indices.clear();
+
+            self.spawn_convert_threads(
+                &buffer,
+                &worker_slice_indices,
+                &mut worker_builders,
+            )?;
+
+            bytes_processed += buffer_capacity - n_bytes_left_after_line_break;
+            bytes_overlapped += n_bytes_left_after_line_break;
+            remaining_bytes -= buffer_capacity - n_bytes_left_after_line_break;
+        }
+
+        info!("We read {} bytes two times (due to sliding window overlap).", bytes_overlapped);
+
+        Ok(())
+    }
+
+    fn spawn_convert_threads(
+        &mut self,
+        buffer: &Vec<u8>,
+        slice_indices: &Vec<(usize, usize)>,
+        builders: &Vec<Vec<Box<dyn ColumnBuilder>>>,
+    ) -> Result<()> {
+
+        let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
+
+        info!("Starting {} worker threads for new slice.", slice_indices.len());
+
+        let threads = slice_indices
+            .into_iter()
+            .enumerate()
+            .map(|(t, t_workload)| {
+                spawn(move || {
+                    let t_sender = sender.clone();
+                    let t_slice = &buffer[0..2];
+                    let t_builders = builders[t];
+                    worker_thread_convert(
+                        t_sender,
+                        t,
+                        t_slice,
+                        t_builders,
+                    )
+                })
+            })
+            .collect::<Vec<JoinHandle<()>>>();
+
+        drop(sender);
+        master_thread_write()?;
+
+        for handle in threads {
+            handle.join().expect("Could not join worker thread handle!");
+        }
+
+        Ok(())
     }
 
     /// Converts the target file in single-threaded mode.
@@ -110,11 +244,10 @@ impl Converter {
     fn convert_single_threaded(&mut self) -> Result<()> {
         let bytes_to_read: usize = self
             .in_file
-            .metadata()
-            .expect("Could not read file metadata!")
+            .metadata()?
             .len() as usize;
 
-        info!("Target file is {} bytes in total.", bytes_to_read);
+        info!("Target file to convert is {} bytes in total.", bytes_to_read);
 
         let mut remaining_bytes: usize = bytes_to_read;
         let mut bytes_processed: usize = 0;
@@ -251,6 +384,42 @@ impl Converter {
 
         Ok(())
     }
+
+    fn distribute_worker_thread_workloads(
+        &self,
+        line_break_indices: &Vec<usize>,
+        buffer: &mut Vec<(usize, usize)>,
+    ) {
+
+        let n_line_break_indices: usize = line_break_indices.len();
+        let n_rows_per_thread: usize = n_line_break_indices / (self.n_threads - 1);
+
+        let mut prev_line_break_idx: usize = 0;
+        for worker_idx in 1..(self.n_threads - 1) {
+            let next_line_break_idx: usize = line_break_indices[n_rows_per_thread * worker_idx];
+            buffer.push((prev_line_break_idx, next_line_break_idx));
+            prev_line_break_idx = next_line_break_idx;
+        }
+
+        buffer.push((
+            prev_line_break_idx,
+            line_break_indices[n_line_break_indices - 1],
+        ));
+    }
+}
+
+///
+pub fn worker_thread_convert(
+    channel: channel::Sender<(&str, ArrayRef)>,
+    thread: usize,
+    slice: &[u8],
+    builders: Vec<Box<dyn ColumnBuilder>>,
+) {
+}
+
+///
+pub fn master_thread_write() -> Result<()> {
+    Ok(())
 }
 
 ///

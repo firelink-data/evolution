@@ -27,7 +27,6 @@
 
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
 use arrow::record_batch::RecordBatch;
-use log::info;
 use parquet::arrow::ArrowWriter;
 use parquet::file::properties::WriterProperties as ArrowWriterProperties;
 
@@ -284,33 +283,6 @@ impl ParquetWriterBuilder {
     }
 }
 
-/// Find and create a matching Writer for the provided file type.
-///
-/// # Panics
-/// This function can panic for three different reasons:
-///  - If the the provided file name does not contain an extension (characters after the .).
-///  - If the the file name is not valid unicode.
-///  - If the user provided an extension which is not yet supported by the program.
-pub(crate) fn writer_from_file_extension(file: &PathBuf) -> Box<dyn Writer> {
-    match file
-        .extension()
-        .expect("No file extension in file name!")
-        .to_str()
-        .unwrap()
-    {
-        "flf" => {
-            todo!()
-        },
-        "parquet" => {
-            todo!()
-        },
-        _ => panic!(
-            "Could not find a matching writer for file extension: {:?}",
-            file.extension().unwrap(),
-        ),
-    }
-}
-
 #[cfg(test)]
 mod tests_writer {
     use std::fs;
@@ -373,7 +345,7 @@ mod tests_writer {
             .build()
             .unwrap();
 
-        flfw.write(&vec![0u8; 64]);
+        flfw.write(&vec![0u8; 64]).unwrap();
         fs::remove_file(path).unwrap();
     }
 
