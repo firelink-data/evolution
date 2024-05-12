@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-05-07
-// Last updated: 2024-05-10
+// Last updated: 2024-05-12
 //
 
 use arrow::array::{ArrayRef, BooleanBuilder, Float16Builder, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, StringBuilder as Utf8Builder, LargeStringBuilder as LargeUtf8Builder};
@@ -34,7 +34,7 @@ use std::sync::Arc;
 use crate::parser::{BooleanParser, Float16Parser, Float32Parser, Float64Parser, Int16Parser, Int32Parser, Int64Parser, Utf8Parser, LargeUtf8Parser};
 
 ///
-pub(crate) trait ColumnBuilder: Debug {
+pub(crate) trait ColumnBuilder: Debug + Send + Sync {
     fn parse_and_push_bytes(&mut self, bytes: &[u8]);
     fn runes(&self) -> usize;
     fn finish(&mut self) -> (&str, ArrayRef);

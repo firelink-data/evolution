@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-02-17
-// Last updated: 2024-05-12
+// Last updated: 2024-05-13
 //
 
 use arrow::array::ArrayRef;
@@ -33,12 +33,17 @@ use libc;
 use log::{debug, error, info};
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties as ParquetWriterProperties;
+#[cfg(feature = "rayon")]
+use rayon::iter::*;
 
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::mem;
 use std::path::PathBuf;
+use std::sync::Arc;
+#[cfg(not(feature = "rayon"))]
 use std::thread::spawn;
+#[cfg(not(feature = "rayon"))]
 use std::thread::JoinHandle;
 
 use crate::builder::ColumnBuilder;
@@ -67,6 +72,9 @@ pub struct Converter {
     buffer_size: usize,
     thread_channel_capacity: usize,
 }
+
+unsafe impl Send for Converter {}
+unsafe impl Sync for Converter {}
 
 ///
 impl Converter {
@@ -122,6 +130,7 @@ impl Converter {
             .collect::<Vec<Vec<Box<dyn ColumnBuilder>>>>();
 
         let mut worker_slice_indices: Vec<(usize, usize)> = Vec::with_capacity(self.n_threads - 1);
+        let mut worker_slices: Vec<&[u8]> = Vec::with_capacity(self.n_threads - 1);
 
         // Start processing the target file to convert.
         loop {
@@ -171,8 +180,6 @@ impl Converter {
             debug!("Line break indices: {:?}", line_break_indices);
             debug!("Worker thread slice indices: {:?}", worker_slice_indices);
 
-            line_break_indices.clear();
-            worker_slice_indices.clear();
 
             self.spawn_convert_threads(
                 &buffer,
@@ -183,6 +190,9 @@ impl Converter {
             bytes_processed += buffer_capacity - n_bytes_left_after_line_break;
             bytes_overlapped += n_bytes_left_after_line_break;
             remaining_bytes -= buffer_capacity - n_bytes_left_after_line_break;
+
+            line_break_indices.clear();
+            worker_slice_indices.clear();
         }
 
         info!("We read {} bytes two times (due to sliding window overlap).", bytes_overlapped);
@@ -190,40 +200,63 @@ impl Converter {
         Ok(())
     }
 
+    #[cfg(feature = "rayon")]
     fn spawn_convert_threads(
         &mut self,
         buffer: &Vec<u8>,
-        slice_indices: &Vec<(usize, usize)>,
-        builders: &Vec<Vec<Box<dyn ColumnBuilder>>>,
+        thread_workloads: &Vec<(usize, usize)>,
+        builders: &mut Vec<Vec<Box<dyn ColumnBuilder>>>,
     ) -> Result<()> {
-
         let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
 
-        info!("Starting {} worker threads for new slice.", slice_indices.len());
+        let arc_buffer = Arc::new(buffer);
 
-        let threads = slice_indices
+        thread_workloads
+            .into_par_iter()
+            .enumerate()
+            .for_each(|(thread, (from, to))| {
+                let t_sender = sender.clone();
+                let t_buffer = arc_buffer.clone();
+                let mut t_builders = &builders[thread];
+                dummy_worker(t_sender, thread, &t_buffer[*from..*to], &mut t_builders)
+            });
+
+        drop(sender);
+        dummy_master(receiver, &mut self.writer)?;
+
+        Ok(())
+    }
+
+    /// We can never use [`spawn`] with borrowed data...
+    #[cfg(not(feature = "rayon"))]
+    fn spawn_convert_threads(
+        &mut self,
+        buffer: &Vec<u8>,
+        thread_workloads: &Vec<(usize, usize)>,
+        builders: &mut Vec<Vec<Box<dyn ColumnBuilder>>>,
+    ) -> Result<()> {
+        let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
+
+        let arc_buffer = Arc::new(buffer);
+
+        let threads = thread_workloads
             .into_iter()
             .enumerate()
-            .map(|(t, t_workload)| {
+            .map(|(thread, (from, to))| {
+                let t_sender = sender.clone();
+                let t_buffer = arc_buffer.clone();
+                let mut t_builders = &builders[thread];
                 spawn(move || {
-                    let t_sender = sender.clone();
-                    let t_slice = &buffer[0..2];
-                    let t_builders = builders[t];
-                    worker_thread_convert(
-                        t_sender,
-                        t,
-                        t_slice,
-                        t_builders,
-                    )
+                    dummy_worker(t_sender, thread, &t_buffer[*from..*to], &mut t_builders)
                 })
             })
             .collect::<Vec<JoinHandle<()>>>();
 
         drop(sender);
-        master_thread_write()?;
-
+        dummy_master(receiver, &mut self.writer)?;
+        
         for handle in threads {
-            handle.join().expect("Could not join worker thread handle!");
+            handle.join().unwrap();
         }
 
         Ok(())
@@ -388,7 +421,7 @@ impl Converter {
     fn distribute_worker_thread_workloads(
         &self,
         line_break_indices: &Vec<usize>,
-        buffer: &mut Vec<(usize, usize)>,
+        thread_workloads: &mut Vec<(usize, usize)>,
     ) {
 
         let n_line_break_indices: usize = line_break_indices.len();
@@ -397,24 +430,42 @@ impl Converter {
         let mut prev_line_break_idx: usize = 0;
         for worker_idx in 1..(self.n_threads - 1) {
             let next_line_break_idx: usize = line_break_indices[n_rows_per_thread * worker_idx];
-            buffer.push((prev_line_break_idx, next_line_break_idx));
+            thread_workloads.push((prev_line_break_idx, next_line_break_idx));
             prev_line_break_idx = next_line_break_idx;
         }
 
-        buffer.push((
+        thread_workloads.push((
             prev_line_break_idx,
             line_break_indices[n_line_break_indices - 1],
         ));
     }
 }
 
-///
-pub fn worker_thread_convert(
+pub fn dummy_worker(
     channel: channel::Sender<(&str, ArrayRef)>,
     thread: usize,
     slice: &[u8],
-    builders: Vec<Box<dyn ColumnBuilder>>,
+    builders: &Vec<Box<dyn ColumnBuilder>>,
 ) {
+    debug!("Hello from worker thread {}.", thread);
+}
+
+pub fn dummy_master(
+    channel: channel::Receiver<(&str, ArrayRef)>,
+    writer: &mut Box<dyn Writer>,
+) -> Result<()> {
+    debug!("Hello from master thread.");
+    Ok(())
+}
+
+///
+pub fn worker_thread_convert<'a>(
+    _channel: channel::Sender<(&str, ArrayRef)>,
+    _thread: usize,
+    _slice: &'a [u8],
+    _builders: &'a Vec<Box<dyn ColumnBuilder>>,
+) {
+    todo!()
 }
 
 ///

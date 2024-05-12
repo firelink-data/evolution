@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-02-05
-// Last updated: 2024-05-12
+// Last updated: 2024-05-13
 //
 
 use crossbeam::channel;
@@ -89,6 +89,9 @@ pub(crate) struct Mocker {
     thread_channel_capacity: usize,
 }
 
+unsafe impl Send for Mocker {}
+unsafe impl Sync for Mocker {}
+
 ///
 impl Mocker {
     /// Create a new instance of a [`MockerBuilder`] struct with default values.
@@ -132,14 +135,13 @@ impl Mocker {
 
     /// Generate mocked data in multithreading mode using [`rayon`] and parallel iteration.
     #[cfg(feature = "rayon")]
-    fn generate_multithreaded(&self) -> Result<()> {
+    fn generate_multithreaded(&mut self) -> Result<()> {
         // Calculate the workload for each worker thread, if the workload can not evenly
         // be split among the threads, then the last thread will have to take the remainder.
         let mut thread_workloads: Vec<usize> = self.distribute_thread_workload();
         let remainder: usize = self.n_rows - thread_workloads.iter().sum::<usize>();
         thread_workloads.push(remainder);
 
-        let mut writer: Box<dyn Writer> = writer_from_file_extension(&self.output_file);
         let (sender, reciever) = channel::bounded(self.thread_channel_capacity);
 
         info!(
@@ -158,7 +160,7 @@ impl Mocker {
             });
 
         drop(sender);
-        master_thread_write(reciever, &mut writer)?;
+        master_thread_write(reciever, &mut self.writer)?;
         Ok(())
     }
 
