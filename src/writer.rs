@@ -1,39 +1,40 @@
-/*
-* MIT License
-*
-* Copyright (c) 2024 Firelink Data
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
-*
-* The above copyright notice and this permission notice shall be included in all
-* copies or substantial portions of the Software.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE.
-*
-* File created: 2024-05-05
-* Last updated: 2024-05-08
-*/
+//
+// MIT License
+//
+// Copyright (c) 2024 Firelink Data
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+// File created: 2024-05-05
+// Last updated: 2024-05-12
+//
 
 use arrow::record_batch::RecordBatch;
 use parquet::arrow::ArrowWriter;
-use parquet::file::properties::WriterProperties;
+use parquet::file::properties::WriterProperties as ArrowWriterProperties;
 
-use std::default::Default;
 use std::fmt::Debug;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
+
+use crate::error::Result;
 
 ///
 pub(crate) trait Writer: Debug {
@@ -49,14 +50,11 @@ pub(crate) struct FixedLengthFileWriter {
 
 ///
 impl FixedLengthFileWriter {
-    pub fn new(file: &PathBuf) -> Self {
-        let out_file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(file)
-            .expect("Could not open target output file!");
-
-        Self { inner: out_file }
+    ///
+    pub fn builder() -> FixedLengthFileWriterBuilder {
+        FixedLengthFileWriterBuilder {
+            ..Default::default()
+        }
     }
 }
 
@@ -77,34 +75,17 @@ impl Writer for FixedLengthFileWriter {
 #[derive(Debug)]
 pub(crate) struct ParquetWriter {
     out_file: PathBuf,
-    inner: Option<ArrowWriter<File>>,
-    record_batch: Option<RecordBatch>,
-    properties: Option<WriterProperties>,
+    inner: ArrowWriter<File>,
+    record_batch: RecordBatch,
 }
 
 ///
 impl ParquetWriter {
-    /// Create a new [`ParquetWriter`] to target the provided file as output.
     ///
-    /// # Panics
-    /// Iff the specified target file could not opened.
-    pub fn new(file: &PathBuf) -> Self {
-        Self {
-            out_file: file.to_owned(),
-            inner: None,
-            record_batch: None,
-            properties: None,
+    pub fn builder() -> ParquetWriterBuilder {
+        ParquetWriterBuilder {
+            ..Default::default()
         }
-    }
-
-    ///
-    pub fn set_record_batch(&mut self, record_batch: RecordBatch) {
-        self.record_batch = Some(record_batch);
-    }
-
-    ///
-    pub fn set_properties(&mut self, properties: WriterProperties) {
-        self.properties = Some(properties);
     }
 
     ///
@@ -167,6 +148,65 @@ impl Writer for ParquetWriter {
                 panic!("The `ParquetWriter` has not been set up properly, missing `ArrowWriter`!")
             }
         };
+    }
+}
+
+///
+#[derive(Debug, Default)]
+pub(crate) struct ParquetWriterBuilder {
+    out_file: Option<PathBuf>,
+    properties: Option<ArrowWriterProperties>,
+    record_batch: Option<RecordBatch>,
+}
+
+///
+impl ParquetWriterBuilder {
+    ///
+    pub fn with_out_file(mut self, path: PathBuf) -> Self {
+        self.out_file = Some(path);
+        self
+    }
+
+    ///
+    pub fn with_properties(mut self, properties: ArrowWriterProperties) -> Self {
+        self.properties = Some(properties);
+        self
+    }
+
+    ///
+    pub fn with_record_batch(mut self, record_batch: RecordBatch) -> Self {
+        self.record_batch = Some(record_batch);
+        self
+    }
+
+    ///
+    pub fn build(self) -> Result<ParquetWriter> {
+        let out_file: PathBuf = self.out_file
+            .ok_or("Required field 'out_file' missing or None.")?;
+
+        let writer_file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&out_file)
+            .expect("Could not open target output file!");
+
+        let properties: ArrowWriterProperties = self.properties
+            .ok_or("Required field 'properties' missing or None.")?;
+
+        let record_batch: RecordBatch = self.record_batch
+            .ok_or("Required field 'record_batch' missing or None.")?;
+
+        let inner: ArrowWriter<File> = ArrowWriter::try_new(
+            writer_file,
+            record_batch.schema(),
+            Some(properties),
+        )?;
+
+        Ok(ParquetWriter {
+            out_file,
+            inner,
+            record_batch,
+        })
     }
 }
 
