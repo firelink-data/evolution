@@ -8,7 +8,7 @@
             "length": 9,
             "dtype": "Int32",
             "alignment": "Right",
-            "pad_symbol": "Zero",
+            "pad_symbol": "Underscore",
             "is_nullable": false
         },
         {
