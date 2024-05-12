@@ -22,19 +22,22 @@
 // SOFTWARE.
 //
 // File created: 2023-11-25
-// Last updated: 2024-05-10
+// Last updated: 2024-05-12
 //
 
-use arrow::datatypes::{DataType as ArrowDataType, Field, Schema};
+use arrow::datatypes::{DataType as ArrowDataType, Field, Schema, SchemaRef as ArrowSchemaRef};
 use padder::{Alignment, Symbol};
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
 
+use std::fs;
+use std::io;
+use std::sync::Arc;
 use std::path::PathBuf;
-use std::{fs, io};
 
 use crate::builder::{BooleanColumnBuilder, ColumnBuilder, Float16ColumnBuilder, Float32ColumnBuilder, Float64ColumnBuilder, Int16ColumnBuilder, Int32ColumnBuilder, Int64ColumnBuilder, Utf8ColumnBuilder, LargeUtf8ColumnBuilder};
 use crate::datatype::DataType;
+use crate::error::Result;
 use crate::mocking::{mock_bool, mock_float, mock_integer, mock_string};
 use crate::parser::{BooleanParser, Float16Parser, Float32Parser, Float64Parser, Int16Parser, Int32Parser, Int64Parser, LargeUtf8Parser, Utf8Parser};
 
@@ -179,11 +182,14 @@ impl FixedSchema {
     /// # Panics
     /// If the file does not exist or if the schema in the file
     /// does not adhere to the above struct definition.
-    pub fn from_path(path: PathBuf) -> Self {
-        let json = fs::File::open(path).unwrap();
+    pub fn from_path(path: PathBuf) -> Result<Self> {
+        let json = fs::File::open(path)?;
         let reader = io::BufReader::new(json);
 
-        serde_json::from_reader(reader).unwrap()
+        match serde_json::from_reader(reader) {
+            Ok(s) => Ok(s),
+            Err(e) => return Err(Box::new(e)),
+        }
     }
 
     /// Get the number of columns in the schema.
@@ -234,6 +240,33 @@ impl FixedSchema {
             .collect();
 
         Schema::new(fields)
+    }
+
+    /// 
+    /// # Performance
+    /// This function will clone each [`FixedColumn`] name attribute which might
+    /// incurr heavy performance costs for very large [`FixedSchema`]s. This 
+    /// method should only really be called at the start of the program when initializing 
+    /// required resources (like [`crate::mocker::Mocker`] or [`crate::converter::Converter`].
+    pub fn as_arrow_schema(&self) -> Schema {
+        let fields: Vec<Field> = self
+            .columns
+            .iter()
+            .map(|column| {
+                Field::new(
+                    column.name.clone(),
+                    column.as_arrow_dtype(),
+                    column.is_nullable,
+                )
+            })
+            .collect();
+
+        Schema::new(fields)
+    }
+
+    /// 
+    pub fn as_arrow_schema_ref(&self) -> ArrowSchemaRef {
+        Arc::new(self.as_arrow_schema())
     }
 
     /// Create a vec of [`ColumnBuilder`]s for each [`FixedColumn`] in the schema.
@@ -287,7 +320,7 @@ mod tests_schema {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/schemas/test_valid_schema_all.json");
 
-        let fixed_schema: FixedSchema = FixedSchema::from_path(path);
+        let fixed_schema: FixedSchema = FixedSchema::from_path(path).unwrap();
         let arrow_schema: Schema = fixed_schema.into_arrow_schema();
 
         assert_eq!(5, arrow_schema.fields.len());
@@ -298,7 +331,7 @@ mod tests_schema {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/schemas/test_valid_schema_booleans.json");
 
-        let schema: FixedSchema = FixedSchema::from_path(path);
+        let schema: FixedSchema = FixedSchema::from_path(path).unwrap();
         let offsets: Vec<usize> = vec![0, 9, 14];
         let lengths: Vec<usize> = vec![9, 5, 32];
 
@@ -314,6 +347,6 @@ mod tests_schema {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/schemas/test_invalid_schema_trailing_commas.json");
 
-        let _schema: FixedSchema = FixedSchema::from_path(path);
+        let _schema: FixedSchema = FixedSchema::from_path(path).unwrap();
     }
 }

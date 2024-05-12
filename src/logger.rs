@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2023-11-21
-// Last updated: 2024-05-11
+// Last updated: 2024-05-12
 //
 
 use chrono::Local;
@@ -103,7 +103,9 @@ impl Logger {
         );
     }
 
-    ///
+    /// Here we can use [`.to_string()`] because an error log should only be used
+    /// when terminating execution due to error, and then memory allocations
+    /// and performance is not an issue. We can be sloppy here.
     fn error(&self, record: &Record) {
         println!(
             "[{}]  {}\t {}",
@@ -113,7 +115,7 @@ impl Logger {
                 .red()
                 .bold(),
             record.level().as_str().red().bold(),
-            record.args().as_str().unwrap().red().bold(),
+            record.args().to_string().red().bold(),
         );
     }
 }

@@ -27,6 +27,7 @@
 
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
 use arrow::record_batch::RecordBatch;
+use log::info;
 use parquet::arrow::ArrowWriter;
 use parquet::file::properties::WriterProperties as ArrowWriterProperties;
 
@@ -39,8 +40,9 @@ use crate::error::Result;
 
 ///
 pub(crate) trait Writer: Debug {
-    fn write(&mut self, buffer: &Vec<u8>);
-    fn finish(&mut self);
+    fn write(&mut self, buffer: &Vec<u8>) -> Result<()>;
+    fn write_batch(&mut self, batch: &RecordBatch) -> Result<()>;
+    fn finish(&mut self) -> Result<()>;
 }
 
 ///
@@ -118,7 +120,6 @@ impl FixedLengthFileWriterPropertiesBuilder {
 #[derive(Debug)]
 pub(crate) struct FixedLengthFileWriter {
     inner: File,
-    properties: FixedLengthFileWriterProperties,
 }
 
 ///
@@ -161,6 +162,7 @@ impl FixedLengthFileWriterBuilder {
             .ok_or("Required field 'properties' is missing or None.")?;
 
         let file: File = OpenOptions::new()
+            .write(true)
             .create_new(properties.create_new)
             .create(properties.create)
             .truncate(properties.truncate)
@@ -168,28 +170,29 @@ impl FixedLengthFileWriterBuilder {
 
         Ok(FixedLengthFileWriter {
             inner: file,
-            properties,
         })
     }
 }
 
 ///
 impl Writer for FixedLengthFileWriter {
-    fn write(&mut self, buffer: &Vec<u8>) {
-        self.inner
-            .write_all(buffer)
-            .expect("Bad buffer, output write failed!");
+    fn write(&mut self, buffer: &Vec<u8>) -> Result<()> {
+        self.inner.write_all(buffer)?;
+        Ok(())
     }
 
-    fn finish(&mut self) {
-        todo!();
+    fn write_batch(&mut self, _batch: &RecordBatch) -> Result<()> {
+        todo!()
+    }
+
+    fn finish(&mut self) -> Result<()> {
+        Ok(())
     }
 }
 
 ///
 #[derive(Debug)]
 pub(crate) struct ParquetWriter {
-    out_file: PathBuf,
     inner: ArrowWriter<File>,
 }
 
@@ -201,17 +204,16 @@ impl ParquetWriter {
             ..Default::default()
         }
     }
-
-    ///
-    pub fn write_batch(&mut self, batch: &RecordBatch) -> Result<()> {
-        self.inner.write(batch)?;
-        Ok(())
-    }
 }
 
 impl Writer for ParquetWriter {
-    fn write(&mut self, _buffer: &Vec<u8>) {
+    fn write(&mut self, _buffer: &Vec<u8>) -> Result<()> {
         todo!();
+    }
+
+    fn write_batch(&mut self, batch: &RecordBatch) -> Result<()> {
+        self.inner.write(batch)?;
+        Ok(())
     }
 
     /// Close and finalize the underlying Parquet writer buffer.
@@ -219,8 +221,9 @@ impl Writer for ParquetWriter {
     /// # Panics
     /// If either the [`ParquetWriter`] has not been setup with an [`ArrowWriter`] or
     /// if the writer tries to write something efter calling finish (race condition).
-    fn finish(&mut self) {
-        todo!()
+    fn finish(&mut self) -> Result<()> {
+        self.inner.finish()?;
+        Ok(())
     }
 }
 
@@ -276,7 +279,6 @@ impl ParquetWriterBuilder {
         )?;
 
         Ok(ParquetWriter {
-            out_file,
             inner,
         })
     }

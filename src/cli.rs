@@ -65,22 +65,23 @@ enum Commands {
     Convert {
         /// The fixed-length file to convert.
         #[arg(
-            short = 'f',
-            long = "file",
-            value_name = "FILE",
+            short = 'i',
+            long = "in-file",
+            value_name = "IN-FILE",
             action = ArgAction::Set,
+            required = true,
         )]
-        file: PathBuf,
+        in_file: PathBuf,
 
         /// Specify output (target) file name.
         #[arg(
             short = 'o',
-            long = "output-file",
-            value_name = "OUTPUT-FILE",
+            long = "out-file",
+            value_name = "OUT-FILE",
             action = ArgAction::Set,
-            required = false,
+            required = true,
         )]
-        output_file: PathBuf,
+        out_file: PathBuf,
 
         /// Specify the .json schema file to use when converting.
         #[arg(
@@ -88,6 +89,7 @@ enum Commands {
             long = "schema",
             value_name = "SCHEMA",
             action = ArgAction::Set,
+            required = true,
         )]
         schema: PathBuf,
 
@@ -142,23 +144,50 @@ enum Commands {
         )]
         n_rows: Option<usize>,
 
+        /// Set the writer mode to create a new file or fail if it already exists.
+        #[arg(
+            long = "create-new",
+            value_name = "WRITER-CREATE-NEW",
+            action = ArgAction::SetTrue,
+            required = false,
+        )]
+        writer_create_new: bool,
+
+        /// Set the writer mode to create a new file or open it if it already exists.
+        #[arg(
+            long = "create",
+            value_name = "WRITER-CREATE",
+            action = ArgAction::SetFalse,
+            required = false,
+        )]
+        writer_create: bool,
+
+        /// Set the writer option to truncate a previous file if the out file already exists.
+        #[arg(
+            long = "truncate",
+            value_name = "WRITER-TRUNCATE",
+            action = ArgAction::SetTrue,
+            required = false,
+        )]
+        writer_truncate: bool,
+
         /// Set the size of the buffer (number of rows).
         #[arg(
             long = "buffer-size",
-            value_name = "BUFFER-SIZE",
+            value_name = "MOCKER-BUFFER-SIZE",
             action = ArgAction::Set,
             required = false,
         )]
-        buffer_size: Option<usize>,
+        mocker_buffer_size: Option<usize>,
 
         /// Set the capacity of the thread channel (number of messages).
         #[arg(
             long = "thread-channel-capacity",
-            value_name = "THREAD-CHANNEL-CAPACITY",
+            value_name = "MOCKER-THREAD-CHANNEL-CAPACITY",
             action = ArgAction::Set,
             required = false,
         )]
-        thread_channel_capacity: Option<usize>,
+        mocker_thread_channel_capacity: Option<usize>,
     },
 }
 
@@ -179,38 +208,44 @@ impl Cli {
 
         match &self.command {
             Commands::Convert {
-                file,
-                output_file,
+                in_file,
+                out_file,
                 schema,
                 buffer_size,
                 thread_channel_capacity,
             } => {
                 Converter::builder()
-                    .target_file(file.to_owned())
-                    .output_file(output_file.to_owned())
-                    .schema(schema.to_owned())
-                    .num_threads(n_threads)
-                    .buffer_size(*buffer_size)
-                    .thread_channel_capacity(*thread_channel_capacity)
+                    .with_in_file(in_file.to_owned())
+                    .with_out_file(out_file.to_owned())
+                    .with_schema(schema.to_owned())
+                    .with_num_threads(n_threads)
+                    .with_buffer_size(*buffer_size)
+                    .with_thread_channel_capacity(*thread_channel_capacity)
                     .build()?
-                    .convert();
+                    .convert()?;
             }
             Commands::Mock {
                 schema,
                 out_file,
                 n_rows,
-                buffer_size,
-                thread_channel_capacity,
+                writer_create_new,
+                writer_create,
+                writer_truncate,
+                mocker_buffer_size,
+                mocker_thread_channel_capacity,
             } => {
                 Mocker::builder()
                     .with_schema(schema.to_owned())
                     .with_out_file(out_file.to_owned())
                     .with_num_rows(*n_rows)
+                    .with_create_new(*writer_create_new)
+                    .with_create(*writer_create)
+                    .with_truncate(*writer_truncate)
                     .with_num_threads(n_threads)
-                    .with_buffer_size(*buffer_size)
-                    .with_thread_channel_capacity(*thread_channel_capacity)
+                    .with_buffer_size(*mocker_buffer_size)
+                    .with_thread_channel_capacity(*mocker_thread_channel_capacity)
                     .build()?
-                    .generate();
+                    .generate()?;
             }
         }
 

@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2023-11-21
-// Last updated: 2024-05-10
+// Last updated: 2024-05-12
 //
 
 #![cfg_attr(feature = "nightly", feature(str_internals))]
@@ -57,6 +57,6 @@ fn main() {
 
     match cli.run() {
         Ok(_) => info!("All done! Bye. 👋🥳"),
-        Err(e) => error!("Something went wrong during execution: {:?}", e),
+        Err(e) => error!("{}", e),
     }
 }

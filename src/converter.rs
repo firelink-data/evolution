@@ -22,15 +22,16 @@
 // SOFTWARE.
 //
 // File created: 2024-02-17
-// Last updated: 2024-05-11
+// Last updated: 2024-05-12
 //
 
 use arrow::array::ArrayRef;
+use arrow::datatypes::SchemaRef as ArrowSchemaRef;
 use arrow::record_batch::RecordBatch;
 use libc;
 use log::{debug, error, info};
 use parquet::basic::Compression;
-use parquet::file::properties::WriterProperties;
+use parquet::file::properties::WriterProperties as ParquetWriterProperties;
 
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -54,14 +55,14 @@ pub(crate) static CONVERTER_LINE_BREAKS_BUFFER_SIZE: usize = 1 * 1024 * 1024;
 ///
 #[derive(Debug)]
 pub struct Converter {
-    output_path: PathBuf,
-    target_file: File,
+    in_file: File,
     schema: FixedSchema,
+    writer: Box<dyn Writer>,
+    slicer: Slicer,
     n_threads: usize,
-    multithreading: bool,
+    multithreaded: bool,
     buffer_size: usize,
     thread_channel_capacity: usize,
-    slicer: Slicer,
 }
 
 ///
@@ -74,21 +75,23 @@ impl Converter {
     }
 
     ///
-    pub fn convert(&mut self) {
-        if self.multithreading {
+    pub fn convert(&mut self) -> Result<()> {
+        if self.multithreaded {
             info!(
                 "Converting in multithreaded mode using {} threads.",
                 self.n_threads
             );
-            self.convert_multithreaded()
+            self.convert_multithreaded()?
         } else {
             info!("Converting in single-threaded mode.");
-            self.convert_single_threaded()
+            self.convert_single_threaded()?
         }
+
+        Ok(())
     }
 
     ///
-    fn convert_multithreaded(&mut self) {
+    fn convert_multithreaded(&mut self) -> Result<()> {
         todo!();
     }
 
@@ -104,9 +107,9 @@ impl Converter {
     /// We use [`libc::memset`] to directly write to and 'reset' the buffer in memory.
     /// This can cause a Segmentation fault if e.g. the memory is not allocated properly,
     /// or we are trying to write outside of the allocated memory area.
-    fn convert_single_threaded(&mut self) {
+    fn convert_single_threaded(&mut self) -> Result<()> {
         let bytes_to_read: usize = self
-            .target_file
+            .in_file
             .metadata()
             .expect("Could not read file metadata!")
             .len() as usize;
@@ -120,37 +123,12 @@ impl Converter {
 
         // We wrap the file descriptor in a [`BufReader`] to improve the syscall
         // efficiency of small and repeated I/O calls to the same file.
-        let mut reader: BufReader<&File> = BufReader::new(&self.target_file);
+        let mut reader: BufReader<&File> = BufReader::new(&self.in_file);
         let mut buffer: Vec<u8> = vec![0u8; buffer_capacity];
 
         let mut line_break_indices: Vec<usize> =
             Vec::with_capacity(CONVERTER_LINE_BREAKS_BUFFER_SIZE);
         let mut builders: Vec<Box<dyn ColumnBuilder>> = self.schema.as_column_builders();
-
-        // Setup writer configuration for specific target schema.
-        let mut empty_column_builders = self
-            .schema
-            .iter()
-            .map(|col| col.as_column_builder())
-            .collect::<Vec<Box<dyn ColumnBuilder>>>();
-
-        let column_refs = empty_column_builders
-            .iter_mut()
-            .map(|builder| builder.finish())
-            .collect::<Vec<(&str, ArrayRef)>>();
-
-        let writer_record_batch = RecordBatch::try_from_iter(column_refs)
-            .expect("Could not create RecordBatch from FixedSchema columns!");
-
-        let writer_properties = WriterProperties::builder()
-            .set_compression(Compression::SNAPPY)
-            .build();
-
-        debug!("Creating and setting up ParquetWriter.");
-        let mut writer: ParquetWriter = ParquetWriter::new(&self.output_path);
-        writer.set_properties(writer_properties);
-        writer.set_record_batch(writer_record_batch);
-        writer.setup_arrow_writer();
 
         // Here we start processing the target file.
         loop {
@@ -258,29 +236,31 @@ impl Converter {
             let batch = RecordBatch::try_from_iter(builder_write_buffer)
                 .expect("Could not create RecordBatch from finished ArrayRefs!");
 
-            writer.write_batch(&batch);
+            self.writer.write_batch(&batch)?;
 
             debug!("Bytes processed: {}", bytes_processed);
             debug!("Remaining bytes: {}", remaining_bytes);
         }
 
-        writer.finish();
+        self.writer.finish()?;
 
         info!(
             "Done converting! We read {} bytes two times (due to sliding window overlap).",
             bytes_overlapped,
         );
+
+        Ok(())
     }
 }
 
 ///
 #[derive(Debug, Default)]
 pub struct ConverterBuilder {
-    target_file_path: Option<PathBuf>,
-    output_file_path: Option<PathBuf>,
-    schema_path: Option<PathBuf>,
+    in_file: Option<PathBuf>,
+    out_file: Option<PathBuf>,
+    schema_file: Option<PathBuf>,
     n_threads: Option<usize>,
-    multithreading: Option<bool>,
+    multithreaded: Option<bool>,
     buffer_size: Option<usize>,
     thread_channel_capacity: Option<usize>,
 }
@@ -288,38 +268,38 @@ pub struct ConverterBuilder {
 ///
 impl ConverterBuilder {
     /// Set the [`PathBuf`] for the target file to convert.
-    pub fn target_file(mut self, file_path: PathBuf) -> Self {
-        self.target_file_path = Some(file_path);
+    pub fn with_in_file(mut self, in_file: PathBuf) -> Self {
+        self.in_file = Some(in_file);
         self
     }
 
     /// Set the [`PathBuf`] for the output file of the converted data.
-    pub fn output_file(mut self, file_path: PathBuf) -> Self {
-        self.output_file_path = Some(file_path);
+    pub fn with_out_file(mut self, out_file: PathBuf) -> Self {
+        self.out_file = Some(out_file);
         self
     }
 
     /// Set the [`PathBuf`] for the schema of the target file.
-    pub fn schema(mut self, schema_path: PathBuf) -> Self {
-        self.schema_path = Some(schema_path);
+    pub fn with_schema(mut self, schema_file: PathBuf) -> Self {
+        self.schema_file = Some(schema_file);
         self
     }
 
     /// Set the number of threads to use when converting the target file with the [`Converter`].
-    pub fn num_threads(mut self, n_threads: usize) -> Self {
+    pub fn with_num_threads(mut self, n_threads: usize) -> Self {
         self.n_threads = Some(n_threads);
-        self.multithreading = Some(n_threads > 1);
+        self.multithreaded = Some(n_threads > 1);
         self
     }
 
     ///
-    pub fn buffer_size(mut self, buffer_size: Option<usize>) -> Self {
+    pub fn with_buffer_size(mut self, buffer_size: Option<usize>) -> Self {
         self.buffer_size = buffer_size;
         self
     }
 
     ///
-    pub fn thread_channel_capacity(mut self, thread_channel_capacity: Option<usize>) -> Self {
+    pub fn with_thread_channel_capacity(mut self, thread_channel_capacity: Option<usize>) -> Self {
         self.thread_channel_capacity = thread_channel_capacity;
         self
     }
@@ -331,67 +311,48 @@ impl ConverterBuilder {
     ///
     /// # Error
     /// Iff any of the required fields are `None`.
+    ///
+    /// # Panics
+    /// ...
     pub fn build(self) -> Result<Converter> {
-        let target_file: File = match self.target_file_path {
-            Some(p) => match File::open(&p) {
-                Ok(f) => f,
-                Err(e) => {
-                    error!("Could not open target file path, reason: {}", e);
-                    return Err(Box::new(SetupError));
-                }
+        let in_file: File = match self.in_file {
+            Some(p) => File::open(p)?,
+            None => {
+                error!("Required field 'in_file' is missing or None.");
+                return Err(Box::new(SetupError));
             },
-            None => {
-                error!("Required field target_file_path not provided, exiting...");
-                return Err(Box::new(SetupError));
-            }
         };
 
-        let output_path: PathBuf = match self.output_file_path {
-            Some(p) => p,
+        let out_file: PathBuf = self.out_file
+            .ok_or("Required field 'out_file' is missing or None.")?;
+
+        let schema: FixedSchema = match self.schema_file {
+            Some(p) => FixedSchema::from_path(p)?,
             None => {
-                error!("Required field target_file_path not provided, exiting...");
+                error!("Required field 'schema_file' is missing or None.");
                 return Err(Box::new(SetupError));
-            }
+            },
         };
 
-        // The call to [`FixedSchema::from_path`] might panic.
-        let schema: FixedSchema = match self.schema_path {
-            Some(path) => FixedSchema::from_path(path),
-            None => {
-                error!("Required field `schema_path` not provided, exiting...");
-                return Err(Box::new(SetupError));
-            }
-        };
+        let n_threads: usize = self.n_threads
+            .ok_or("Required field 'n_threads' is missing or None.")?;
 
-        let n_threads: usize = match self.n_threads {
-            Some(n) => n,
-            None => {
-                error!("Required field `n_threads` not provided, exiting...");
-                return Err(Box::new(SetupError));
-            }
-        };
-
-        let multithreading: bool = match self.multithreading {
-            Some(b) => b,
-            None => {
-                error!("Required field `multithreading` not provided, exiting...");
-                return Err(Box::new(SetupError));
-            }
-        };
+        let multithreaded: bool = self.multithreaded
+            .ok_or("Required field 'multithreaded' is missing or None.")?;
 
         //
         // Optional configuration below.
         //
         let buffer_size: usize = match self.buffer_size {
             Some(s) => {
-                if multithreading {
+                if multithreaded {
                     s / (n_threads - 1)
                 } else {
                     s
                 }
             }
             None => {
-                if multithreading {
+                if multithreaded {
                     info!(
                         "Optional field `buffer_size` not provided, will use static value CONVERTER_SLICE_BUFFER_SIZE={}.",
                         CONVERTER_SLICE_BUFFER_SIZE / (n_threads - 1),
@@ -418,17 +379,31 @@ impl ConverterBuilder {
             }
         };
 
-        let slicer = Slicer::builder().num_threads(n_threads).build()?;
+        let properties: ParquetWriterProperties = ParquetWriterProperties::builder()
+            .set_compression(Compression::SNAPPY)
+            .build();
+
+        let arrow_schema: ArrowSchemaRef = schema.as_arrow_schema_ref();
+
+        let writer: Box<dyn Writer> = Box::new(ParquetWriter::builder()
+            .with_out_file(out_file)
+            .with_properties(properties)
+            .with_arrow_schema(arrow_schema)
+            .build()?);
+
+        let slicer = Slicer::builder()
+            .num_threads(n_threads)
+            .build()?;
 
         Ok(Converter {
-            output_path,
-            target_file,
+            in_file,
             schema,
+            writer,
+            slicer,
             n_threads,
-            multithreading,
+            multithreaded,
             buffer_size,
             thread_channel_capacity,
-            slicer,
         })
     }
 }
