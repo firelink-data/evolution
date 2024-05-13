@@ -25,6 +25,7 @@
 * Last updated: 2024-02-28
 */
 
+use crate::cli::Cli;
 use clap::Parser;
 use log::{debug, error, info};
 
@@ -34,17 +35,14 @@ mod error;
 mod logger;
 mod mocker;
 mod schema;
-use crate::slicers::chunked_slicer::{IN_MAX_CHUNKS, SLICER_IN_CHUNK_SIZE};
-use crate::slicers::ChunkAndResidue;
-use cli::Cli;
+
 mod threads;
 mod writer;
 mod builder;
 mod parser;
 
-mod converters;
+mod chunked;
 mod dump;
-mod slicers;
 mod mocking;
 mod converter;
 mod slicer;
