@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-02-05
-// Last updated: 2024-05-11
+// Last updated: 2024-05-13
 //
 
 use std::error;
@@ -34,6 +34,7 @@ pub(crate) type Result<T> = result::Result<T, Box<dyn error::Error>>;
 
 /// Error type used during execution when something goes wrong.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub(crate) struct ExecutionError;
 
 impl error::Error for ExecutionError {}

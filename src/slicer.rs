@@ -34,6 +34,7 @@ use core::str::utf8_char_width;
 use crate::error::Result;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub(crate) struct Slicer {
     n_threads: usize,
     multithreading: bool,

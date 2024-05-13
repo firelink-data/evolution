@@ -54,11 +54,11 @@ use crate::slicer::Slicer;
 use crate::writer::{ParquetWriter, Writer};
 
 ///
-pub(crate) static CONVERTER_SLICE_BUFFER_SIZE: usize = 2 * 1024 * 1024;
+pub(crate) static CONVERTER_SLICE_BUFFER_SIZE: usize = 1024 * 1024 * 1024;
 ///
 pub(crate) static CONVERTER_THREAD_CHANNEL_CAPACITY: usize = 128;
 ///
-pub(crate) static CONVERTER_LINE_BREAKS_BUFFER_SIZE: usize = 1 * 1024 * 1024;
+pub(crate) static CONVERTER_LINE_BREAKS_BUFFER_SIZE: usize =  1 * 1024 * 1024;
 
 ///
 #[derive(Debug)]
@@ -122,14 +122,8 @@ impl Converter {
 
         let mut line_break_indices: Vec<usize> =
             Vec::with_capacity(CONVERTER_LINE_BREAKS_BUFFER_SIZE);
-
-        let mut worker_builders = (0..(self.n_threads - 1))
-            .map(|_| {
-                self.schema.as_column_builders()
-            })
-            .collect::<Vec<Vec<Box<dyn ColumnBuilder>>>>();
-
-        let mut worker_slice_indices: Vec<(usize, usize)> = Vec::with_capacity(self.n_threads - 1);
+        
+        let mut worker_line_break_indices: Vec<(usize, usize)> = Vec::with_capacity(self.n_threads - 1);
 
         // Start processing the target file to convert.
         loop {
@@ -141,7 +135,7 @@ impl Converter {
                 buffer_capacity = remaining_bytes;
             }
 
-            debug!("(UNSAFE) clearing read buffer.");
+            debug!("(UNSAFE) clearing read buffer memory.");
             unsafe {
                 libc::memset(
                     buffer.as_mut_ptr() as _,
@@ -152,7 +146,7 @@ impl Converter {
 
             match reader.read_exact(&mut buffer).is_ok() {
                 true => (),
-                false => debug!("EOF reached, this is the last time reading the buffer."),
+                false => debug!("EOF reached, this should be the last time reading the buffer."),
             }
 
             self.slicer
@@ -160,29 +154,20 @@ impl Converter {
 
             let byte_idx_last_line_break = line_break_indices
                 .last()
-                .expect("No line breaks found in the read buffer!");
+                .ok_or("No line breaks found in the read buffer!")?;
             let n_bytes_left_after_line_break = buffer_capacity - 1 - byte_idx_last_line_break;
 
-            match reader
-                .seek_relative(-(n_bytes_left_after_line_break as i64))
-                .is_ok()
-            {
-                true => {}
-                false => panic!("Could not move cursor back in BufReader!"),
-            };
+            reader.seek_relative(-(n_bytes_left_after_line_break as i64))?;
 
             self.distribute_worker_thread_workloads(
                 &line_break_indices,
-                &mut worker_slice_indices,
+                &mut worker_line_break_indices,
             );
-
-            debug!("Line break indices: {:?}", line_break_indices);
-            debug!("Worker thread slice indices: {:?}", worker_slice_indices);
 
             self.spawn_convert_threads(
                 &buffer,
-                &worker_slice_indices,
-                &mut worker_builders,
+                &line_break_indices,
+                &worker_line_break_indices,
             )?;
 
             bytes_processed += buffer_capacity - n_bytes_left_after_line_break;
@@ -190,10 +175,18 @@ impl Converter {
             remaining_bytes -= buffer_capacity - n_bytes_left_after_line_break;
 
             line_break_indices.clear();
-            worker_slice_indices.clear();
+            worker_line_break_indices.clear();
+
+            debug!("Bytes processed: {}", bytes_processed);
+            debug!("Remaining bytes: {}", remaining_bytes);
         }
 
+        info!("Almost done, finishing and closing writer.");
+        self.writer.finish()?;
+
+        info!("Done converting in multithreaded mode using {} threads!", self.n_threads);
         info!("We read {} bytes two times (due to sliding window overlap).", bytes_overlapped);
+
 
         Ok(())
     }
@@ -234,30 +227,31 @@ impl Converter {
     fn spawn_convert_threads(
         &mut self,
         buffer: &Vec<u8>,
+        line_breaks: &Vec<usize>,
         thread_workloads: &Vec<(usize, usize)>,
-        builders: &mut Vec<Vec<Box<dyn ColumnBuilder>>>,
     ) -> Result<()> {
 
         let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
-        let arc_buffer = Arc::new(buffer);
-
-        info!("Starting {} worker threads.", thread_workloads.len());
+        let arc_buffer: Arc<&Vec<u8>> = Arc::new(buffer);
+        let arc_slicer: Arc<&Slicer> = Arc::new(&self.slicer);
 
         let _ = scope(|s| {
             let threads = thread_workloads
                 .into_iter()
-                .enumerate()
-                .map(|(thread, (from, to))| {
-                    let t_sender = sender.clone();
-                    let t_buffer = arc_buffer.clone();
-                    let mut t_builders = &builders[thread];
+                .map(|(from, to)| {
+                    let t_sender: channel::Sender<RecordBatch> = sender.clone();
+                    let t_line_breaks: &[usize] = &line_breaks[*from..*to];
+                    let t_buffer: Arc<&Vec<u8>> = arc_buffer.clone();
+                    let t_slicer: Arc<&Slicer> = arc_slicer.clone();
+                    let mut t_builders = self.schema.as_column_builders();
                     s.spawn(move |_| {
                         worker_thread_convert(
                             t_sender,
-                            thread,
-                            &t_buffer[*from..*to],
+                            &t_buffer,
+                            t_line_breaks,
+                            &t_slicer,
                             &mut t_builders,
-                        )
+                        );
                     })
                 })
                 .collect::<Vec<ScopedJoinHandle<()>>>();
@@ -319,7 +313,7 @@ impl Converter {
                 buffer_capacity = remaining_bytes;
             }
 
-            debug!("(UNSAFE) clearing read buffer.");
+            debug!("(UNSAFE) clearing read buffer memory.");
             unsafe {
                 libc::memset(
                     buffer.as_mut_ptr() as _,
@@ -330,23 +324,16 @@ impl Converter {
 
             match reader.read_exact(&mut buffer).is_ok() {
                 true => (),
-                false => debug!("EOF reached, this is the last time reading the buffer."),
+                false => debug!("EOF reached, this should be the last time reading the buffer."),
             }
 
-            self.slicer
-                .find_line_breaks(&buffer, &mut line_break_indices);
+            self.slicer.find_line_breaks(&buffer, &mut line_break_indices);
             let byte_idx_last_line_break = line_break_indices
                 .last()
-                .expect("No line breaks found in the read buffer!");
+                .ok_or("No line breaks found in read buffer!")?;
             let n_bytes_left_after_line_break = buffer_capacity - 1 - byte_idx_last_line_break;
 
-            match reader
-                .seek_relative(-(n_bytes_left_after_line_break as i64))
-                .is_ok()
-            {
-                true => {}
-                false => panic!("Could not move cursor back in BufReader!"),
-            };
+            reader.seek_relative(-(n_bytes_left_after_line_break as i64))?;
 
             bytes_processed += buffer_capacity - n_bytes_left_after_line_break;
             bytes_overlapped += n_bytes_left_after_line_break;
@@ -379,8 +366,7 @@ impl Converter {
                 builder_write_buffer.push(builder.finish());
             }
 
-            let batch = RecordBatch::try_from_iter(builder_write_buffer)
-                .expect("Could not create RecordBatch from finished ArrayRefs!");
+            let batch = RecordBatch::try_from_iter(builder_write_buffer)?;
 
             self.writer.write_batch(&batch)?;
 
@@ -390,10 +376,8 @@ impl Converter {
 
         self.writer.finish()?;
 
-        info!(
-            "Done converting! We read {} bytes two times (due to sliding window overlap).",
-            bytes_overlapped,
-        );
+        info!("Done converting in single-threaded mode!");
+        info!("We read {} bytes two times (due to sliding window overlap).", bytes_overlapped);
 
         Ok(())
     }
@@ -409,32 +393,68 @@ impl Converter {
 
         let mut prev_line_break_idx: usize = 0;
         for worker_idx in 1..(self.n_threads - 1) {
-            let next_line_break_idx: usize = line_break_indices[n_rows_per_thread * worker_idx];
+            let next_line_break_idx: usize = n_rows_per_thread * worker_idx;
             thread_workloads.push((prev_line_break_idx, next_line_break_idx));
-            prev_line_break_idx = next_line_break_idx + NUM_CHARS_FOR_NEWLINE;
+            prev_line_break_idx = next_line_break_idx;
         }
 
-        thread_workloads.push((
-            prev_line_break_idx,
-            line_break_indices[n_line_break_indices - 1],
-        ));
+        thread_workloads.push((prev_line_break_idx, n_line_break_indices));
     }
 }
 
-///
+/// We know that the slice contains full rows, therefore, we do not need to know where
+/// the newlines are, since we have the builders, and thus we know how many runes/chars
+/// to read before expecting a newline char and skipping it.
 pub fn worker_thread_convert(
-    channel: channel::Sender<Vec<(&str, ArrayRef)>>,
-    thread: usize,
+    channel: channel::Sender<RecordBatch>,
     slice: &[u8],
-    builders: &Vec<Box<dyn ColumnBuilder>>,
+    line_breaks: &[usize],
+    slicer: &Slicer,
+    builders: &mut Vec<Box<dyn ColumnBuilder>>,
 ) {
+    let mut prev_line_break_idx: usize = 0;
+
+    for line_break_idx in line_breaks.iter() {
+        let line: &[u8] = &slice[prev_line_break_idx..*line_break_idx];
+        let mut prev_byte_idx: usize = 0;
+        for builder in builders.iter_mut() {
+            let byte_idx: usize = slicer.find_num_bytes_for_num_runes(
+                &line[prev_byte_idx..],
+                builder.runes(),
+            );
+
+            let next_byte_idx: usize = prev_byte_idx + byte_idx;
+            builder.parse_and_push_bytes(&line[prev_byte_idx..next_byte_idx]);
+            prev_byte_idx = next_byte_idx;
+        }
+        prev_line_break_idx = line_break_idx + NUM_CHARS_FOR_NEWLINE;
+    }
+
+    // NOTE: THIS IS BAD allocates memory
+    let mut builder_write_buffer: Vec<(&str, ArrayRef)> = vec![];
+
+    for builder in builders.iter_mut() {
+        builder_write_buffer.push(builder.finish());
+    }
+
+    channel
+        .send(RecordBatch::try_from_iter(builder_write_buffer).unwrap())
+        .unwrap();
+
+    drop(channel);
 }
 
 ///
 pub fn master_thread_write(
-    channel: channel::Receiver<Vec<(&str, ArrayRef)>>,
+    channel: channel::Receiver<RecordBatch>,
     writer: &mut Box<dyn Writer>,
 ) -> Result<()> {
+
+    for record_batch in channel {
+        writer.write_batch(&record_batch)?;
+        drop(record_batch);
+    }
+
     Ok(())
 }
 
@@ -546,9 +566,9 @@ impl ConverterBuilder {
                 } else {
                     info!(
                         "Optional field `buffer_size` not provided, will use static value CONVERTER_SLICE_BUFFER_SIZE={}.",
-                        CONVERTER_SLICE_BUFFER_SIZE,
+                        CONVERTER_SLICE_BUFFER_SIZE / (n_threads - 1),
                     );
-                    CONVERTER_SLICE_BUFFER_SIZE
+                    CONVERTER_SLICE_BUFFER_SIZE / (n_threads - 1)
                 }
             }
         };
