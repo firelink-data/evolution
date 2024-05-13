@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-02-05
-// Last updated: 2024-05-12
+// Last updated: 2024-05-13
 //
 
 use clap::{value_parser, ArgAction, Parser, Subcommand};
@@ -146,30 +146,21 @@ enum Commands {
 
         /// Set the writer mode to create a new file or fail if it already exists.
         #[arg(
-            long = "create-new",
-            value_name = "WRITER-CREATE-NEW",
+            long = "force-new",
+            value_name = "WRITER-FORCE-NEW",
             action = ArgAction::SetTrue,
             required = false,
         )]
-        writer_create_new: bool,
-
-        /// Set the writer mode to create a new file or open it if it already exists.
-        #[arg(
-            long = "create",
-            value_name = "WRITER-CREATE",
-            action = ArgAction::SetFalse,
-            required = false,
-        )]
-        writer_create: bool,
+        writer_force_new: bool,
 
         /// Set the writer option to truncate a previous file if the out file already exists.
         #[arg(
-            long = "truncate",
+            long = "truncate-existing",
             value_name = "WRITER-TRUNCATE",
             action = ArgAction::SetTrue,
             required = false,
         )]
-        writer_truncate: bool,
+        writer_truncate_existing: bool,
 
         /// Set the size of the buffer (number of rows).
         #[arg(
@@ -228,9 +219,8 @@ impl Cli {
                 schema,
                 out_file,
                 n_rows,
-                writer_create_new,
-                writer_create,
-                writer_truncate,
+                writer_force_new,
+                writer_truncate_existing,
                 mocker_buffer_size,
                 mocker_thread_channel_capacity,
             } => {
@@ -238,9 +228,9 @@ impl Cli {
                     .with_schema(schema.to_owned())
                     .with_out_file(out_file.to_owned())
                     .with_num_rows(*n_rows)
-                    .with_create_new(*writer_create_new)
-                    .with_create(*writer_create)
-                    .with_truncate(*writer_truncate)
+                    .with_create_new(*writer_force_new)
+                    .with_create(true)
+                    .with_truncate(*writer_truncate_existing)
                     .with_num_threads(n_threads)
                     .with_buffer_size(*mocker_buffer_size)
                     .with_thread_channel_capacity(*mocker_thread_channel_capacity)

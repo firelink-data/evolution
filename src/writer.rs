@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-05-05
-// Last updated: 2024-05-12
+// Last updated: 2024-05-13
 //
 
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
@@ -164,7 +164,8 @@ impl FixedLengthFileWriterBuilder {
             .write(true)
             .create_new(properties.create_new)
             .create(properties.create)
-            .truncate(properties.truncate)
+            .append(properties.create && !properties.truncate)
+            .truncate(properties.truncate && !properties.create_new)
             .open(&out_file)?;
 
         Ok(FixedLengthFileWriter {
