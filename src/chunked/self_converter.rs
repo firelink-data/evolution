@@ -25,8 +25,8 @@
 * Last updated: 2023-12-14
 */
 
-use crate::converters::Converter;
-use crate::slicers::FnFindLastLineBreak;
+use crate::chunked::Converter;
+use crate::chunked::FnFindLastLineBreak;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::prelude::*;
 use std::fs::File;

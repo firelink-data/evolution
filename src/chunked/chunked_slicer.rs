@@ -31,9 +31,9 @@ use std::{cmp, fs};
 
 use log::info;
 
-use crate::converters::Converter;
-use crate::slicers::{ChunkAndResidue, FnFindLastLineBreak, Slicer};
-use crate::slicers::{IterRevolver, Stats};
+use crate::chunked::Converter;
+use crate::chunked::{ChunkAndResidue, FnFindLastLineBreak, Slicer};
+use crate::chunked::{IterRevolver, Stats};
 
 /**
 GOAL(s)
