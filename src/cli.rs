@@ -274,7 +274,7 @@ impl Cli {
                 in_file,
                 out_file,
             } => {
-                let _in_file = fs::File::open(&in_file)?;
+                let _in_file = fs::File::open(in_file)?;
 
                 let mut slicer_instance: Box<dyn Slicer> = Box::new(OldSlicer {
                     fn_find_last_nl: find_last_nl,
@@ -313,7 +313,7 @@ impl Cli {
                 let stats = slicer_instance.slice_and_convert(
                     converter_instance,
                     _in_file,
-                    n_threads as usize,
+                    n_threads,
                 )?;
 
                 info!(

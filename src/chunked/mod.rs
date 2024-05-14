@@ -58,11 +58,11 @@ pub(crate) struct Stats {
 pub(crate) type FnLineBreakLen = fn() -> usize;
 #[allow(dead_code)]
 pub(crate) fn line_break_len_cr() -> usize {
-    1 as usize
+    1_usize
 }
 #[allow(dead_code)]
 pub(crate) fn line_break_len_crlf() -> usize {
-    2 as usize
+    2_usize
 }
 
 pub(crate) type FnFindLastLineBreak<'a> = fn(bytes: &'a [u8]) -> (bool, usize);
@@ -142,6 +142,7 @@ impl<'a, T> Iterator for IterRevolver<'a, T> {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) trait Converter<'a> {
     fn set_line_break_handler(&mut self, fn_line_break: FnFindLastLineBreak<'a>);
     fn get_line_break_handler(&self) -> FnFindLastLineBreak<'a>;
@@ -165,7 +166,7 @@ fn column_length_num_rightaligned(data: &[u8], runes: i16) -> (usize, usize) {
     let stop: usize = min(data.len(), runes as usize);
 
     while counted_runes < runes as usize {
-        let byten = eat.nth(0);
+        let byten = eat.next();
         let bb: u8 = match byten {
             None => {
                 //TODO  we ran out of data,this is an error, fix later.
@@ -174,10 +175,8 @@ fn column_length_num_rightaligned(data: &[u8], runes: i16) -> (usize, usize) {
             Some(b) => *b,
         };
 
-        match bb {
-            48..=57 => return (start, stop),
-            _ => {}
-        };
+        if let 48..=57 = bb { return (start, stop) }
+
         start += 1;
         counted_runes += 1;
     }
@@ -192,7 +191,7 @@ fn column_length_char_rightaligned(data: &[u8], runes: i16) -> (usize, usize) {
     let stop: usize = min(data.len(), runes as usize);
 
     while counted_runes < runes as usize {
-        let byten = eat.nth(0);
+        let byten = eat.next();
         let bb: u8 = match byten {
             None => {
                 //TODO  we ran out of data,this is an error, fix later.

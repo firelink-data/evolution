@@ -63,7 +63,7 @@ unsafe impl Send for MasterBuilders {}
 unsafe impl Sync for MasterBuilders {}
 
 impl MasterBuilders {
-    pub fn writer_factory<'a>(&mut self, out_file: &PathBuf) -> ArrowWriter<File> {
+    pub fn writer_factory(&mut self, out_file: &PathBuf) -> ArrowWriter<File> {
         let _out_file = fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -86,8 +86,8 @@ impl MasterBuilders {
         writer
     }
 
-    pub fn builders_factory<'a>(schema_path: PathBuf, instances: i16) -> Self {
-        let schema = schema::FixedSchema::from_path(schema_path.into()).unwrap();
+    pub fn builders_factory(schema_path: PathBuf, instances: i16) -> Self {
+        let schema = schema::FixedSchema::from_path(schema_path).unwrap();
         let antal_col = schema.num_columns();
         let mut builders: Vec<Vec<Box<dyn ColumnBuilder + Sync + Send>>> = Vec::new();
 

@@ -124,7 +124,7 @@ impl<'a> Slicer<'a> for OldSlicer<'a> {
 
         match converter.finish() {
             Ok(x) => Result::Ok(Stats {
-                bytes_in: bytes_in,
+                bytes_in,
                 bytes_out: converter.get_finish_bytes_written(),
                 num_rows: x.num_rows,
             }),
@@ -145,9 +145,7 @@ fn residual_to_slice<'a>(
     if 0 != residue_effective_len {
         target_chunk_residue.copy_from_slice(&residue[0..residue_effective_len]);
     }
-    let mut r: Vec<&[u8]> = vec![];
-
-    r.push(target_chunk_residue);
+    let r: Vec<&[u8]> = vec![target_chunk_residue];
     r
 }
 

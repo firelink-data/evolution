@@ -232,7 +232,7 @@ impl Converter {
     fn spawn_convert_threads(
         &mut self,
         buffer: &Vec<u8>,
-        line_breaks: &Vec<usize>,
+        line_breaks: &[usize],
         thread_workloads: &Vec<(usize, usize)>,
     ) -> Result<()> {
         let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
