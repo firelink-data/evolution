@@ -56,11 +56,11 @@ use crate::slicer::Slicer;
 use crate::writer::{ParquetWriter, Writer};
 
 ///
-pub(crate) static CONVERTER_SLICE_BUFFER_SIZE: usize = 1024 * 1024 * 1024;
+pub(crate) static CONVERTER_SLICE_BUFFER_SIZE: usize = 8 * 1024 * 1024 * 1024;
 ///
 pub(crate) static CONVERTER_THREAD_CHANNEL_CAPACITY: usize = 128;
 ///
-pub(crate) static CONVERTER_LINE_BREAKS_BUFFER_SIZE: usize =  1 * 1024 * 1024;
+pub(crate) static CONVERTER_LINE_BREAKS_BUFFER_SIZE: usize = 1 * 1024 * 1024;
 
 ///
 #[derive(Debug)]
@@ -107,12 +107,12 @@ impl Converter {
     /// # Panics
     /// If could not move cursor back.
     fn convert_multithreaded(&mut self) -> Result<()> {
-        let bytes_to_read: usize = self
-            .in_file
-            .metadata()?
-            .len() as usize;
+        let bytes_to_read: usize = self.in_file.metadata()?.len() as usize;
 
-        info!("Target file to convert is {} bytes in total.", bytes_to_read);
+        info!(
+            "Target file to convert is {} bytes in total.",
+            bytes_to_read
+        );
 
         let mut remaining_bytes: usize = bytes_to_read;
         let mut bytes_processed: usize = 0;
@@ -125,8 +125,9 @@ impl Converter {
 
         let mut line_break_indices: Vec<usize> =
             Vec::with_capacity(CONVERTER_LINE_BREAKS_BUFFER_SIZE);
-        
-        let mut worker_line_break_indices: Vec<(usize, usize)> = Vec::with_capacity(self.n_threads - 1);
+
+        let mut worker_line_break_indices: Vec<(usize, usize)> =
+            Vec::with_capacity(self.n_threads - 1);
 
         // Start processing the target file to convert.
         loop {
@@ -150,7 +151,10 @@ impl Converter {
 
             match reader.read_exact(&mut buffer).is_ok() {
                 true => (),
-                false => info!("EOF reached, this should be the last time reading the buffer."),
+                false => {
+                    #[cfg(debug_assertions)]
+                    debug!("EOF reached, this should be the last time reading the buffer.");
+                }
             }
 
             self.slicer
@@ -168,11 +172,7 @@ impl Converter {
                 &mut worker_line_break_indices,
             );
 
-            self.spawn_convert_threads(
-                &buffer,
-                &line_break_indices,
-                &worker_line_break_indices,
-            )?;
+            self.spawn_convert_threads(&buffer, &line_break_indices, &worker_line_break_indices)?;
 
             bytes_processed += buffer_capacity - n_bytes_left_after_line_break;
             bytes_overlapped += n_bytes_left_after_line_break;
@@ -194,9 +194,22 @@ impl Converter {
         debug!("Finishing and closing writer.");
         self.writer.finish()?;
 
-        info!("Done converting in multithreaded mode using {} threads!", self.n_threads);
+        #[cfg(feature = "rayon")]
+        info!(
+            "Done converting with rayon parallelism using {} threads!",
+            self.n_threads
+        );
+
+        #[cfg(not(feature = "rayon"))]
+        info!(
+            "Done converting in standard multithreaded mode using {} threads!",
+            self.n_threads
+        );
         if bytes_overlapped > 0 {
-            info!("We read {} bytes two times (due to sliding window overlap).", bytes_overlapped);
+            info!(
+                "We read {} bytes two times (due to sliding window overlap).",
+                bytes_overlapped
+            );
         }
 
         Ok(())
@@ -216,23 +229,21 @@ impl Converter {
         #[cfg(debug_assertions)]
         debug!("Starting {} worker threads.", thread_workloads.len());
 
-        thread_workloads
-            .into_par_iter()
-            .for_each(|(from, to)| {
-                let t_sender = sender.clone();
-                let t_buffer = arc_buffer.clone();
-                let t_line_breaks: &[usize] = &line_breaks[*from..*to];
-                let t_slicer = arc_slicer.clone();
-                // Note: this allocated new memory on the heap for the builders.
-                let mut t_builders = self.schema.as_column_builders();
-                worker_thread_convert(
-                    t_sender,
-                    &t_buffer,
-                    t_line_breaks,
-                    &t_slicer,
-                    &mut t_builders,
-                );
-            });
+        thread_workloads.into_par_iter().for_each(|(from, to)| {
+            let t_sender = sender.clone();
+            let t_buffer = arc_buffer.clone();
+            let t_line_breaks: &[usize] = &line_breaks[*from..*to];
+            let t_slicer = arc_slicer.clone();
+            // Note: this allocated new memory on the heap for the builders.
+            let mut t_builders = self.schema.as_column_builders();
+            worker_thread_convert(
+                t_sender,
+                &t_buffer,
+                t_line_breaks,
+                &t_slicer,
+                &mut t_builders,
+            );
+        });
 
         drop(sender);
 
@@ -257,7 +268,6 @@ impl Converter {
         let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
         let arc_buffer: Arc<&Vec<u8>> = Arc::new(buffer);
         let arc_slicer: Arc<&Slicer> = Arc::new(&self.slicer);
-
 
         let _ = scope(|s| {
             #[cfg(debug_assertions)]
@@ -291,12 +301,10 @@ impl Converter {
             for handle in threads {
                 handle.join().expect("Could not join worker thread handle!");
             }
-
         });
 
         Ok(())
     }
-
 
     /// Converts the target file in single-threaded mode.
     ///
@@ -311,12 +319,12 @@ impl Converter {
     /// This can cause a Segmentation fault if e.g. the memory is not allocated properly,
     /// or we are trying to write outside of the allocated memory area.
     fn convert_single_threaded(&mut self) -> Result<()> {
-        let bytes_to_read: usize = self
-            .in_file
-            .metadata()?
-            .len() as usize;
+        let bytes_to_read: usize = self.in_file.metadata()?.len() as usize;
 
-        info!("Target file to convert is {} bytes in total.", bytes_to_read);
+        info!(
+            "Target file to convert is {} bytes in total.",
+            bytes_to_read
+        );
 
         let mut remaining_bytes: usize = bytes_to_read;
         let mut bytes_processed: usize = 0;
@@ -342,6 +350,8 @@ impl Converter {
                 buffer_capacity = remaining_bytes;
             }
 
+            #[cfg(debug_assertions)]
+            debug!("(UNSAFE) clearing read buffer memory.");
             unsafe {
                 libc::memset(
                     buffer.as_mut_ptr() as _,
@@ -352,10 +362,14 @@ impl Converter {
 
             match reader.read_exact(&mut buffer).is_ok() {
                 true => (),
-                false => info!("EOF reached, this should be the last slice to convert."),
+                false => {
+                    #[cfg(debug_assertions)]
+                    debug!("EOF reached, this should be the last slice to convert.");
+                }
             }
 
-            self.slicer.find_line_breaks(&buffer, &mut line_break_indices);
+            self.slicer
+                .find_line_breaks(&buffer, &mut line_break_indices);
             let byte_idx_last_line_break = line_break_indices
                 .last()
                 .ok_or("No line breaks found in read buffer!")?;
@@ -407,7 +421,10 @@ impl Converter {
         self.writer.finish()?;
 
         info!("Done converting in single-threaded mode!");
-        info!("We read {} bytes two times (due to sliding window overlap).", bytes_overlapped);
+        info!(
+            "We read {} bytes two times (due to sliding window overlap).",
+            bytes_overlapped
+        );
 
         Ok(())
     }
@@ -417,7 +434,6 @@ impl Converter {
         line_break_indices: &Vec<usize>,
         thread_workloads: &mut Vec<(usize, usize)>,
     ) {
-
         let n_line_break_indices: usize = line_break_indices.len();
         let n_rows_per_thread: usize = n_line_break_indices / (self.n_threads - 1);
 
@@ -446,10 +462,8 @@ pub fn worker_thread_convert(
         let line: &[u8] = &slice[prev_line_break_idx..*line_break_idx];
         let mut prev_byte_idx: usize = 0;
         for builder in builders.iter_mut() {
-            let byte_idx: usize = slicer.find_num_bytes_for_num_runes(
-                &line[prev_byte_idx..],
-                builder.runes(),
-            );
+            let byte_idx: usize =
+                slicer.find_num_bytes_for_num_runes(&line[prev_byte_idx..], builder.runes());
 
             let next_byte_idx: usize = prev_byte_idx + byte_idx;
             builder.parse_and_push_bytes(&line[prev_byte_idx..next_byte_idx]);
@@ -477,7 +491,6 @@ pub fn master_thread_write(
     channel: channel::Receiver<RecordBatch>,
     writer: &mut Box<dyn Writer>,
 ) -> Result<()> {
-
     for record_batch in channel {
         writer.write_batch(&record_batch)?;
         drop(record_batch);
@@ -556,10 +569,11 @@ impl ConverterBuilder {
             None => {
                 error!("Required field 'in_file' is missing or None.");
                 return Err(Box::new(SetupError));
-            },
+            }
         };
 
-        let out_file: PathBuf = self.out_file
+        let out_file: PathBuf = self
+            .out_file
             .ok_or("Required field 'out_file' is missing or None.")?;
 
         let schema: FixedSchema = match self.schema_file {
@@ -567,13 +581,15 @@ impl ConverterBuilder {
             None => {
                 error!("Required field 'schema_file' is missing or None.");
                 return Err(Box::new(SetupError));
-            },
+            }
         };
 
-        let n_threads: usize = self.n_threads
+        let n_threads: usize = self
+            .n_threads
             .ok_or("Required field 'n_threads' is missing or None.")?;
 
-        let multithreaded: bool = self.multithreaded
+        let multithreaded: bool = self
+            .multithreaded
             .ok_or("Required field 'multithreaded' is missing or None.")?;
 
         //
@@ -624,15 +640,15 @@ impl ConverterBuilder {
 
         let arrow_schema: ArrowSchemaRef = schema.as_arrow_schema_ref();
 
-        let writer: Box<dyn Writer> = Box::new(ParquetWriter::builder()
-            .with_out_file(out_file)
-            .with_properties(properties)
-            .with_arrow_schema(arrow_schema)
-            .build()?);
+        let writer: Box<dyn Writer> = Box::new(
+            ParquetWriter::builder()
+                .with_out_file(out_file)
+                .with_properties(properties)
+                .with_arrow_schema(arrow_schema)
+                .build()?,
+        );
 
-        let slicer = Slicer::builder()
-            .num_threads(n_threads)
-            .build()?;
+        let slicer = Slicer::builder().num_threads(n_threads).build()?;
 
         Ok(Converter {
             in_file,

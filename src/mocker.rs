@@ -175,10 +175,7 @@ impl Mocker {
 
         let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
 
-        info!(
-            "Starting {} worker threads.",
-            thread_workloads.len(),
-        );
+        info!("Starting {} worker threads.", thread_workloads.len(),);
 
         let schema = Arc::new(self.schema.clone());
         let threads = thread_workloads
@@ -334,22 +331,28 @@ impl MockerBuilder {
             }
         };
 
-        let n_rows: usize = self.n_rows
+        let n_rows: usize = self
+            .n_rows
             .ok_or("Required field 'n_rows' is missing or None.")?;
 
-        let create_new: bool = self.create_new
+        let create_new: bool = self
+            .create_new
             .ok_or("Required field 'create_new' is missing or None.")?;
 
-        let create: bool = self.create
+        let create: bool = self
+            .create
             .ok_or("Required field 'create' is missing or None.")?;
 
-        let truncate: bool = self.truncate
+        let truncate: bool = self
+            .truncate
             .ok_or("Required field 'truncate' is missing or None.")?;
 
-        let n_threads: usize = self.n_threads
+        let n_threads: usize = self
+            .n_threads
             .ok_or("Requried field 'n_threads' is missing or None.")?;
 
-        let multithreaded: bool = self.multithreaded
+        let multithreaded: bool = self
+            .multithreaded
             .ok_or("Required field 'multithreaded' is missing or None.")?;
 
         //
@@ -404,16 +407,19 @@ impl MockerBuilder {
             }
         };
 
-        let properties: FixedLengthFileWriterProperties = FixedLengthFileWriterProperties::builder()
-            .with_create_new(create_new)
-            .with_create(create)
-            .with_truncate(truncate)
-            .build()?;
+        let properties: FixedLengthFileWriterProperties =
+            FixedLengthFileWriterProperties::builder()
+                .with_create_new(create_new)
+                .with_create(create)
+                .with_truncate(truncate)
+                .build()?;
 
-        let writer: Box<dyn Writer> = Box::new(FixedLengthFileWriter::builder()
-            .with_out_file(out_file)
-            .with_properties(properties)
-            .build()?);
+        let writer: Box<dyn Writer> = Box::new(
+            FixedLengthFileWriter::builder()
+                .with_out_file(out_file)
+                .with_properties(properties)
+                .build()?,
+        );
 
         Ok(Mocker {
             schema,
@@ -475,7 +481,10 @@ fn worker_thread_generate(
 }
 
 ///
-fn master_thread_write(channel: channel::Receiver<Vec<u8>>, writer: &mut Box<dyn Writer>) -> Result<()> {
+fn master_thread_write(
+    channel: channel::Receiver<Vec<u8>>,
+    writer: &mut Box<dyn Writer>,
+) -> Result<()> {
     // Write buffer contents to disk.
     for buffer in channel {
         writer.write(&buffer)?;

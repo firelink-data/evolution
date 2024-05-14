@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-05-05
-// Last updated: 2024-05-13
+// Last updated: 2024-05-14
 //
 
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
@@ -37,14 +37,12 @@ use std::path::PathBuf;
 
 use crate::error::Result;
 
-///
 pub(crate) trait Writer: Debug {
     fn write(&mut self, buffer: &Vec<u8>) -> Result<()>;
     fn write_batch(&mut self, batch: &RecordBatch) -> Result<()>;
     fn finish(&mut self) -> Result<()>;
 }
 
-///
 #[derive(Clone, Debug)]
 pub(crate) struct FixedLengthFileWriterProperties {
     create_new: bool,
@@ -52,7 +50,6 @@ pub(crate) struct FixedLengthFileWriterProperties {
     truncate: bool,
 }
 
-///
 impl FixedLengthFileWriterProperties {
     pub fn builder() -> FixedLengthFileWriterPropertiesBuilder {
         FixedLengthFileWriterPropertiesBuilder {
@@ -74,7 +71,7 @@ impl FixedLengthFileWriterPropertiesBuilder {
     /// Set the option to create a new file, failing if it already exists.
     /// No file is allowed to exist at the target location, also no (dangling)
     /// symlink. In this way, if the call succeeds, the file returned is gauranteed
-    /// to be new. This operation is atomic. 
+    /// to be new. This operation is atomic.
     ///
     /// If this option is set, then [`.with_create()`] and [`.with_truncate()`] are ignored.
     pub fn with_create_new(mut self, create_new: bool) -> Self {
@@ -84,7 +81,7 @@ impl FixedLengthFileWriterPropertiesBuilder {
 
     /// Set the option to create a new file, or open it if it already exists.
     /// In order for the file to be created, [`OpenOptions::write`] or
-    /// [`OpenOptions::append`] access must also be used. 
+    /// [`OpenOptions::append`] access must also be used.
     pub fn with_create(mut self, create: bool) -> Self {
         self.create = Some(create);
         self
@@ -98,13 +95,16 @@ impl FixedLengthFileWriterPropertiesBuilder {
     }
 
     pub fn build(self) -> Result<FixedLengthFileWriterProperties> {
-        let create_new: bool = self.create_new
+        let create_new: bool = self
+            .create_new
             .ok_or("Required field 'create_new' is missing or None.")?;
 
-        let create: bool = self.create
+        let create: bool = self
+            .create
             .ok_or("Required field 'create' is missing or None.")?;
 
-        let truncate: bool = self.truncate
+        let truncate: bool = self
+            .truncate
             .ok_or("Required field 'truncate' is missing or None.")?;
 
         Ok(FixedLengthFileWriterProperties {
@@ -154,10 +154,12 @@ impl FixedLengthFileWriterBuilder {
 
     ///
     pub fn build(self) -> Result<FixedLengthFileWriter> {
-        let out_file: PathBuf = self.out_file
+        let out_file: PathBuf = self
+            .out_file
             .ok_or("Required field 'out_file' is missing or None.")?;
 
-        let properties: FixedLengthFileWriterProperties = self.properties
+        let properties: FixedLengthFileWriterProperties = self
+            .properties
             .ok_or("Required field 'properties' is missing or None.")?;
 
         let file: File = OpenOptions::new()
@@ -168,9 +170,7 @@ impl FixedLengthFileWriterBuilder {
             .truncate(properties.truncate && !properties.create_new)
             .open(&out_file)?;
 
-        Ok(FixedLengthFileWriter {
-            inner: file,
-        })
+        Ok(FixedLengthFileWriter { inner: file })
     }
 }
 
@@ -257,7 +257,8 @@ impl ParquetWriterBuilder {
 
     ///
     pub fn build(self) -> Result<ParquetWriter> {
-        let out_file: PathBuf = self.out_file
+        let out_file: PathBuf = self
+            .out_file
             .ok_or("Required field 'out_file' is missing or None.")?;
 
         let writer_file = OpenOptions::new()
@@ -266,21 +267,17 @@ impl ParquetWriterBuilder {
             .open(&out_file)
             .expect("Could not open target output file!");
 
-        let properties: ArrowWriterProperties = self.properties
+        let properties: ArrowWriterProperties = self
+            .properties
             .ok_or("Required field 'properties' is missing or None.")?;
 
-        let schema: ArrowSchemaRef = self.schema
+        let schema: ArrowSchemaRef = self
+            .schema
             .ok_or("Required field 'schema' is missing or None.")?;
 
-        let inner: ArrowWriter<File> = ArrowWriter::try_new(
-            writer_file,
-            schema,
-            Some(properties),
-        )?;
+        let inner: ArrowWriter<File> = ArrowWriter::try_new(writer_file, schema, Some(properties))?;
 
-        Ok(ParquetWriter {
-            inner,
-        })
+        Ok(ParquetWriter { inner })
     }
 }
 
@@ -293,12 +290,13 @@ mod tests_writer {
     #[test]
     #[should_panic]
     fn test_new_fixed_length_file_writer_panic() {
-        let properties: FixedLengthFileWriterProperties = FixedLengthFileWriterProperties::builder()
-            .with_create_new(false)
-            .with_create(true)
-            .with_truncate(false)
-            .build()
-            .unwrap();
+        let properties: FixedLengthFileWriterProperties =
+            FixedLengthFileWriterProperties::builder()
+                .with_create_new(false)
+                .with_create(true)
+                .with_truncate(false)
+                .build()
+                .unwrap();
 
         let _: FixedLengthFileWriter = FixedLengthFileWriter::builder()
             .with_out_file(PathBuf::from(""))
@@ -312,12 +310,13 @@ mod tests_writer {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/cool-file.really-cool");
 
-        let properties: FixedLengthFileWriterProperties = FixedLengthFileWriterProperties::builder()
-            .with_create_new(true)
-            .with_create(false)
-            .with_truncate(false)
-            .build()
-            .unwrap();
+        let properties: FixedLengthFileWriterProperties =
+            FixedLengthFileWriterProperties::builder()
+                .with_create_new(true)
+                .with_create(false)
+                .with_truncate(false)
+                .build()
+                .unwrap();
 
         let _: FixedLengthFileWriter = FixedLengthFileWriter::builder()
             .with_out_file(path.clone())
@@ -333,12 +332,13 @@ mod tests_writer {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/this-file-maybe-exists.xd");
 
-        let properties: FixedLengthFileWriterProperties = FixedLengthFileWriterProperties::builder()
-            .with_create_new(true)
-            .with_create(false)
-            .with_truncate(false)
-            .build()
-            .unwrap();
+        let properties: FixedLengthFileWriterProperties =
+            FixedLengthFileWriterProperties::builder()
+                .with_create_new(true)
+                .with_create(false)
+                .with_truncate(false)
+                .build()
+                .unwrap();
 
         let mut flfw: FixedLengthFileWriter = FixedLengthFileWriter::builder()
             .with_out_file(path.clone())
@@ -356,12 +356,13 @@ mod tests_writer {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/this-file-will-already-exist.haha");
 
-        let properties: FixedLengthFileWriterProperties = FixedLengthFileWriterProperties::builder()
-            .with_create_new(true)
-            .with_create(false)
-            .with_truncate(false)
-            .build()
-            .unwrap();
+        let properties: FixedLengthFileWriterProperties =
+            FixedLengthFileWriterProperties::builder()
+                .with_create_new(true)
+                .with_create(false)
+                .with_truncate(false)
+                .build()
+                .unwrap();
 
         let _: FixedLengthFileWriter = FixedLengthFileWriter::builder()
             .with_out_file(path.clone())
@@ -372,12 +373,13 @@ mod tests_writer {
         let _ = match FixedLengthFileWriter::builder()
             .with_out_file(path.clone())
             .with_properties(properties.clone())
-            .build() {
-            Ok(_) => {},
+            .build()
+        {
+            Ok(_) => {}
             Err(_) => {
                 fs::remove_file(path).unwrap();
                 panic!();
-            },
+            }
         };
     }
 }

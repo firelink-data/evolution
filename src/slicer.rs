@@ -25,11 +25,10 @@
 // Last updated: 2024-05-13
 //
 
-
-use std::default::Default;
-use std::slice::Iter;
 #[cfg(feature = "nightly")]
 use core::str::utf8_char_width;
+use std::default::Default;
+use std::slice::Iter;
 
 use crate::error::Result;
 

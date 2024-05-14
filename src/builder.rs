@@ -25,13 +25,20 @@
 // Last updated: 2024-05-12
 //
 
-use arrow::array::{ArrayRef, BooleanBuilder, Float16Builder, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, StringBuilder as Utf8Builder, LargeStringBuilder as LargeUtf8Builder};
+use arrow::array::{
+    ArrayRef, BooleanBuilder, Float16Builder, Float32Builder, Float64Builder, Int16Builder,
+    Int32Builder, Int64Builder, LargeStringBuilder as LargeUtf8Builder,
+    StringBuilder as Utf8Builder,
+};
 use log::warn;
 
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use crate::parser::{BooleanParser, Float16Parser, Float32Parser, Float64Parser, Int16Parser, Int32Parser, Int64Parser, Utf8Parser, LargeUtf8Parser};
+use crate::parser::{
+    BooleanParser, Float16Parser, Float32Parser, Float64Parser, Int16Parser, Int32Parser,
+    Int64Parser, LargeUtf8Parser, Utf8Parser,
+};
 
 ///
 pub(crate) trait ColumnBuilder: Debug + Send + Sync {

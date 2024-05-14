@@ -48,7 +48,7 @@ mod writer;
 
 use cli::Cli;
 
-///
+/// Run the evolution program, parsing any CLI arguments using [`clap`].
 fn main() {
     let cli = Cli::parse();
 
@@ -56,7 +56,7 @@ fn main() {
         Ok(_) => {
             #[cfg(debug_assertions)]
             debug!("Logging setup ok!")
-        },
+        }
         Err(e) => error!("Could not set up env logging: {:?}", e),
     };
 

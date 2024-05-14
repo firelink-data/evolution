@@ -32,14 +32,21 @@ use serde::{Deserialize, Serialize};
 
 use std::fs;
 use std::io;
-use std::sync::Arc;
 use std::path::PathBuf;
+use std::sync::Arc;
 
-use crate::builder::{BooleanColumnBuilder, ColumnBuilder, Float16ColumnBuilder, Float32ColumnBuilder, Float64ColumnBuilder, Int16ColumnBuilder, Int32ColumnBuilder, Int64ColumnBuilder, Utf8ColumnBuilder, LargeUtf8ColumnBuilder};
+use crate::builder::{
+    BooleanColumnBuilder, ColumnBuilder, Float16ColumnBuilder, Float32ColumnBuilder,
+    Float64ColumnBuilder, Int16ColumnBuilder, Int32ColumnBuilder, Int64ColumnBuilder,
+    LargeUtf8ColumnBuilder, Utf8ColumnBuilder,
+};
 use crate::datatype::DataType;
 use crate::error::Result;
 use crate::mocking::{mock_bool, mock_float, mock_integer, mock_string};
-use crate::parser::{BooleanParser, Float16Parser, Float32Parser, Float64Parser, Int16Parser, Int32Parser, Int64Parser, LargeUtf8Parser, Utf8Parser};
+use crate::parser::{
+    BooleanParser, Float16Parser, Float32Parser, Float64Parser, Int16Parser, Int32Parser,
+    Int64Parser, LargeUtf8Parser, Utf8Parser,
+};
 
 ///
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -94,13 +101,13 @@ impl FixedColumn {
         }
     }
 
-    /// Create a new [`ColumnBuilder`] on the heap from the [`FixedColumn`] fields. 
+    /// Create a new [`ColumnBuilder`] on the heap from the [`FixedColumn`] fields.
     ///
-    /// # Performance 
+    /// # Performance
     /// Here it is ok to clone the [`String`] name because the [`ColumnBuilder`]s should
     /// be initialized at the start of the program, and not in any loop or thread.
     pub fn as_column_builder(&self) -> Box<dyn ColumnBuilder> {
-         match self.dtype {
+        match self.dtype {
             DataType::Boolean => Box::new(BooleanColumnBuilder::new(
                 self.length,
                 self.name.clone(),
@@ -146,10 +153,10 @@ impl FixedColumn {
                 self.name.clone(),
                 LargeUtf8Parser::new(self.alignment, self.pad_symbol),
             )),
-        }       
+        }
     }
 
-    /// 
+    ///
     pub fn mock(&self, rng: &mut ThreadRng) -> String {
         match self.dtype {
             DataType::Boolean => mock_bool(rng),
@@ -242,11 +249,11 @@ impl FixedSchema {
         Schema::new(fields)
     }
 
-    /// 
+    ///
     /// # Performance
     /// This function will clone each [`FixedColumn`] name attribute which might
-    /// incurr heavy performance costs for very large [`FixedSchema`]s. This 
-    /// method should only really be called at the start of the program when initializing 
+    /// incurr heavy performance costs for very large [`FixedSchema`]s. This
+    /// method should only really be called at the start of the program when initializing
     /// required resources (like [`crate::mocker::Mocker`] or [`crate::converter::Converter`].
     pub fn as_arrow_schema(&self) -> Schema {
         let fields: Vec<Field> = self
@@ -264,7 +271,7 @@ impl FixedSchema {
         Schema::new(fields)
     }
 
-    /// 
+    ///
     pub fn as_arrow_schema_ref(&self) -> ArrowSchemaRef {
         Arc::new(self.as_arrow_schema())
     }
