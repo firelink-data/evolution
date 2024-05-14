@@ -182,7 +182,7 @@ impl FixedColumn {
 }
 
 /// A struct representing an entire schema for a fixed-length file.
-/// This can be created using the [`serde_json`] crate since this struct and the 
+/// This can be created using the [`serde_json`] crate since this struct and the
 /// [`FixedColumn`] struct derives the [`Deserialize`] and [`Serialize`] traits.
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
 pub struct FixedSchema {

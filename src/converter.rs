@@ -58,14 +58,14 @@ use crate::writer::{ParquetWriter, Writer};
 pub(crate) static CONVERTER_SLICE_BUFFER_SIZE: usize = 512 * 1024 * 1024;
 
 /// The number of messages that can exist in the thread channel at the same time.
-/// If the channel message buffer grows to this size, incoming messages will be 
+/// If the channel message buffer grows to this size, incoming messages will be
 /// held until previous messages have been consumed/read.
 /// Note: this has no effect if using the 'rayon' feature.
 pub(crate) static CONVERTER_THREAD_CHANNEL_CAPACITY: usize = 128;
 
 /// The size of the buffer for all found line-breaks (in number of newlines).
 /// Keeping this slightly smaller than [`CONVERTER_SLICE_BUFFER_SIZE`] should be
-/// fine since we don't expect the file to only contain like one column which is 
+/// fine since we don't expect the file to only contain like one column which is
 /// 1 byte long. Nonetheless, if we find more newline than the buffer is allocated
 /// for, the buffer will simply allocate more memory when needed.
 pub(crate) static CONVERTER_LINE_BREAKS_BUFFER_SIZE: usize = 128 * 1024 * 1024;
@@ -96,10 +96,16 @@ impl Converter {
     pub fn convert(&mut self) -> Result<()> {
         if self.multithreaded {
             #[cfg(feature = "rayon")]
-            info!("Converting with rayon parallelism using {} threads.", self.n_threads);
+            info!(
+                "Converting with rayon parallelism using {} threads.",
+                self.n_threads
+            );
 
             #[cfg(not(feature = "rayon"))]
-            info!("Converting in standard multithreaded mode using {} threads.", self.n_threads);
+            info!(
+                "Converting in standard multithreaded mode using {} threads.",
+                self.n_threads
+            );
             self.convert_multithreaded()?
         } else {
             info!("Converting in single-threaded mode.");
@@ -608,7 +614,7 @@ impl ConverterBuilder {
                     CONVERTER_SLICE_BUFFER_SIZE
                 );
                 CONVERTER_SLICE_BUFFER_SIZE
-            },
+            }
         };
 
         let thread_channel_capacity: usize = match self.thread_channel_capacity {

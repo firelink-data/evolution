@@ -32,7 +32,7 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Read};
 
-use super::{Converter, ChunkAndResidue, FnFindLastLineBreak, Slicer, IterRevolver, Stats};
+use super::{ChunkAndResidue, Converter, FnFindLastLineBreak, IterRevolver, Slicer, Stats};
 
 pub(crate) const SLICER_IN_CHUNK_SIZE: usize = 1024 * 2024;
 pub(crate) const SLICER_MAX_RESIDUE_SIZE: usize = SLICER_IN_CHUNK_SIZE;
@@ -50,8 +50,6 @@ impl<'a> Slicer<'a> for OldSlicer<'a> {
         infile: fs::File,
         n_threads: usize,
     ) -> Result<Stats, &str> {
-
-
         let in_buffers: &mut [ChunkAndResidue; IN_MAX_CHUNKS] = &mut [
             ChunkAndResidue {
                 chunk: Box::new([0_u8; SLICER_IN_CHUNK_SIZE]),

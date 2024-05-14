@@ -41,10 +41,10 @@ use std::path::PathBuf;
 use std::str::from_utf8_unchecked;
 use std::sync::Arc;
 
+use super::{ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen};
+use crate::chunked;
 use crate::datatype::DataType;
 use crate::schema;
-use crate::chunked;
-use super::{ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen};
 
 pub(crate) struct Slice2Arrow<'a> {
     //    pub(crate) file_out: File,

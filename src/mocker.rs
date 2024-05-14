@@ -144,10 +144,7 @@ impl Mocker {
         thread_workloads.push(remainder);
         let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
 
-        info!(
-            "Starting {} worker threads.",
-            thread_workloads.len(),
-        );
+        info!("Starting {} worker threads.", thread_workloads.len(),);
 
         let schema = Arc::new(self.schema.clone());
         thread_workloads
