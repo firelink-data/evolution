@@ -96,7 +96,7 @@ impl Converter {
     pub fn convert(&mut self) -> Result<()> {
         if self.multithreaded {
             #[cfg(feature = "rayon")]
-            info!("Convert with rayon parallelism using {} threads.", self.n_threads);
+            info!("Converting with rayon parallelism using {} threads.", self.n_threads);
 
             #[cfg(not(feature = "rayon"))]
             info!("Converting in standard multithreaded mode using {} threads.", self.n_threads);
