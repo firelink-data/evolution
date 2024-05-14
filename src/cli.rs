@@ -40,13 +40,13 @@ use std::fs::File;
 use std::path::PathBuf;
 
 #[cfg(feature = "rayon")]
-use crate::chunked::arrow_converter::{Slice2Arrow, MasterBuilders};
+use crate::chunked::arrow_converter::{MasterBuilders, Slice2Arrow};
 #[cfg(feature = "rayon")]
 use crate::chunked::converter::SampleSliceAggregator;
 #[cfg(feature = "rayon")]
-use crate::chunked::{Converter as ChunkedConverter, Slicer, find_last_nl, line_break_len_cr};
-#[cfg(feature = "rayon")]
 use crate::chunked::slicer::OldSlicer;
+#[cfg(feature = "rayon")]
+use crate::chunked::{find_last_nl, line_break_len_cr, Converter as ChunkedConverter, Slicer};
 use crate::converter::Converter;
 use crate::error::Result;
 use crate::mocker::Mocker;
@@ -265,7 +265,7 @@ impl Cli {
                     .with_thread_channel_capacity(*thread_channel_capacity)
                     .build()?
                     .convert()?;
-            },
+            }
             #[cfg(feature = "rayon")]
             Commands::CConvert {
                 converter,
@@ -295,7 +295,7 @@ impl Cli {
                             masterbuilders: master_builders,
                         });
                         s2a
-                    },
+                    }
                     Converters::None => {
                         let _out_file = fs::OpenOptions::new()
                             .create(true)
@@ -320,8 +320,7 @@ impl Cli {
                     "Operation successful inbytes={} out bytes={} num of rows={}",
                     stats.bytes_in, stats.bytes_out, stats.num_rows
                 );
-
-            },
+            }
             Commands::Mock {
                 schema,
                 out_file,
