@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2023-11-21
-// Last updated: 2024-05-14
+// Last updated: 2024-05-15
 //
 
 #![cfg_attr(feature = "nightly", allow(internal_features))]
@@ -34,6 +34,8 @@ use log::debug;
 use log::{error, info};
 
 mod builder;
+#[cfg(feature = "rayon")]
+mod chunked;
 mod cli;
 mod converter;
 mod datatype;

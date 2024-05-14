@@ -70,6 +70,16 @@ pub struct FixedColumn {
 }
 
 impl FixedColumn {
+    #[cfg(feature = "rayon")]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    #[cfg(feature = "rayon")]
+    pub fn dtype(&self) -> DataType {
+        self.dtype
+    }
+
     /// Get the length of the column.
     pub fn length(&self) -> usize {
         self.length

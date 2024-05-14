@@ -22,19 +22,49 @@
 // SOFTWARE.
 //
 // File created: 2024-02-05
-// Last updated: 2024-05-14
+// Last updated: 2024-05-15
 //
 
 use clap::{value_parser, ArgAction, Parser, Subcommand};
 #[cfg(all(feature = "rayon", debug_assertions))]
 use log::debug;
+#[cfg(feature = "rayon")]
+use log::info;
+#[cfg(feature = "rayon")]
+use parquet::arrow::ArrowWriter;
 
+#[cfg(feature = "rayon")]
+use std::fs;
+#[cfg(feature = "rayon")]
+use std::fs::File;
 use std::path::PathBuf;
 
+#[cfg(feature = "rayon")]
+use crate::chunked::arrow_converter::{Slice2Arrow, MasterBuilders};
+#[cfg(feature = "rayon")]
+use crate::chunked::converter::SampleSliceAggregator;
+#[cfg(feature = "rayon")]
+use crate::chunked::{Converter as ChunkedConverter, Slicer, find_last_nl, line_break_len_cr};
+#[cfg(feature = "rayon")]
+use crate::chunked::slicer::OldSlicer;
 use crate::converter::Converter;
 use crate::error::Result;
 use crate::mocker::Mocker;
 use crate::threads::get_available_threads;
+
+#[cfg(feature = "rayon")]
+#[derive(clap::ValueEnum, Clone)]
+enum Converters {
+    Arrow,
+    None,
+}
+
+#[cfg(feature = "rayon")]
+#[derive(clap::ValueEnum, Clone)]
+enum Slicers {
+    Chunks,
+    Lines,
+}
 
 #[derive(Parser)]
 #[command(
@@ -110,6 +140,26 @@ enum Commands {
             required = false,
         )]
         thread_channel_capacity: Option<usize>,
+    },
+
+    #[cfg(feature = "rayon")]
+    CConvert {
+        #[clap(value_enum, value_name = "CCONVERTER")]
+        converter: Converters,
+
+        #[clap(value_enum, value_name = "SLICER")]
+        slicer: Slicers,
+
+        #[arg(short, long, value_name = "SCHEMA")]
+        schema: PathBuf,
+
+        /// Sets input file
+        #[arg(short, long, value_name = "IN-FILE")]
+        in_file: PathBuf,
+
+        /// Sets input file
+        #[arg(short, long, value_name = "OUT-FILE")]
+        out_file: PathBuf,
     },
 
     /// Generate mocked fixed-length files (.flf) for testing purposes.
@@ -215,7 +265,63 @@ impl Cli {
                     .with_thread_channel_capacity(*thread_channel_capacity)
                     .build()?
                     .convert()?;
-            }
+            },
+            #[cfg(feature = "rayon")]
+            Commands::CConvert {
+                converter,
+                slicer: _,
+                schema,
+                in_file,
+                out_file,
+            } => {
+                let _in_file = fs::File::open(&in_file)?;
+
+                let mut slicer_instance: Box<dyn Slicer> = Box::new(OldSlicer {
+                    fn_find_last_nl: find_last_nl,
+                });
+
+                let converter_instance: Box<dyn ChunkedConverter> = match converter {
+                    Converters::Arrow => {
+                        let mut master_builders = MasterBuilders::builders_factory(
+                            schema.to_path_buf(),
+                            n_threads as i16,
+                        );
+                        let writer: ArrowWriter<File> = master_builders.writer_factory(out_file);
+
+                        let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow {
+                            writer,
+                            fn_line_break: find_last_nl,
+                            fn_line_break_len: line_break_len_cr,
+                            masterbuilders: master_builders,
+                        });
+                        s2a
+                    },
+                    Converters::None => {
+                        let _out_file = fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open(out_file)?;
+
+                        let s3a: Box<SampleSliceAggregator> = Box::new(SampleSliceAggregator {
+                            file_out: _out_file,
+                            fn_line_break: find_last_nl,
+                        });
+                        s3a
+                    }
+                };
+
+                let stats = slicer_instance.slice_and_convert(
+                    converter_instance,
+                    _in_file,
+                    n_threads as usize,
+                )?;
+
+                info!(
+                    "Operation successful inbytes={} out bytes={} num of rows={}",
+                    stats.bytes_in, stats.bytes_out, stats.num_rows
+                );
+
+            },
             Commands::Mock {
                 schema,
                 out_file,
