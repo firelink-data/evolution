@@ -168,7 +168,7 @@ impl FixedLengthFileWriterBuilder {
             .create(properties.create)
             .append(properties.create && !properties.truncate)
             .truncate(properties.truncate && !properties.create_new)
-            .open(&out_file)?;
+            .open(out_file)?;
 
         Ok(FixedLengthFileWriter { inner: file })
     }
@@ -264,7 +264,7 @@ impl ParquetWriterBuilder {
         let writer_file = OpenOptions::new()
             .create(true)
             .append(true)
-            .open(&out_file)
+            .open(out_file)
             .expect("Could not open target output file!");
 
         let properties: ArrowWriterProperties = self

@@ -33,7 +33,6 @@ use crossbeam::channel;
 use crossbeam::scope;
 #[cfg(not(feature = "rayon"))]
 use crossbeam::thread::ScopedJoinHandle;
-use libc;
 #[cfg(debug_assertions)]
 use log::debug;
 use log::{error, info};
@@ -60,7 +59,7 @@ pub(crate) static CONVERTER_SLICE_BUFFER_SIZE: usize = 8 * 1024 * 1024 * 1024;
 ///
 pub(crate) static CONVERTER_THREAD_CHANNEL_CAPACITY: usize = 128;
 ///
-pub(crate) static CONVERTER_LINE_BREAKS_BUFFER_SIZE: usize = 1 * 1024 * 1024;
+pub(crate) static CONVERTER_LINE_BREAKS_BUFFER_SIZE: usize = 1024 * 1024;
 
 ///
 #[derive(Debug)]
@@ -273,7 +272,7 @@ impl Converter {
             #[cfg(debug_assertions)]
             debug!("Starting {} worker threads.", thread_workloads.len());
             let threads = thread_workloads
-                .into_iter()
+                .iter()
                 .map(|(from, to)| {
                     let t_sender: channel::Sender<RecordBatch> = sender.clone();
                     let t_line_breaks: &[usize] = &line_breaks[*from..*to];

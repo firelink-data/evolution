@@ -195,7 +195,7 @@ impl FixedSchema {
 
         match serde_json::from_reader(reader) {
             Ok(s) => Ok(s),
-            Err(e) => return Err(Box::new(e)),
+            Err(e) => Err(Box::new(e)),
         }
     }
 

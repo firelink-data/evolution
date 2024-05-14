@@ -47,12 +47,12 @@ pub fn randomize_file_name() -> String {
 
 /// Randomly generate a String `true` or `false` with exactly
 /// 50% chance of either, sampled from a Bernoulli distribution.
-pub fn mock_bool<'a>(rng: &'a mut ThreadRng) -> String {
+pub fn mock_bool(rng: &mut ThreadRng) -> String {
     rng.gen_bool(0.5).to_string()
 }
 
 /// Uniformly sample a floating point number from a range and return it as a String.
-pub fn mock_float<'a>(rng: &'a mut ThreadRng) -> String {
+pub fn mock_float(rng: &mut ThreadRng) -> String {
     rng.gen_range(-MOCKED_FLOAT_SIZE..=MOCKED_FLOAT_SIZE)
         .to_string()
 }

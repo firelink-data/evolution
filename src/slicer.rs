@@ -163,10 +163,7 @@ impl SlicerBuilder {
 
     ///
     pub fn build(self) -> Result<Slicer> {
-        let n_threads = match self.n_threads {
-            Some(n) => n,
-            None => 1,
-        };
+        let n_threads = self.n_threads.unwrap_or(1);
 
         let multithreading = n_threads > 1;
 
