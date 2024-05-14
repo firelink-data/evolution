@@ -175,7 +175,9 @@ fn column_length_num_rightaligned(data: &[u8], runes: i16) -> (usize, usize) {
             Some(b) => *b,
         };
 
-        if let 48..=57 = bb { return (start, stop) }
+        if let 48..=57 = bb {
+            return (start, stop);
+        }
 
         start += 1;
         counted_runes += 1;

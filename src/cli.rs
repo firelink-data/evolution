@@ -310,11 +310,8 @@ impl Cli {
                     }
                 };
 
-                let stats = slicer_instance.slice_and_convert(
-                    converter_instance,
-                    _in_file,
-                    n_threads,
-                )?;
+                let stats =
+                    slicer_instance.slice_and_convert(converter_instance, _in_file, n_threads)?;
 
                 info!(
                     "Operation successful inbytes={} out bytes={} num of rows={}",
