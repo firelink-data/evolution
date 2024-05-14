@@ -22,13 +22,15 @@
 // SOFTWARE.
 //
 // File created: 2023-11-21
-// Last updated: 2024-05-12
+// Last updated: 2024-05-14
 //
 
 #![cfg_attr(feature = "nightly", feature(str_internals))]
 
 use clap::Parser;
-use log::{debug, error, info};
+#[cfg(debug_assertions)]
+use log::debug;
+use log::{error, info};
 
 mod builder;
 mod cli;
@@ -51,7 +53,10 @@ fn main() {
     let cli = Cli::parse();
 
     match logger::setup_log() {
-        Ok(_) => debug!("Logging setup ok!"),
+        Ok(_) => {
+            #[cfg(debug_assertions)]
+            debug!("Logging setup ok!")
+        },
         Err(e) => error!("Could not set up env logging: {:?}", e),
     };
 

@@ -22,12 +22,12 @@
 // SOFTWARE.
 //
 // File created: 2024-02-05
-// Last updated: 2024-05-13
+// Last updated: 2024-05-14
 //
 
 use clap::{value_parser, ArgAction, Parser, Subcommand};
-#[cfg(feature = "rayon")]
-use log::info;
+#[cfg(all(feature = "rayon", debug_assertions))]
+use log::debug;
 
 use std::path::PathBuf;
 
@@ -193,7 +193,8 @@ impl Cli {
                     .num_threads(n_threads)
                     .build_global()
                     .expect("Could not create Rayon thread pool!");
-                info!("Multithreading enabled!");
+                #[cfg(debug_assertions)]
+                debug!("Rayon parallelism enabled!");
             };
         }
 

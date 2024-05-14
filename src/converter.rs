@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-02-17
-// Last updated: 2024-05-13
+// Last updated: 2024-05-14
 //
 
 use arrow::array::ArrayRef;
@@ -34,7 +34,9 @@ use crossbeam::scope;
 #[cfg(not(feature = "rayon"))]
 use crossbeam::thread::ScopedJoinHandle;
 use libc;
-use log::{debug, error, info};
+#[cfg(debug_assertions)]
+use log::debug;
+use log::{error, info};
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties as ParquetWriterProperties;
 #[cfg(feature = "rayon")]
@@ -116,6 +118,7 @@ impl Converter {
         let mut bytes_processed: usize = 0;
         let mut bytes_overlapped: usize = 0;
         let mut buffer_capacity = self.buffer_size;
+        let mut ratio_processed: f32;
 
         let mut reader: BufReader<File> = BufReader::new(self.in_file.try_clone()?);
         let mut buffer: Vec<u8> = vec![0u8; buffer_capacity];
@@ -135,6 +138,7 @@ impl Converter {
                 buffer_capacity = remaining_bytes;
             }
 
+            #[cfg(debug_assertions)]
             debug!("(UNSAFE) clearing read buffer memory.");
             unsafe {
                 libc::memset(
@@ -146,7 +150,7 @@ impl Converter {
 
             match reader.read_exact(&mut buffer).is_ok() {
                 true => (),
-                false => debug!("EOF reached, this should be the last time reading the buffer."),
+                false => info!("EOF reached, this should be the last time reading the buffer."),
             }
 
             self.slicer
@@ -173,20 +177,27 @@ impl Converter {
             bytes_processed += buffer_capacity - n_bytes_left_after_line_break;
             bytes_overlapped += n_bytes_left_after_line_break;
             remaining_bytes -= buffer_capacity - n_bytes_left_after_line_break;
+            ratio_processed = 100.0 * bytes_processed as f32 / bytes_to_read as f32;
 
             line_break_indices.clear();
             worker_line_break_indices.clear();
 
+            #[cfg(debug_assertions)]
             debug!("Bytes processed: {}", bytes_processed);
+            #[cfg(debug_assertions)]
             debug!("Remaining bytes: {}", remaining_bytes);
+
+            info!("Estimated progress: {:.1}%", ratio_processed);
         }
 
-        info!("Almost done, finishing and closing writer.");
+        #[cfg(debug_assertions)]
+        debug!("Finishing and closing writer.");
         self.writer.finish()?;
 
         info!("Done converting in multithreaded mode using {} threads!", self.n_threads);
-        info!("We read {} bytes two times (due to sliding window overlap).", bytes_overlapped);
-
+        if bytes_overlapped > 0 {
+            info!("We read {} bytes two times (due to sliding window overlap).", bytes_overlapped);
+        }
 
         Ok(())
     }
@@ -195,25 +206,38 @@ impl Converter {
     fn spawn_convert_threads(
         &mut self,
         buffer: &Vec<u8>,
+        line_breaks: &Vec<usize>,
         thread_workloads: &Vec<(usize, usize)>,
-        builders: &mut Vec<Vec<Box<dyn ColumnBuilder>>>,
     ) -> Result<()> {
         let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
         let arc_buffer = Arc::new(buffer);
+        let arc_slicer = Arc::new(&self.slicer);
 
-        info!("Starting {} worker threads.", thread_workloads.len());
+        #[cfg(debug_assertions)]
+        debug!("Starting {} worker threads.", thread_workloads.len());
 
         thread_workloads
             .into_par_iter()
-            .enumerate()
-            .for_each(|(thread, (from, to))| {
+            .for_each(|(from, to)| {
                 let t_sender = sender.clone();
                 let t_buffer = arc_buffer.clone();
-                let mut t_builders = &builders[thread];
-                worker_thread_convert(t_sender, thread, &t_buffer[*from..*to], &mut t_builders)
+                let t_line_breaks: &[usize] = &line_breaks[*from..*to];
+                let t_slicer = arc_slicer.clone();
+                // Note: this allocated new memory on the heap for the builders.
+                let mut t_builders = self.schema.as_column_builders();
+                worker_thread_convert(
+                    t_sender,
+                    &t_buffer,
+                    t_line_breaks,
+                    &t_slicer,
+                    &mut t_builders,
+                );
             });
 
         drop(sender);
+
+        #[cfg(debug_assertions)]
+        debug!("Starting master writer thread.");
         master_thread_write(receiver, &mut self.writer)?;
 
         Ok(())
@@ -230,12 +254,14 @@ impl Converter {
         line_breaks: &Vec<usize>,
         thread_workloads: &Vec<(usize, usize)>,
     ) -> Result<()> {
-
         let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
         let arc_buffer: Arc<&Vec<u8>> = Arc::new(buffer);
         let arc_slicer: Arc<&Slicer> = Arc::new(&self.slicer);
 
+
         let _ = scope(|s| {
+            #[cfg(debug_assertions)]
+            debug!("Starting {} worker threads.", thread_workloads.len());
             let threads = thread_workloads
                 .into_iter()
                 .map(|(from, to)| {
@@ -257,7 +283,10 @@ impl Converter {
                 .collect::<Vec<ScopedJoinHandle<()>>>();
 
             drop(sender);
-            master_thread_write(receiver, &mut self.writer).expect("Master thread died!");
+
+            #[cfg(debug_assertions)]
+            debug!("Starting master writer thread.");
+            master_thread_write(receiver, &mut self.writer).expect("Master writer thread failed!");
 
             for handle in threads {
                 handle.join().expect("Could not join worker thread handle!");
@@ -313,7 +342,6 @@ impl Converter {
                 buffer_capacity = remaining_bytes;
             }
 
-            debug!("(UNSAFE) clearing read buffer memory.");
             unsafe {
                 libc::memset(
                     buffer.as_mut_ptr() as _,
@@ -324,7 +352,7 @@ impl Converter {
 
             match reader.read_exact(&mut buffer).is_ok() {
                 true => (),
-                false => debug!("EOF reached, this should be the last time reading the buffer."),
+                false => info!("EOF reached, this should be the last slice to convert."),
             }
 
             self.slicer.find_line_breaks(&buffer, &mut line_break_indices);
@@ -370,7 +398,9 @@ impl Converter {
 
             self.writer.write_batch(&batch)?;
 
+            #[cfg(debug_assertions)]
             debug!("Bytes processed: {}", bytes_processed);
+            #[cfg(debug_assertions)]
             debug!("Remaining bytes: {}", remaining_bytes);
         }
 
@@ -402,9 +432,7 @@ impl Converter {
     }
 }
 
-/// We know that the slice contains full rows, therefore, we do not need to know where
-/// the newlines are, since we have the builders, and thus we know how many runes/chars
-/// to read before expecting a newline char and skipping it.
+///
 pub fn worker_thread_convert(
     channel: channel::Sender<RecordBatch>,
     slice: &[u8],
@@ -430,7 +458,7 @@ pub fn worker_thread_convert(
         prev_line_break_idx = line_break_idx + NUM_CHARS_FOR_NEWLINE;
     }
 
-    // NOTE: THIS IS BAD allocates memory
+    // Note: again we allocated memory on the heap from each thread, bad!
     let mut builder_write_buffer: Vec<(&str, ArrayRef)> = vec![];
 
     for builder in builders.iter_mut() {
@@ -454,6 +482,9 @@ pub fn master_thread_write(
         writer.write_batch(&record_batch)?;
         drop(record_batch);
     }
+
+    #[cfg(debug_assertions)]
+    debug!("Master thread done writing converted slice!");
 
     Ok(())
 }
@@ -558,13 +589,15 @@ impl ConverterBuilder {
             }
             None => {
                 if multithreaded {
-                    info!(
+                    #[cfg(debug_assertions)]
+                    debug!(
                         "Optional field `buffer_size` not provided, will use static value CONVERTER_SLICE_BUFFER_SIZE={}.",
                         CONVERTER_SLICE_BUFFER_SIZE / (n_threads - 1),
                     );
                     CONVERTER_SLICE_BUFFER_SIZE / (n_threads - 1)
                 } else {
-                    info!(
+                    #[cfg(debug_assertions)]
+                    debug!(
                         "Optional field `buffer_size` not provided, will use static value CONVERTER_SLICE_BUFFER_SIZE={}.",
                         CONVERTER_SLICE_BUFFER_SIZE / (n_threads - 1),
                     );
@@ -576,7 +609,8 @@ impl ConverterBuilder {
         let thread_channel_capacity: usize = match self.thread_channel_capacity {
             Some(c) => c,
             None => {
-                info!(
+                #[cfg(debug_assertions)]
+                debug!(
                     "Optional field `thread_channel_capacity` not provided, will use static value CONVERTER_THREAD_CHANNEL_CAPACITY={}.",
                       CONVERTER_THREAD_CHANNEL_CAPACITY,
                 );

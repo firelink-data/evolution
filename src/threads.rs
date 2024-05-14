@@ -22,10 +22,12 @@
 // SOFTWARE.
 //
 // File created: 2024-05-07
-// Last updated: 2024-05-11
+// Last updated: 2024-05-14
 //
 
-use log::{info, warn};
+#[cfg(debug_assertions)]
+use log::debug;
+use log::warn;
 
 pub(crate) fn get_available_threads(mut n_wanted_threads: usize) -> usize {
     let n_logical_threads: usize = num_cpus::get();
@@ -42,7 +44,8 @@ pub(crate) fn get_available_threads(mut n_wanted_threads: usize) -> usize {
         n_wanted_threads = n_logical_threads;
     };
 
-    info!("Executing using {} logical threads.", n_wanted_threads);
+    #[cfg(debug_assertions)]
+    debug!("Executing using {} logical threads.", n_wanted_threads);
 
     n_wanted_threads
 }
