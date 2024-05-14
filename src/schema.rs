@@ -22,23 +22,33 @@
 // SOFTWARE.
 //
 // File created: 2023-11-25
-// Last updated: 2024-05-10
+// Last updated: 2024-05-15
 //
 
-use arrow::datatypes::{DataType as ArrowDataType, Field, Schema};
+use arrow::datatypes::{DataType as ArrowDataType, Field, Schema, SchemaRef as ArrowSchemaRef};
 use padder::{Alignment, Symbol};
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
 
+use std::fs;
+use std::io;
 use std::path::PathBuf;
-use std::{fs, io};
+use std::sync::Arc;
 
-use crate::builder::{BooleanColumnBuilder, ColumnBuilder, Float16ColumnBuilder, Float32ColumnBuilder, Float64ColumnBuilder, Int16ColumnBuilder, Int32ColumnBuilder, Int64ColumnBuilder, Utf8ColumnBuilder, LargeUtf8ColumnBuilder};
+use crate::builder::{
+    BooleanColumnBuilder, ColumnBuilder, Float16ColumnBuilder, Float32ColumnBuilder,
+    Float64ColumnBuilder, Int16ColumnBuilder, Int32ColumnBuilder, Int64ColumnBuilder,
+    LargeUtf8ColumnBuilder, Utf8ColumnBuilder,
+};
 use crate::datatype::DataType;
+use crate::error::Result;
 use crate::mocking::{mock_bool, mock_float, mock_integer, mock_string};
-use crate::parser::{BooleanParser, Float16Parser, Float32Parser, Float64Parser, Int16Parser, Int32Parser, Int64Parser, LargeUtf8Parser, Utf8Parser};
+use crate::parser::{
+    BooleanParser, Float16Parser, Float32Parser, Float64Parser, Int16Parser, Int32Parser,
+    Int64Parser, LargeUtf8Parser, Utf8Parser,
+};
 
-///
+/// A struct representing a column in a fixed-length file.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct FixedColumn {
     /// The symbolic name of the column.
@@ -59,21 +69,20 @@ pub struct FixedColumn {
     is_nullable: bool,
 }
 
-///
 impl FixedColumn {
-    ///
-    pub fn name(&self) -> &String {
+    #[cfg(feature = "rayon")]
+    pub fn name(&self) -> &str {
         &self.name
+    }
+
+    #[cfg(feature = "rayon")]
+    pub fn dtype(&self) -> DataType {
+        self.dtype
     }
 
     /// Get the length of the column.
     pub fn length(&self) -> usize {
         self.length
-    }
-
-    ///
-    pub fn dtype(&self) -> DataType {
-        self.dtype
     }
 
     /// Get the alignment mode of the column.
@@ -101,13 +110,13 @@ impl FixedColumn {
         }
     }
 
-    /// Create a new [`ColumnBuilder`] on the heap from the [`FixedColumn`] fields. 
+    /// Create a new [`ColumnBuilder`] on the heap from the [`FixedColumn`] fields.
     ///
-    /// # Performance 
+    /// # Performance
     /// Here it is ok to clone the [`String`] name because the [`ColumnBuilder`]s should
     /// be initialized at the start of the program, and not in any loop or thread.
     pub fn as_column_builder(&self) -> Box<dyn ColumnBuilder> {
-         match self.dtype {
+        match self.dtype {
             DataType::Boolean => Box::new(BooleanColumnBuilder::new(
                 self.length,
                 self.name.clone(),
@@ -153,10 +162,10 @@ impl FixedColumn {
                 self.name.clone(),
                 LargeUtf8Parser::new(self.alignment, self.pad_symbol),
             )),
-        }       
+        }
     }
 
-    /// 
+    /// Randomly generate data for the [`FixedColumn`] based on its datatype.
     pub fn mock(&self, rng: &mut ThreadRng) -> String {
         match self.dtype {
             DataType::Boolean => mock_bool(rng),
@@ -172,7 +181,9 @@ impl FixedColumn {
     }
 }
 
-///
+/// A struct representing an entire schema for a fixed-length file.
+/// This can be created using the [`serde_json`] crate since this struct and the
+/// [`FixedColumn`] struct derives the [`Deserialize`] and [`Serialize`] traits.
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
 pub struct FixedSchema {
     name: String,
@@ -180,7 +191,6 @@ pub struct FixedSchema {
     columns: Vec<FixedColumn>,
 }
 
-///
 #[allow(dead_code)]
 impl FixedSchema {
     /// Implicitly create a new [`FixedSchema`] by reading a json path
@@ -189,11 +199,14 @@ impl FixedSchema {
     /// # Panics
     /// If the file does not exist or if the schema in the file
     /// does not adhere to the above struct definition.
-    pub fn from_path(path: PathBuf) -> Self {
-        let json = fs::File::open(path).unwrap();
+    pub fn from_path(path: PathBuf) -> Result<Self> {
+        let json = fs::File::open(path)?;
         let reader = io::BufReader::new(json);
 
-        serde_json::from_reader(reader).unwrap()
+        match serde_json::from_reader(reader) {
+            Ok(s) => Ok(s),
+            Err(e) => Err(Box::new(e)),
+        }
     }
 
     /// Get the number of columns in the schema.
@@ -246,6 +259,32 @@ impl FixedSchema {
         Schema::new(fields)
     }
 
+    ///
+    /// # Performance
+    /// This function will clone each [`FixedColumn`] name attribute which might
+    /// incurr heavy performance costs for very large [`FixedSchema`]s. This
+    /// method should only really be called at the start of the program when initializing
+    /// required resources (like [`crate::mocker::Mocker`] or [`crate::converter::Converter`].
+    pub fn as_arrow_schema(&self) -> Schema {
+        let fields: Vec<Field> = self
+            .columns
+            .iter()
+            .map(|column| {
+                Field::new(
+                    column.name.clone(),
+                    column.as_arrow_dtype(),
+                    column.is_nullable,
+                )
+            })
+            .collect();
+
+        Schema::new(fields)
+    }
+
+    pub fn as_arrow_schema_ref(&self) -> ArrowSchemaRef {
+        Arc::new(self.as_arrow_schema())
+    }
+
     /// Create a vec of [`ColumnBuilder`]s for each [`FixedColumn`] in the schema.
     pub fn as_column_builders(&self) -> Vec<Box<dyn ColumnBuilder>> {
         self.columns
@@ -295,9 +334,9 @@ mod tests_schema {
     #[test]
     fn test_fixed_to_arrow_schema_ok() {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("resources/test-schemas/test_valid_schema_all.json");
+        path.push("resources/schemas/test_valid_schema_all.json");
 
-        let fixed_schema: FixedSchema = FixedSchema::from_path(path);
+        let fixed_schema: FixedSchema = FixedSchema::from_path(path).unwrap();
         let arrow_schema: Schema = fixed_schema.into_arrow_schema();
 
         assert_eq!(5, arrow_schema.fields.len());
@@ -306,9 +345,9 @@ mod tests_schema {
     #[test]
     fn test_derive_from_file_ok() {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("resources/test-schemas/test_valid_schema_booleans.json");
+        path.push("resources/schemas/test_valid_schema_booleans.json");
 
-        let schema: FixedSchema = FixedSchema::from_path(path);
+        let schema: FixedSchema = FixedSchema::from_path(path).unwrap();
         let offsets: Vec<usize> = vec![0, 9, 14];
         let lengths: Vec<usize> = vec![9, 5, 32];
 
@@ -322,8 +361,8 @@ mod tests_schema {
     #[should_panic]
     fn test_derive_from_file_trailing_commas() {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("resources/test-schemas/test_invalid_schema_trailing_commas.json");
+        path.push("resources/schemas/test_invalid_schema_trailing_commas.json");
 
-        let _schema: FixedSchema = FixedSchema::from_path(path);
+        let _schema: FixedSchema = FixedSchema::from_path(path).unwrap();
     }
 }

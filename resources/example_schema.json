@@ -1,12 +1,14 @@
 {
-    "name": "EvolutionTestSchema",
-    "version": 418901,
+    "name": "EvolutionExampleSchema",
+    "version": 1337,
     "columns": [
         {
             "name": "id",
             "offset": 0,
             "length": 9,
             "dtype": "Int32",
+            "alignment": "Right",
+            "pad_symbol": "Underscore",
             "is_nullable": false
         },
         {
@@ -14,20 +16,24 @@
             "offset": 9,
             "length": 32,
             "dtype": "Utf8",
-            "is_nullable": false
+            "is_nullable": true
         },
         {
             "name": "city",
             "offset": 41,
             "length": 32,
             "dtype": "Utf8",
-            "is_nullable": true
+            "alignment": "Right",
+            "pad_symbol": "Backslash",
+            "is_nullable": false
         },
         {
             "name": "employed",
             "offset": 73,
             "length": 5,
             "dtype": "Boolean",
+            "alignment": "Center",
+            "pad_symbol": "Asterisk",
             "is_nullable": true
         }
     ]

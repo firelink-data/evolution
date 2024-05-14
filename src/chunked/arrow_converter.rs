@@ -1,37 +1,33 @@
-/*
-* MIT License
-*
-* Copyright (c) 2024 Firelink Data
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
-*
-* The above copyright notice and this permission notice shall be included in all
-* copies or substantial portions of the Software.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE.
-*
-* File created: 2023-11-21
-* Last updated: 2023-11-21
-*/
-use std::fs;
-use std::fs::File;
-use std::path::PathBuf;
-use std::str::from_utf8_unchecked;
-use std::sync::Arc;
+//
+// MIT License
+//
+// Copyright (c) 2024 Firelink Data
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+// File created: 2023-12-11
+// Last updated: 2024-05-15
+//
 
 use arrow::array::{ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
+use log::debug;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
@@ -39,11 +35,16 @@ use parquet::format;
 use rayon::iter::IndexedParallelIterator;
 use rayon::prelude::*;
 
+use std::fs;
+use std::fs::File;
+use std::path::PathBuf;
+use std::str::from_utf8_unchecked;
+use std::sync::Arc;
+
+use super::{ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen};
+use crate::chunked;
 use crate::datatype::DataType;
-use crate::chunked::{ColumnBuilder, Converter};
-use crate::chunked::{FnFindLastLineBreak, FnLineBreakLen};
-use crate::{chunked, schema};
-use debug_print::debug_println;
+use crate::schema;
 
 pub(crate) struct Slice2Arrow<'a> {
     //    pub(crate) file_out: File,
@@ -62,7 +63,7 @@ unsafe impl Send for MasterBuilders {}
 unsafe impl Sync for MasterBuilders {}
 
 impl MasterBuilders {
-    pub fn writer_factory<'a>(&mut self, out_file: &PathBuf) -> ArrowWriter<File> {
+    pub fn writer_factory(&mut self, out_file: &PathBuf) -> ArrowWriter<File> {
         let _out_file = fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -85,8 +86,8 @@ impl MasterBuilders {
         writer
     }
 
-    pub fn builders_factory<'a>(schema_path: PathBuf, instances: i16) -> Self {
-        let schema = schema::FixedSchema::from_path(schema_path.into());
+    pub fn builders_factory(schema_path: PathBuf, instances: i16) -> Self {
+        let schema = schema::FixedSchema::from_path(schema_path).unwrap();
         let antal_col = schema.num_columns();
         let mut builders: Vec<Vec<Box<dyn ColumnBuilder + Sync + Send>>> = Vec::new();
 
@@ -98,7 +99,7 @@ impl MasterBuilders {
                     DataType::Boolean => buildersmut.push(Box::new(HandlerBooleanBuilder {
                         boolean_builder: BooleanBuilder::new(),
                         runes_in_column: col.length(),
-                        name: col.name().clone(),
+                        name: col.name().to_string().clone(),
                     })),
                     DataType::Float16 => todo!(),
                     DataType::Float32 => todo!(),
@@ -107,22 +108,22 @@ impl MasterBuilders {
                     DataType::Int32 => buildersmut.push(Box::new(HandlerInt32Builder {
                         int32builder: Int32Builder::new(),
                         runes_in_column: col.length(),
-                        name: col.name().clone(),
+                        name: col.name().to_string().clone(),
                     })),
                     DataType::Int64 => buildersmut.push(Box::new(HandlerInt64Builder {
                         int64builder: Int64Builder::new(),
                         runes_in_column: col.length(),
-                        name: col.name().clone(),
+                        name: col.name().to_string().clone(),
                     })),
                     DataType::Utf8 => buildersmut.push(Box::new(HandlerStringBuilder {
                         string_builder: StringBuilder::new(),
                         runes_in_column: col.length(),
-                        name: col.name().clone(),
+                        name: col.name().to_string().clone(),
                     })),
                     DataType::LargeUtf8 => buildersmut.push(Box::new(HandlerStringBuilder {
                         string_builder: StringBuilder::new(),
                         runes_in_column: col.length(),
-                        name: col.name().clone(),
+                        name: col.name().to_string().clone(),
                     })),
                 }
             }
@@ -179,7 +180,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 
             self.writer.write(&batch).expect("Error Writing batch");
             bytes_out += self.writer.bytes_written();
-            debug_println!("Batch write: accumulated bytes_written {}", bytes_out);
+            debug!("Batch write: accumulated bytes_written {}", bytes_out);
         }
 
         (bytes_in, bytes_out)
@@ -200,7 +201,7 @@ fn parse_slice(
     builders: &mut Vec<Box<dyn ColumnBuilder + Send + Sync>>,
     linebreak: usize,
 ) {
-    debug_println!("index slice={} slice len={}", _i, n.len());
+    debug!("index slice={} slice len={}", _i, n.len());
 
     let mut cursor: usize = 0;
     while cursor < n.len() {

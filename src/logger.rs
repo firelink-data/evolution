@@ -1,39 +1,39 @@
-/*
-* MIT License
-*
-* Copyright (c) 2024 Firelink Data
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
-*
-* The above copyright notice and this permission notice shall be included in all
-* copies or substantial portions of the Software.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE.
-*
-* File created: 2023-11-21
-* Last updated: 2024-02-28
-*/
+//
+// MIT License
+//
+// Copyright (c) 2024 Firelink Data
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+// File created: 2023-11-21
+// Last updated: 2024-05-15
+//
 
 use chrono::Local;
 use colored::Colorize;
-use log::{error, Level, Log, Metadata, Record, SetLoggerError};
+use log::{Level, Log, Metadata, Record, SetLoggerError};
 
 use std::env;
 
 pub(crate) const DEFAULT_LOG_LEVEL: Level = Level::Warn;
 
-///
+/// Get the [`Level`] from the environment variable `RUST_LOG`, default to [`DEFAULT_LOG_LEVEL`].
 fn get_log_level_from_env() -> Level {
     match env::var("RUST_LOG") {
         Ok(val) => match val.to_uppercase().as_str() {
@@ -51,19 +51,17 @@ fn get_log_level_from_env() -> Level {
     }
 }
 
-///
+/// A wrapper struct for the env-logger.
 pub struct Logger {
     log_level: Level,
 }
 
-///
 impl Logger {
-    ///
+    /// Create a new [`Logger`] with associated [`Level`].
     pub fn new(log_level: Level) -> Self {
         Self { log_level }
     }
 
-    ///
     fn trace(&self, record: &Record) {
         println!(
             "[{}]  {}\t {}",
@@ -73,7 +71,6 @@ impl Logger {
         );
     }
 
-    ///
     fn debug(&self, record: &Record) {
         println!(
             "[{}]  {}\t {}",
@@ -83,7 +80,6 @@ impl Logger {
         );
     }
 
-    ///
     fn info(&self, record: &Record) {
         println!(
             "[{}]  {}\t {}",
@@ -93,7 +89,6 @@ impl Logger {
         );
     }
 
-    ///
     fn warn(&self, record: &Record) {
         println!(
             "[{}]  {}\t {}",
@@ -103,7 +98,9 @@ impl Logger {
         );
     }
 
-    ///
+    /// Here we can use [`.to_string()`] because an error log should only be used
+    /// when terminating execution due to error, and then memory allocations
+    /// and performance is not an issue. We can be sloppy here.
     fn error(&self, record: &Record) {
         println!(
             "[{}]  {}\t {}",
@@ -113,19 +110,16 @@ impl Logger {
                 .red()
                 .bold(),
             record.level().as_str().red().bold(),
-            record.args().as_str().unwrap().red().bold(),
+            record.args().to_string().red().bold(),
         );
     }
 }
 
-///
 impl Log for Logger {
-    ///
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= self.log_level
     }
 
-    ///
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             match record.level() {
@@ -138,25 +132,17 @@ impl Log for Logger {
         };
     }
 
-    ///
+    // This does not need to be implemented, just empty boilerplate for trait.
     fn flush(&self) {}
 }
 
+/// Try and setup the env-logger from environment variable.
 ///
-pub fn init_logging() -> Result<(), SetLoggerError> {
+/// # Errors
+/// If we can not set the global logger to our newly created env-logger.
+pub(crate) fn try_init_logging() -> Result<(), SetLoggerError> {
     let log_level = get_log_level_from_env();
     let logger = Logger::new(log_level);
     log::set_boxed_logger(Box::new(logger))
         .map(|()| log::set_max_level(log_level.to_level_filter()))
-}
-
-///
-pub(crate) fn setup_log() -> Result<(), SetLoggerError> {
-    match init_logging() {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            error!("Could not initialize boxed logger, exiting!");
-            Err(e)
-        }
-    }
 }

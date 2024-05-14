@@ -21,31 +21,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-// File created: 2024-05-07
-// Last updated: 2024-05-15
+// File created: 2024-05-10
+// Last updated: 2024-05-10
 //
 
-#[cfg(debug_assertions)]
-use log::debug;
-use log::warn;
+use std::env;
 
-pub(crate) fn get_available_threads(mut n_wanted_threads: usize) -> usize {
-    let n_logical_threads: usize = num_cpus::get();
-
-    if n_wanted_threads > n_logical_threads {
-        warn!(
-            "You specified to use {} threads, but your CPU only has {} logical threads.",
-            n_wanted_threads, n_logical_threads,
-        );
-        warn!(
-            "Will instead use all of the systems available logical threads ({}).",
-            n_logical_threads,
-        );
-        n_wanted_threads = n_logical_threads;
-    };
-
-    #[cfg(debug_assertions)]
-    debug!("Executing using {} logical threads.", n_wanted_threads);
-
-    n_wanted_threads
+fn main() {
+    let toolchain: String = env::var("RUSTUP_TOOLCHAIN").unwrap();
+    if toolchain.starts_with("nightly") {
+        println!("cargo:rustc-cfg=feature=\"nightly\"");
+    }
 }

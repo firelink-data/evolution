@@ -22,26 +22,25 @@
 // SOFTWARE.
 //
 // File created: 2023-12-11
-// Last updated: 2024-05-10
+// Last updated: 2024-05-15
 //
 
-
-use std::default::Default;
-use std::slice::Iter;
 #[cfg(feature = "nightly")]
 use core::str::utf8_char_width;
+use std::default::Default;
+use std::slice::Iter;
 
 use crate::error::Result;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub(crate) struct Slicer {
     n_threads: usize,
     multithreading: bool,
 }
 
-///
 impl Slicer {
-    ///
+    /// Create a new instance of a  [`SlicerBuilder`] with default values.
     pub fn builder() -> SlicerBuilder {
         SlicerBuilder {
             ..Default::default()
@@ -141,32 +140,25 @@ impl Slicer {
 
         (1..bytes.len()).for_each(|idx| {
             if (bytes[idx - 1] == 0x0d) && (bytes[idx] == 0x0a) {
-                buffer.push(idx);
+                buffer.push(idx - 1);
             }
         });
     }
 }
 
-///
 #[derive(Debug, Default)]
 pub(crate) struct SlicerBuilder {
     n_threads: Option<usize>,
 }
 
-///
 impl SlicerBuilder {
-    ///
     pub fn num_threads(mut self, n_threads: usize) -> Self {
         self.n_threads = Some(n_threads);
         self
     }
 
-    ///
     pub fn build(self) -> Result<Slicer> {
-        let n_threads = match self.n_threads {
-            Some(n) => n,
-            None => 1,
-        };
+        let n_threads = self.n_threads.unwrap_or(1);
 
         let multithreading = n_threads > 1;
 

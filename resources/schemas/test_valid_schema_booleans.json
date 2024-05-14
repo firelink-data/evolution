@@ -1,0 +1,33 @@
+{
+    "name": "ValidTestSchemaBooleans",
+    "version": 1337,
+    "columns": [
+        {
+            "name": "healthy",
+            "offset": 0,
+            "length": 9,
+            "dtype": "Boolean",
+            "alignment": "Right",
+            "pad_symbol": "Whitespace",
+            "is_nullable": false
+        },
+        {
+            "name": "cool",
+            "offset": 9,
+            "length": 5,
+            "dtype": "Boolean",
+            "alignment": "Right",
+            "pad_symbol": "Whitespace",
+            "is_nullable": false
+        },
+        {
+            "name": "educated",
+            "offset": 14,
+            "length": 32,
+            "dtype": "Boolean",
+            "alignment": "Right",
+            "pad_symbol": "Dot",
+            "is_nullable": true
+        }
+    ]
+}

@@ -1,72 +1,46 @@
-/*
-* MIT License
-*
-* Copyright (c) 2024 Firelink Data
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
-*
-* The above copyright notice and this permission notice shall be included in all
-* copies or substantial portions of the Software.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE.
-*
-* File created: 2023-12-11
-* Last updated: 2023-12-14
-*/
-
-use std::fs::File;
-use std::io::{BufReader, Read};
-use std::{cmp, fs};
+//
+// MIT License
+//
+// Copyright (c) 2024 Firelink Data
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+// File created: 2023-12-11
+// Last updated: 2024-05-15
+//
 
 use log::info;
 
-use crate::chunked::Converter;
-use crate::chunked::{ChunkAndResidue, FnFindLastLineBreak, Slicer};
-use crate::chunked::{IterRevolver, Stats};
+use std::cmp;
+use std::fs;
+use std::fs::File;
+use std::io::{BufReader, Read};
 
-/**
-GOAL(s)
-
-
-0) Read a chunk of the file
-1) split the chunk that was read in x parts in O(1) including line alignment search, add to chunk-to-be-parsed list
-2) Goto 0 read next chunk (bring last fraction of "line" that was left out).
-
-
-V1 Parameters will will be:
-SLICER_IN_CHUNK_SIZE
-in_max_chunks
-in_chunk_cores (how man splits will be made)
-
- */
+use super::{ChunkAndResidue, Converter, FnFindLastLineBreak, IterRevolver, Slicer, Stats};
 
 pub(crate) const SLICER_IN_CHUNK_SIZE: usize = 1024 * 2024;
 pub(crate) const SLICER_MAX_RESIDUE_SIZE: usize = SLICER_IN_CHUNK_SIZE;
 
 pub(crate) const IN_MAX_CHUNKS: usize = 2;
 
-//struct Chunk {
-//    chunk: [u8;SLICER_IN_CHUNK_SIZE]
-//}
-
 pub(crate) struct OldSlicer<'a> {
     pub(crate) fn_find_last_nl: FnFindLastLineBreak<'a>,
-}
-
-#[allow(dead_code)]
-fn ceil_amount_of_chunks(a: i64, b: i64) -> usize {
-    (a / b + (a % b).signum()) as usize
 }
 
 impl<'a> Slicer<'a> for OldSlicer<'a> {
@@ -76,9 +50,7 @@ impl<'a> Slicer<'a> for OldSlicer<'a> {
         infile: fs::File,
         n_threads: usize,
     ) -> Result<Stats, &str> {
-
-
-        let mut in_buffers: &mut [ChunkAndResidue; IN_MAX_CHUNKS] = &mut [
+        let in_buffers: &mut [ChunkAndResidue; IN_MAX_CHUNKS] = &mut [
             ChunkAndResidue {
                 chunk: Box::new([0_u8; SLICER_IN_CHUNK_SIZE]),
             },
@@ -152,7 +124,7 @@ impl<'a> Slicer<'a> for OldSlicer<'a> {
 
         match converter.finish() {
             Ok(x) => Result::Ok(Stats {
-                bytes_in: bytes_in,
+                bytes_in,
                 bytes_out: converter.get_finish_bytes_written(),
                 num_rows: x.num_rows,
             }),
@@ -173,9 +145,7 @@ fn residual_to_slice<'a>(
     if 0 != residue_effective_len {
         target_chunk_residue.copy_from_slice(&residue[0..residue_effective_len]);
     }
-    let mut r: Vec<&[u8]> = vec![];
-
-    r.push(target_chunk_residue);
+    let r: Vec<&[u8]> = vec![target_chunk_residue];
     r
 }
 
@@ -251,6 +221,3 @@ fn read_chunk_and_slice<'a>(
         (residual.len(), chunk_len_was_read, r)
     }
 }
-
-#[cfg(test)]
-mod tests_old_slicer {}

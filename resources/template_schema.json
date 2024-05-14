@@ -1,0 +1,99 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/firelink-data/evolution/tree/main/resources/template_schema.json",
+    "title": "Fixed-length file",
+    "description": "The specification for a valid fixed-length file (.flf).",
+    "type": "object",
+    "properties": {
+        "name": {
+            "description": "The name of the schema.",
+            "type": "string"
+        },
+        "version": {
+            "description": "The version of the schema.",
+            "type": "integer"
+        },
+        "columns": {
+            "description": "The fixed-length columns of the file.",
+            "type": "array",
+            "items": {
+                "description": "A fixed-length column.",
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "description": "The name of the column.",
+                        "type": "string"
+                    },
+                    "offset": {
+                        "description": "The offset from the start of a row (in runes).",
+                        "type": "integer"
+                    },
+                    "length": {
+                        "description": "The length of the column (in runes).",
+                        "type": "integer"
+                    },
+                    "dtype": {
+                        "description": "The datatype of the column.",
+                        "type": "string",
+                        "enum": [
+                            "Boolean",
+                            "Float16",
+                            "Float32",
+                            "Float64",
+                            "Int16",
+                            "Int32",
+                            "Int64",
+                            "Utf8",
+                            "LargeUtf8"
+                        ]
+                    },
+                    "alignment": {
+                        "description": "The alignment mode of the column.",
+                        "type": "string",
+                        "enum": [ "Left", "Right", "Center" ]
+                    },
+                    "pad_symbol": {
+                        "description": "The name of the padding symbol used in the column.",
+                        "type": "string",
+                        "enum": [
+                            "Hyphen",
+                            "Underscore",
+                            "Dot",
+                            "Comma",
+                            "Colon",
+                            "Semicolon",
+                            "Hashtag",
+                            "Backslash",
+                            "Forwardslash",
+                            "Asterisk",
+                            "Whitespace",
+                            "Zero",
+                            "One",
+                            "Two",
+                            "Three",
+                            "Four",
+                            "Five",
+                            "Six",
+                            "Seven",
+                            "Eight",
+                            "Nine"
+                        ]
+                    },
+                    "is_nullable": {
+                        "description": "Whether or not the values in the column can be null.",
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "name",
+                    "offset",
+                    "length",
+                    "dtype",
+                    "is_nullable"
+                ]
+            },
+            "minItems": 1
+        }
+    },
+    "required": [ "name", "version", "columns" ]
+}
