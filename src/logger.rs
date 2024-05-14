@@ -22,18 +22,18 @@
 // SOFTWARE.
 //
 // File created: 2023-11-21
-// Last updated: 2024-05-12
+// Last updated: 2024-05-14
 //
 
 use chrono::Local;
 use colored::Colorize;
-use log::{error, Level, Log, Metadata, Record, SetLoggerError};
+use log::{Level, Log, Metadata, Record, SetLoggerError};
 
 use std::env;
 
 pub(crate) const DEFAULT_LOG_LEVEL: Level = Level::Warn;
 
-///
+/// Get the [`Level`] from the environment variable `RUST_LOG`, default to [`DEFAULT_LOG_LEVEL`].
 fn get_log_level_from_env() -> Level {
     match env::var("RUST_LOG") {
         Ok(val) => match val.to_uppercase().as_str() {
@@ -51,19 +51,17 @@ fn get_log_level_from_env() -> Level {
     }
 }
 
-///
+/// A wrapper struct for the env-logger.
 pub struct Logger {
     log_level: Level,
 }
 
-///
 impl Logger {
-    ///
+    /// Create a new [`Logger`] with associated [`Level`].
     pub fn new(log_level: Level) -> Self {
         Self { log_level }
     }
 
-    ///
     fn trace(&self, record: &Record) {
         println!(
             "[{}]  {}\t {}",
@@ -73,7 +71,6 @@ impl Logger {
         );
     }
 
-    ///
     fn debug(&self, record: &Record) {
         println!(
             "[{}]  {}\t {}",
@@ -83,7 +80,6 @@ impl Logger {
         );
     }
 
-    ///
     fn info(&self, record: &Record) {
         println!(
             "[{}]  {}\t {}",
@@ -93,7 +89,6 @@ impl Logger {
         );
     }
 
-    ///
     fn warn(&self, record: &Record) {
         println!(
             "[{}]  {}\t {}",
@@ -120,14 +115,11 @@ impl Logger {
     }
 }
 
-///
 impl Log for Logger {
-    ///
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= self.log_level
     }
 
-    ///
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             match record.level() {
@@ -144,21 +136,14 @@ impl Log for Logger {
     fn flush(&self) {}
 }
 
+/// Try and setup the env-logger from environment variable.
 ///
-fn init_logging() -> Result<(), SetLoggerError> {
+/// # Errors
+/// If we can not set the global logger to our newly created env-logger.
+pub(crate) fn try_init_logging() -> Result<(), SetLoggerError> {
     let log_level = get_log_level_from_env();
     let logger = Logger::new(log_level);
     log::set_boxed_logger(Box::new(logger))
         .map(|()| log::set_max_level(log_level.to_level_filter()))
 }
 
-///
-pub(crate) fn setup_log() -> Result<(), SetLoggerError> {
-    match init_logging() {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            error!("Could not initialize boxed logger, exiting!");
-            Err(e)
-        }
-    }
-}

@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-05-07
-// Last updated: 2024-05-12
+// Last updated: 2024-05-15
 //
 
 use arrow::array::{
@@ -40,14 +40,12 @@ use crate::parser::{
     Int64Parser, LargeUtf8Parser, Utf8Parser,
 };
 
-///
 pub(crate) trait ColumnBuilder: Debug + Send + Sync {
     fn parse_and_push_bytes(&mut self, bytes: &[u8]);
     fn runes(&self) -> usize;
     fn finish(&mut self) -> (&str, ArrayRef);
 }
 
-///
 #[derive(Debug)]
 pub(crate) struct BooleanColumnBuilder {
     inner: BooleanBuilder,
@@ -56,9 +54,7 @@ pub(crate) struct BooleanColumnBuilder {
     parser: BooleanParser,
 }
 
-///
 impl BooleanColumnBuilder {
-    ///
     pub fn new(runes: usize, name: String, parser: BooleanParser) -> Self {
         Self {
             inner: BooleanBuilder::new(),
@@ -69,9 +65,7 @@ impl BooleanColumnBuilder {
     }
 }
 
-///
 impl ColumnBuilder for BooleanColumnBuilder {
-    ///
     fn parse_and_push_bytes(&mut self, bytes: &[u8]) {
         match self.parser.parse(bytes) {
             Ok(b) => self.inner.append_value(b),
@@ -82,18 +76,15 @@ impl ColumnBuilder for BooleanColumnBuilder {
         };
     }
 
-    ///
     fn runes(&self) -> usize {
         self.runes
     }
 
-    ///
     fn finish(&mut self) -> (&str, ArrayRef) {
         (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
     }
 }
 
-///
 #[derive(Debug)]
 pub(crate) struct Float16ColumnBuilder {
     inner: Float16Builder,
@@ -103,7 +94,6 @@ pub(crate) struct Float16ColumnBuilder {
 }
 
 impl Float16ColumnBuilder {
-    ///
     pub fn new(runes: usize, name: String, parser: Float16Parser) -> Self {
         Self {
             inner: Float16Builder::new(),
@@ -114,9 +104,7 @@ impl Float16ColumnBuilder {
     }
 }
 
-///
 impl ColumnBuilder for Float16ColumnBuilder {
-    ///
     fn parse_and_push_bytes(&mut self, bytes: &[u8]) {
         match self.parser.parse(bytes) {
             Ok(f) => self.inner.append_value(f),
@@ -127,18 +115,15 @@ impl ColumnBuilder for Float16ColumnBuilder {
         };
     }
 
-    ///
     fn runes(&self) -> usize {
         self.runes
     }
 
-    ///
     fn finish(&mut self) -> (&str, ArrayRef) {
         (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
     }
 }
 
-///
 #[derive(Debug)]
 pub(crate) struct Float32ColumnBuilder {
     inner: Float32Builder,
@@ -148,7 +133,6 @@ pub(crate) struct Float32ColumnBuilder {
 }
 
 impl Float32ColumnBuilder {
-    ///
     pub fn new(runes: usize, name: String, parser: Float32Parser) -> Self {
         Self {
             inner: Float32Builder::new(),
@@ -159,9 +143,7 @@ impl Float32ColumnBuilder {
     }
 }
 
-///
 impl ColumnBuilder for Float32ColumnBuilder {
-    ///
     fn parse_and_push_bytes(&mut self, bytes: &[u8]) {
         match self.parser.parse(bytes) {
             Ok(f) => self.inner.append_value(f),
@@ -172,18 +154,15 @@ impl ColumnBuilder for Float32ColumnBuilder {
         };
     }
 
-    ///
     fn runes(&self) -> usize {
         self.runes
     }
 
-    ///
     fn finish(&mut self) -> (&str, ArrayRef) {
         (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
     }
 }
 
-///
 #[derive(Debug)]
 pub(crate) struct Float64ColumnBuilder {
     inner: Float64Builder,
@@ -193,7 +172,6 @@ pub(crate) struct Float64ColumnBuilder {
 }
 
 impl Float64ColumnBuilder {
-    ///
     pub fn new(runes: usize, name: String, parser: Float64Parser) -> Self {
         Self {
             inner: Float64Builder::new(),
@@ -204,9 +182,7 @@ impl Float64ColumnBuilder {
     }
 }
 
-///
 impl ColumnBuilder for Float64ColumnBuilder {
-    ///
     fn parse_and_push_bytes(&mut self, bytes: &[u8]) {
         match self.parser.parse(bytes) {
             Ok(f) => self.inner.append_value(f),
@@ -217,18 +193,15 @@ impl ColumnBuilder for Float64ColumnBuilder {
         };
     }
 
-    ///
     fn runes(&self) -> usize {
         self.runes
     }
 
-    ///
     fn finish(&mut self) -> (&str, ArrayRef) {
         (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
     }
 }
 
-///
 #[derive(Debug)]
 pub(crate) struct Int16ColumnBuilder {
     inner: Int16Builder,
@@ -238,7 +211,6 @@ pub(crate) struct Int16ColumnBuilder {
 }
 
 impl Int16ColumnBuilder {
-    ///
     pub fn new(runes: usize, name: String, parser: Int16Parser) -> Self {
         Self {
             inner: Int16Builder::new(),
@@ -249,9 +221,7 @@ impl Int16ColumnBuilder {
     }
 }
 
-///
 impl ColumnBuilder for Int16ColumnBuilder {
-    ///
     fn parse_and_push_bytes(&mut self, bytes: &[u8]) {
         match self.parser.parse(bytes) {
             Ok(f) => self.inner.append_value(f),
@@ -262,18 +232,15 @@ impl ColumnBuilder for Int16ColumnBuilder {
         };
     }
 
-    ///
     fn runes(&self) -> usize {
         self.runes
     }
 
-    ///
     fn finish(&mut self) -> (&str, ArrayRef) {
         (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
     }
 }
 
-///
 #[derive(Debug)]
 pub(crate) struct Int32ColumnBuilder {
     inner: Int32Builder,
@@ -283,7 +250,6 @@ pub(crate) struct Int32ColumnBuilder {
 }
 
 impl Int32ColumnBuilder {
-    ///
     pub fn new(runes: usize, name: String, parser: Int32Parser) -> Self {
         Self {
             inner: Int32Builder::new(),
@@ -294,9 +260,7 @@ impl Int32ColumnBuilder {
     }
 }
 
-///
 impl ColumnBuilder for Int32ColumnBuilder {
-    ///
     fn parse_and_push_bytes(&mut self, bytes: &[u8]) {
         match self.parser.parse(bytes) {
             Ok(f) => self.inner.append_value(f),
@@ -307,18 +271,15 @@ impl ColumnBuilder for Int32ColumnBuilder {
         };
     }
 
-    ///
     fn runes(&self) -> usize {
         self.runes
     }
 
-    ///
     fn finish(&mut self) -> (&str, ArrayRef) {
         (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
     }
 }
 
-///
 #[derive(Debug)]
 pub(crate) struct Int64ColumnBuilder {
     inner: Int64Builder,
@@ -328,7 +289,6 @@ pub(crate) struct Int64ColumnBuilder {
 }
 
 impl Int64ColumnBuilder {
-    ///
     pub fn new(runes: usize, name: String, parser: Int64Parser) -> Self {
         Self {
             inner: Int64Builder::new(),
@@ -339,9 +299,7 @@ impl Int64ColumnBuilder {
     }
 }
 
-///
 impl ColumnBuilder for Int64ColumnBuilder {
-    ///
     fn parse_and_push_bytes(&mut self, bytes: &[u8]) {
         match self.parser.parse(bytes) {
             Ok(f) => self.inner.append_value(f),
@@ -352,18 +310,15 @@ impl ColumnBuilder for Int64ColumnBuilder {
         };
     }
 
-    ///
     fn runes(&self) -> usize {
         self.runes
     }
 
-    ///
     fn finish(&mut self) -> (&str, ArrayRef) {
         (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
     }
 }
 
-///
 #[derive(Debug)]
 pub(crate) struct Utf8ColumnBuilder {
     inner: Utf8Builder,
@@ -373,7 +328,6 @@ pub(crate) struct Utf8ColumnBuilder {
 }
 
 impl Utf8ColumnBuilder {
-    ///
     pub fn new(runes: usize, name: String, parser: Utf8Parser) -> Self {
         Self {
             inner: Utf8Builder::new(),
@@ -384,9 +338,7 @@ impl Utf8ColumnBuilder {
     }
 }
 
-///
 impl ColumnBuilder for Utf8ColumnBuilder {
-    ///
     fn parse_and_push_bytes(&mut self, bytes: &[u8]) {
         match self.parser.parse(bytes) {
             Ok(f) => self.inner.append_value(f),
@@ -397,18 +349,15 @@ impl ColumnBuilder for Utf8ColumnBuilder {
         };
     }
 
-    ///
     fn runes(&self) -> usize {
         self.runes
     }
 
-    ///
     fn finish(&mut self) -> (&str, ArrayRef) {
         (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
     }
 }
 
-///
 #[derive(Debug)]
 pub(crate) struct LargeUtf8ColumnBuilder {
     inner: LargeUtf8Builder,
@@ -418,7 +367,6 @@ pub(crate) struct LargeUtf8ColumnBuilder {
 }
 
 impl LargeUtf8ColumnBuilder {
-    ///
     pub fn new(runes: usize, name: String, parser: LargeUtf8Parser) -> Self {
         Self {
             inner: LargeUtf8Builder::new(),
@@ -429,9 +377,7 @@ impl LargeUtf8ColumnBuilder {
     }
 }
 
-///
 impl ColumnBuilder for LargeUtf8ColumnBuilder {
-    ///
     fn parse_and_push_bytes(&mut self, bytes: &[u8]) {
         match self.parser.parse(bytes) {
             Ok(f) => self.inner.append_value(f),
@@ -442,12 +388,10 @@ impl ColumnBuilder for LargeUtf8ColumnBuilder {
         };
     }
 
-    ///
     fn runes(&self) -> usize {
         self.runes
     }
 
-    ///
     fn finish(&mut self) -> (&str, ArrayRef) {
         (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
     }

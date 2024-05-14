@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-05-05
-// Last updated: 2024-05-10
+// Last updated: 2024-05-14
 //
 
 use rand::distributions::{Alphanumeric, DistString};
@@ -33,7 +33,8 @@ pub(crate) static MOCKED_FILENAME_LEN: usize = 8;
 pub(crate) static MOCKED_FLOAT_SIZE: f32 = 1_000.0;
 pub(crate) static MOCKED_INTEGER_SIZE: i32 = 1_000;
 
-///
+/// Randomly generate a string from the [`Alphanumeric`] distribution with desired length
+/// [`MOCKED_FILENAME_LEN`].
 pub fn randomize_file_name() -> String {
     let mut path_name: String = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
     path_name.push('_');

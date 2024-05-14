@@ -54,14 +54,22 @@ use crate::schema::FixedSchema;
 use crate::slicer::Slicer;
 use crate::writer::{ParquetWriter, Writer};
 
-///
-pub(crate) static CONVERTER_SLICE_BUFFER_SIZE: usize = 8 * 1024 * 1024 * 1024;
-///
-pub(crate) static CONVERTER_THREAD_CHANNEL_CAPACITY: usize = 128;
-///
-pub(crate) static CONVERTER_LINE_BREAKS_BUFFER_SIZE: usize = 1024 * 1024;
+/// The size of the converter read buffer (in bytes).
+pub(crate) static CONVERTER_SLICE_BUFFER_SIZE: usize = 512 * 1024 * 1024;
 
-///
+/// The number of messages that can exist in the thread channel at the same time.
+/// If the channel message buffer grows to this size, incoming messages will be 
+/// held until previous messages have been consumed/read.
+/// Note: this has no effect if using the 'rayon' feature.
+pub(crate) static CONVERTER_THREAD_CHANNEL_CAPACITY: usize = 128;
+
+/// The size of the buffer for all found line-breaks (in number of newlines).
+/// Keeping this slightly smaller than [`CONVERTER_SLICE_BUFFER_SIZE`] should be
+/// fine since we don't expect the file to only contain like one column which is 
+/// 1 byte long. Nonetheless, if we find more newline than the buffer is allocated
+/// for, the buffer will simply allocate more memory when needed.
+pub(crate) static CONVERTER_LINE_BREAKS_BUFFER_SIZE: usize = 128 * 1024 * 1024;
+
 #[derive(Debug)]
 pub struct Converter {
     in_file: File,
@@ -77,7 +85,6 @@ pub struct Converter {
 unsafe impl Send for Converter {}
 unsafe impl Sync for Converter {}
 
-///
 impl Converter {
     /// Create a new instance of a [`Converter`] struct with default values.
     pub fn builder() -> ConverterBuilder {
@@ -86,13 +93,13 @@ impl Converter {
         }
     }
 
-    ///
     pub fn convert(&mut self) -> Result<()> {
         if self.multithreaded {
-            info!(
-                "Converting in multithreaded mode using {} threads.",
-                self.n_threads
-            );
+            #[cfg(feature = "rayon")]
+            info!("Convert with rayon parallelism using {} threads.", self.n_threads);
+
+            #[cfg(not(feature = "rayon"))]
+            info!("Converting in standard multithreaded mode using {} threads.", self.n_threads);
             self.convert_multithreaded()?
         } else {
             info!("Converting in single-threaded mode.");
@@ -204,6 +211,7 @@ impl Converter {
             "Done converting in standard multithreaded mode using {} threads!",
             self.n_threads
         );
+
         if bytes_overlapped > 0 {
             info!(
                 "We read {} bytes two times (due to sliding window overlap).",
@@ -261,8 +269,8 @@ impl Converter {
     fn spawn_convert_threads(
         &mut self,
         buffer: &Vec<u8>,
-        line_breaks: &Vec<usize>,
-        thread_workloads: &Vec<(usize, usize)>,
+        line_breaks: &[usize],
+        thread_workloads: &[(usize, usize)],
     ) -> Result<()> {
         let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
         let arc_buffer: Arc<&Vec<u8>> = Arc::new(buffer);
@@ -420,17 +428,20 @@ impl Converter {
         self.writer.finish()?;
 
         info!("Done converting in single-threaded mode!");
-        info!(
-            "We read {} bytes two times (due to sliding window overlap).",
-            bytes_overlapped
-        );
+
+        if bytes_overlapped > 0 {
+            info!(
+                "We read {} bytes two times (due to sliding window overlap).",
+                bytes_overlapped
+            );
+        }
 
         Ok(())
     }
 
     fn distribute_worker_thread_workloads(
         &self,
-        line_break_indices: &Vec<usize>,
+        line_break_indices: &[usize],
         thread_workloads: &mut Vec<(usize, usize)>,
     ) {
         let n_line_break_indices: usize = line_break_indices.len();
@@ -447,13 +458,12 @@ impl Converter {
     }
 }
 
-///
 pub fn worker_thread_convert(
     channel: channel::Sender<RecordBatch>,
     slice: &[u8],
     line_breaks: &[usize],
     slicer: &Slicer,
-    builders: &mut Vec<Box<dyn ColumnBuilder>>,
+    builders: &mut [Box<dyn ColumnBuilder>],
 ) {
     let mut prev_line_break_idx: usize = 0;
 
@@ -485,7 +495,6 @@ pub fn worker_thread_convert(
     drop(channel);
 }
 
-///
 pub fn master_thread_write(
     channel: channel::Receiver<RecordBatch>,
     writer: &mut Box<dyn Writer>,
@@ -501,7 +510,6 @@ pub fn master_thread_write(
     Ok(())
 }
 
-///
 #[derive(Debug, Default)]
 pub struct ConverterBuilder {
     in_file: Option<PathBuf>,
@@ -513,7 +521,6 @@ pub struct ConverterBuilder {
     thread_channel_capacity: Option<usize>,
 }
 
-///
 impl ConverterBuilder {
     /// Set the [`PathBuf`] for the target file to convert.
     pub fn with_in_file(mut self, in_file: PathBuf) -> Self {
@@ -540,13 +547,11 @@ impl ConverterBuilder {
         self
     }
 
-    ///
     pub fn with_buffer_size(mut self, buffer_size: Option<usize>) -> Self {
         self.buffer_size = buffer_size;
         self
     }
 
-    ///
     pub fn with_thread_channel_capacity(mut self, thread_channel_capacity: Option<usize>) -> Self {
         self.thread_channel_capacity = thread_channel_capacity;
         self
@@ -595,30 +600,15 @@ impl ConverterBuilder {
         // Optional configuration below.
         //
         let buffer_size: usize = match self.buffer_size {
-            Some(s) => {
-                if multithreaded {
-                    s / (n_threads - 1)
-                } else {
-                    s
-                }
-            }
+            Some(s) => s,
             None => {
-                if multithreaded {
-                    #[cfg(debug_assertions)]
-                    debug!(
-                        "Optional field `buffer_size` not provided, will use static value CONVERTER_SLICE_BUFFER_SIZE={}.",
-                        CONVERTER_SLICE_BUFFER_SIZE / (n_threads - 1),
-                    );
-                    CONVERTER_SLICE_BUFFER_SIZE / (n_threads - 1)
-                } else {
-                    #[cfg(debug_assertions)]
-                    debug!(
-                        "Optional field `buffer_size` not provided, will use static value CONVERTER_SLICE_BUFFER_SIZE={}.",
-                        CONVERTER_SLICE_BUFFER_SIZE / (n_threads - 1),
-                    );
-                    CONVERTER_SLICE_BUFFER_SIZE / (n_threads - 1)
-                }
-            }
+                #[cfg(debug_assertions)]
+                debug!(
+                    "Optional field 'buffer_size' not provided, will use default static value CONVERTER_SLICE_BUFFER_SIZE={}.",
+                    CONVERTER_SLICE_BUFFER_SIZE
+                );
+                CONVERTER_SLICE_BUFFER_SIZE
+            },
         };
 
         let thread_channel_capacity: usize = match self.thread_channel_capacity {

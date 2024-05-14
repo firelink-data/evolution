@@ -38,7 +38,7 @@ use std::path::PathBuf;
 use crate::error::Result;
 
 pub(crate) trait Writer: Debug {
-    fn write(&mut self, buffer: &Vec<u8>) -> Result<()>;
+    fn write(&mut self, buffer: &[u8]) -> Result<()>;
     fn write_batch(&mut self, batch: &RecordBatch) -> Result<()>;
     fn finish(&mut self) -> Result<()>;
 }
@@ -58,7 +58,6 @@ impl FixedLengthFileWriterProperties {
     }
 }
 
-///
 #[derive(Debug, Default)]
 pub(crate) struct FixedLengthFileWriterPropertiesBuilder {
     create_new: Option<bool>,
@@ -66,7 +65,6 @@ pub(crate) struct FixedLengthFileWriterPropertiesBuilder {
     truncate: Option<bool>,
 }
 
-///
 impl FixedLengthFileWriterPropertiesBuilder {
     /// Set the option to create a new file, failing if it already exists.
     /// No file is allowed to exist at the target location, also no (dangling)
@@ -115,15 +113,12 @@ impl FixedLengthFileWriterPropertiesBuilder {
     }
 }
 
-///
 #[derive(Debug)]
 pub(crate) struct FixedLengthFileWriter {
     inner: File,
 }
 
-///
 impl FixedLengthFileWriter {
-    ///
     pub fn builder() -> FixedLengthFileWriterBuilder {
         FixedLengthFileWriterBuilder {
             ..Default::default()
@@ -131,28 +126,23 @@ impl FixedLengthFileWriter {
     }
 }
 
-///
 #[derive(Debug, Default)]
 pub(crate) struct FixedLengthFileWriterBuilder {
     out_file: Option<PathBuf>,
     properties: Option<FixedLengthFileWriterProperties>,
 }
 
-///
 impl FixedLengthFileWriterBuilder {
-    ///
     pub fn with_out_file(mut self, out_file: PathBuf) -> Self {
         self.out_file = Some(out_file);
         self
     }
 
-    ///
     pub fn with_properties(mut self, properties: FixedLengthFileWriterProperties) -> Self {
         self.properties = Some(properties);
         self
     }
 
-    ///
     pub fn build(self) -> Result<FixedLengthFileWriter> {
         let out_file: PathBuf = self
             .out_file
@@ -174,9 +164,8 @@ impl FixedLengthFileWriterBuilder {
     }
 }
 
-///
 impl Writer for FixedLengthFileWriter {
-    fn write(&mut self, buffer: &Vec<u8>) -> Result<()> {
+    fn write(&mut self, buffer: &[u8]) -> Result<()> {
         self.inner.write_all(buffer)?;
         Ok(())
     }
@@ -190,15 +179,12 @@ impl Writer for FixedLengthFileWriter {
     }
 }
 
-///
 #[derive(Debug)]
 pub(crate) struct ParquetWriter {
     inner: ArrowWriter<File>,
 }
 
-///
 impl ParquetWriter {
-    ///
     pub fn builder() -> ParquetWriterBuilder {
         ParquetWriterBuilder {
             ..Default::default()
@@ -207,7 +193,7 @@ impl ParquetWriter {
 }
 
 impl Writer for ParquetWriter {
-    fn write(&mut self, _buffer: &Vec<u8>) -> Result<()> {
+    fn write(&mut self, _buffer: &[u8]) -> Result<()> {
         todo!();
     }
 
@@ -227,7 +213,6 @@ impl Writer for ParquetWriter {
     }
 }
 
-///
 #[derive(Debug, Default)]
 pub(crate) struct ParquetWriterBuilder {
     out_file: Option<PathBuf>,
@@ -235,27 +220,22 @@ pub(crate) struct ParquetWriterBuilder {
     properties: Option<ArrowWriterProperties>,
 }
 
-///
 impl ParquetWriterBuilder {
-    ///
     pub fn with_out_file(mut self, path: PathBuf) -> Self {
         self.out_file = Some(path);
         self
     }
 
-    ///
     pub fn with_properties(mut self, properties: ArrowWriterProperties) -> Self {
         self.properties = Some(properties);
         self
     }
 
-    ///
     pub fn with_arrow_schema(mut self, schema: ArrowSchemaRef) -> Self {
         self.schema = Some(schema);
         self
     }
 
-    ///
     pub fn build(self) -> Result<ParquetWriter> {
         let out_file: PathBuf = self
             .out_file
@@ -370,7 +350,7 @@ mod tests_writer {
             .build()
             .unwrap();
 
-        let _ = match FixedLengthFileWriter::builder()
+        match FixedLengthFileWriter::builder()
             .with_out_file(path.clone())
             .with_properties(properties.clone())
             .build()

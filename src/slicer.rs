@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2023-12-11
-// Last updated: 2024-05-13
+// Last updated: 2024-05-14
 //
 
 #[cfg(feature = "nightly")]
@@ -39,9 +39,8 @@ pub(crate) struct Slicer {
     multithreading: bool,
 }
 
-///
 impl Slicer {
-    ///
+    /// Create a new instance of a  [`SlicerBuilder`] with default values.
     pub fn builder() -> SlicerBuilder {
         SlicerBuilder {
             ..Default::default()
@@ -147,21 +146,17 @@ impl Slicer {
     }
 }
 
-///
 #[derive(Debug, Default)]
 pub(crate) struct SlicerBuilder {
     n_threads: Option<usize>,
 }
 
-///
 impl SlicerBuilder {
-    ///
     pub fn num_threads(mut self, n_threads: usize) -> Self {
         self.n_threads = Some(n_threads);
         self
     }
 
-    ///
     pub fn build(self) -> Result<Slicer> {
         let n_threads = self.n_threads.unwrap_or(1);
 

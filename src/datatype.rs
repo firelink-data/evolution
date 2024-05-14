@@ -22,12 +22,14 @@
 // SOFTWARE.
 //
 // File created: 2024-05-10
-// Last updated: 2024-05-10
+// Last updated: 2024-05-14
 //
 
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq, Serialize)]
+/// DataType enum as a subset of the [`arrow::datatypes::DataType`]. Only needed so we can
+/// derive [`Deserialize`] and [`Serialize`] for the [`crate::schema::FixedSchema`] struct.
 pub(crate) enum DataType {
     Boolean,
     Float16,

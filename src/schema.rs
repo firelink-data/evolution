@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2023-11-25
-// Last updated: 2024-05-12
+// Last updated: 2024-05-14
 //
 
 use arrow::datatypes::{DataType as ArrowDataType, Field, Schema, SchemaRef as ArrowSchemaRef};
@@ -48,7 +48,7 @@ use crate::parser::{
     Int64Parser, LargeUtf8Parser, Utf8Parser,
 };
 
-///
+/// A struct representing a column in a fixed-length file.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct FixedColumn {
     /// The symbolic name of the column.
@@ -69,7 +69,6 @@ pub struct FixedColumn {
     is_nullable: bool,
 }
 
-///
 impl FixedColumn {
     /// Get the length of the column.
     pub fn length(&self) -> usize {
@@ -156,7 +155,7 @@ impl FixedColumn {
         }
     }
 
-    ///
+    /// Randomly generate data for the [`FixedColumn`] based on its datatype.
     pub fn mock(&self, rng: &mut ThreadRng) -> String {
         match self.dtype {
             DataType::Boolean => mock_bool(rng),
@@ -172,7 +171,9 @@ impl FixedColumn {
     }
 }
 
-///
+/// A struct representing an entire schema for a fixed-length file.
+/// This can be created using the [`serde_json`] crate since this struct and the 
+/// [`FixedColumn`] struct derives the [`Deserialize`] and [`Serialize`] traits.
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
 pub struct FixedSchema {
     name: String,
@@ -180,7 +181,6 @@ pub struct FixedSchema {
     columns: Vec<FixedColumn>,
 }
 
-///
 #[allow(dead_code)]
 impl FixedSchema {
     /// Implicitly create a new [`FixedSchema`] by reading a json path
@@ -271,7 +271,6 @@ impl FixedSchema {
         Schema::new(fields)
     }
 
-    ///
     pub fn as_arrow_schema_ref(&self) -> ArrowSchemaRef {
         Arc::new(self.as_arrow_schema())
     }

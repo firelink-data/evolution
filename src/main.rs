@@ -25,6 +25,7 @@
 // Last updated: 2024-05-14
 //
 
+#![cfg_attr(feature = "nightly", allow(internal_features))]
 #![cfg_attr(feature = "nightly", feature(str_internals))]
 
 use clap::Parser;
@@ -52,7 +53,7 @@ use cli::Cli;
 fn main() {
     let cli = Cli::parse();
 
-    match logger::setup_log() {
+    match logger::try_init_logging() {
         Ok(_) => {
             #[cfg(debug_assertions)]
             debug!("Logging setup ok!")

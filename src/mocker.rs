@@ -22,10 +22,12 @@
 // SOFTWARE.
 //
 // File created: 2024-02-05
-// Last updated: 2024-05-13
+// Last updated: 2024-05-14
 //
 
 use crossbeam::channel;
+#[cfg(debug_assertions)]
+use log::debug;
 use log::{error, info, warn};
 use padder::*;
 use rand::rngs::ThreadRng;
@@ -92,7 +94,6 @@ pub(crate) struct Mocker {
 unsafe impl Send for Mocker {}
 unsafe impl Sync for Mocker {}
 
-///
 impl Mocker {
     /// Create a new instance of a [`MockerBuilder`] struct with default values.
     pub fn builder() -> MockerBuilder {
@@ -141,13 +142,11 @@ impl Mocker {
         let mut thread_workloads: Vec<usize> = self.distribute_thread_workload();
         let remainder: usize = self.n_rows - thread_workloads.iter().sum::<usize>();
         thread_workloads.push(remainder);
-
         let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
 
         info!(
-            "Starting {} worker threads with workload: {:?}",
+            "Starting {} worker threads.",
             thread_workloads.len(),
-            thread_workloads
         );
 
         let schema = Arc::new(self.schema.clone());
@@ -172,7 +171,6 @@ impl Mocker {
         let mut thread_workloads: Vec<usize> = self.distribute_thread_workload();
         let remainder: usize = self.n_rows - thread_workloads.iter().sum::<usize>();
         thread_workloads.push(remainder);
-
         let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
 
         info!("Starting {} worker threads.", thread_workloads.len(),);
@@ -256,7 +254,6 @@ pub(crate) struct MockerBuilder {
     thread_channel_capacity: Option<usize>,
 }
 
-///
 impl MockerBuilder {
     /// Set the [`PathBuf`] for the schema to use when generating data with the [`Mocker`].
     pub fn with_schema(mut self, schema_file: PathBuf) -> Self {
@@ -276,19 +273,16 @@ impl MockerBuilder {
         self
     }
 
-    ///
     pub fn with_create_new(mut self, create_new: bool) -> Self {
         self.create_new = Some(create_new);
         self
     }
 
-    ///
     pub fn with_create(mut self, create: bool) -> Self {
         self.create = Some(create);
         self
     }
 
-    ///
     pub fn with_truncate(mut self, truncate: bool) -> Self {
         self.truncate = Some(truncate);
         self
@@ -301,13 +295,11 @@ impl MockerBuilder {
         self
     }
 
-    ///
     pub fn with_buffer_size(mut self, buffer_size: Option<usize>) -> Self {
         self.buffer_size = buffer_size;
         self
     }
 
-    ///
     pub fn with_thread_channel_capacity(mut self, thread_channel_capacity: Option<usize>) -> Self {
         self.thread_channel_capacity = thread_channel_capacity;
         self
@@ -433,7 +425,6 @@ impl MockerBuilder {
     }
 }
 
-///
 fn worker_thread_generate(
     channel: channel::Sender<Vec<u8>>,
     thread: usize,
@@ -448,7 +439,8 @@ fn worker_thread_generate(
     let mut rng: ThreadRng = rand::thread_rng();
     let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size);
 
-    info!("Worker thread {} starting.", thread);
+    #[cfg(debug_assertions)]
+    debug!("Worker thread {} starting.", thread);
 
     for row_idx in 0..n_rows {
         if (row_idx % buffer_size == 0) && (row_idx != 0) {
@@ -480,7 +472,6 @@ fn worker_thread_generate(
     drop(channel);
 }
 
-///
 fn master_thread_write(
     channel: channel::Receiver<Vec<u8>>,
     writer: &mut Box<dyn Writer>,
