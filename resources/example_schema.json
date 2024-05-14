@@ -34,7 +34,7 @@
             "dtype": "Boolean",
             "alignment": "Center",
             "pad_symbol": "Asterisk",
-            "is_nullable": false
+            "is_nullable": true
         }
     ]
 }
