@@ -32,8 +32,6 @@ use std::cmp::min;
 use std::fs;
 use padder::Symbol;
 use crate::parser;
-use crate::parser::ColumnTrimmer;
-use crate::Trimmer::NumRightAligned;
 
 use self::residual_slicer::SLICER_IN_CHUNK_SIZE;
 
@@ -164,70 +162,4 @@ pub trait ColumnBuilder {
 }
 
 
-fn  column_length_num_rightaligned(data: &[u8], runes: i16) -> (usize, usize) {
-     NumRightAligned::find_start_stop(data,runes)
-}
 
-fn column_length_char_rightaligned(data: &[u8], runes: i16) -> (usize, usize) {
-    let mut eat = data.iter();
-    let mut counted_runes = 0;
-    let mut start: usize = 0;
-    let stop: usize = min(data.len(), runes as usize);
-
-    while counted_runes < runes as usize {
-        let byten = eat.next();
-        let bb: u8 = match byten {
-            None => {
-                //TODO  we ran out of data,this is an error, fix later.
-                return (start, stop);
-            }
-            Some(b) => *b,
-        };
-
-        match bb {
-            101..=132 => return (start, stop),
-            141..=172 => return (start, stop),
-            _ => {}
-        };
-        start += 1;
-        counted_runes += 1;
-    }
-
-    (start, stop)
-}
-
-fn column_length(data: &[u8], runes: i16) -> usize {
-    let mut eat = data.iter();
-    let mut counted_runes = 0;
-    let mut len: usize = 0;
-    let mut units = 1;
-
-    while counted_runes < runes as usize {
-        let byten = eat.nth(units - 1);
-
-        let bb: u8 = match byten {
-            None => {
-                return len;
-            }
-            Some(b) => *b,
-        };
-
-        units = match bb {
-            bb if bb >> 7 == 0 => 1,
-            bb if bb >> 5 == 0b110 => 2,
-            bb if bb >> 4 == 0b1110 => 3,
-            bb if bb >> 3 == 0b11110 => 4,
-            _bb => {
-                // TODO BAD ERROR HANDL
-                panic!("Incorrect UTF-8 sequence");
-                #[allow(unreachable_code)]
-                0
-            }
-        };
-
-        len += units;
-        counted_runes += 1;
-    }
-
-    len
-}

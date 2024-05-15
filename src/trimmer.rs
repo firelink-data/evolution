@@ -296,6 +296,5 @@ pub(crate) fn trimmer_factory(dtype: DataType,alignment: Alignment, trim_symbol:
         _ => todo!()
     }
 
-//     Box::new(crate::trimmer::NumRightAligned { trim_symbol  })
 
 }
