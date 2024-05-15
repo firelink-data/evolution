@@ -2,7 +2,7 @@
 name = "evolution"
 version = "1.0.0"
 edition = "2021"
-description = "🦖 Evolve your fixed-length data files into Apache Arrow tables, fully parallelized!"
+description = "🦖 Evolve your fixed-length data files into Apache Parquet, fully parallelized!"
 authors = [
     "Ted Hammarlund <TedHammarlund@gmail.com>",
     "Rickard Lundin <rickard@x14.se>",
