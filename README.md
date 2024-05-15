@@ -5,7 +5,7 @@
 <br/>
 <p align="center">
 <a href="https://github.com/firelink-data/evolution">
-<img align="center" width=50% src="./resources/images/evolution-banner.png"></img>
+<img align="center" width=50% src="https://github.com/firelink-data/evolution/blob/e360e5773173d7745cdd609ec3c3abd0a0917ea2/resources/images/evolution-banner.png"></img>
 </a>
 </p>
 </div>
@@ -19,13 +19,12 @@
 [![CD](https://github.com/firelink-data/evolution/actions/workflows/cd.yml/badge.svg)](https://github.com/firelink-data/evolution/actions/workflows/cd.yml)
 [![Tests](https://github.com/firelink-data/evolution/actions/workflows/tests.yml/badge.svg)](https://github.com/firelink-data/evolution/actions/workflows/tests.yml)
 
+🦖 *Evolve your fixed-length data files into Apache Parquet, fully parallelized!*
 
 </div>
 
 
 ## 🔎 Overview
-
-Take your **old and inefficient fixed-length files** and **evolve them into a modern data format like Apache Parquet!**
 
 This repository hosts the **evolution** program which both allows you to convert existing fixed-length files into other data formats, but also allows you to create large amounts of mocked data blazingly fast. The program supports full parallelism and utilizes SIMD techniques, when possible, for highly efficient parsing of data. 
 
