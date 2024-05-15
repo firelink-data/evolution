@@ -194,7 +194,7 @@ enum Commands {
         )]
         n_rows: Option<usize>,
 
-        /// Set the writer mode to create a new file or fail if it already exists.
+        /// Set the writer option to fail if the file already exists.
         #[arg(
             long = "force-new",
             value_name = "WRITER-FORCE-NEW",
