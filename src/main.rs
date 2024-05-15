@@ -47,8 +47,8 @@ mod parser;
 mod schema;
 mod slicer;
 mod threads;
-mod writer;
 mod trimmer;
+mod writer;
 
 use cli::Cli;
 

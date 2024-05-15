@@ -42,10 +42,10 @@ use std::str::from_utf8_unchecked;
 use std::sync::Arc;
 
 use super::{ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen};
-use crate::{chunked, trimmer};
 use crate::datatype::DataType;
 use crate::schema;
-use crate::trimmer::{ColumnTrimmer, trimmer_factory};
+use crate::trimmer::{trimmer_factory, ColumnTrimmer};
+use crate::{chunked, trimmer};
 
 pub(crate) struct Slice2Arrow<'a> {
     //    pub(crate) file_out: File,
@@ -101,7 +101,11 @@ impl MasterBuilders {
                         boolean_builder: BooleanBuilder::new(),
                         runes_in_column: col.length(),
                         name: col.name().to_string().clone(),
-                        trimmer: trimmer_factory(DataType::Boolean, col.alignment(), col.pad_symbol())
+                        trimmer: trimmer_factory(
+                            DataType::Boolean,
+                            col.alignment(),
+                            col.pad_symbol(),
+                        ),
                     })),
                     DataType::Float16 => todo!(),
                     DataType::Float32 => todo!(),
@@ -111,25 +115,37 @@ impl MasterBuilders {
                         int32builder: Int32Builder::new(),
                         runes_in_column: col.length(),
                         name: col.name().to_string().clone(),
-                        trimmer: trimmer_factory(DataType::Int32, col.alignment(), col.pad_symbol())
+                        trimmer: trimmer_factory(
+                            DataType::Int32,
+                            col.alignment(),
+                            col.pad_symbol(),
+                        ),
                     })),
                     DataType::Int64 => buildersmut.push(Box::new(HandlerInt64Builder {
                         int64builder: Int64Builder::new(),
                         runes_in_column: col.length(),
                         name: col.name().to_string().clone(),
-                        trimmer: trimmer_factory(DataType::Int64, col.alignment(), col.pad_symbol())
+                        trimmer: trimmer_factory(
+                            DataType::Int64,
+                            col.alignment(),
+                            col.pad_symbol(),
+                        ),
                     })),
                     DataType::Utf8 => buildersmut.push(Box::new(HandlerStringBuilder {
                         string_builder: StringBuilder::new(),
                         runes_in_column: col.length(),
                         name: col.name().to_string().clone(),
-                        trimmer: trimmer_factory(DataType::Utf8, col.alignment(), col.pad_symbol())
+                        trimmer: trimmer_factory(DataType::Utf8, col.alignment(), col.pad_symbol()),
                     })),
                     DataType::LargeUtf8 => buildersmut.push(Box::new(HandlerStringBuilder {
                         string_builder: StringBuilder::new(),
                         runes_in_column: col.length(),
                         name: col.name().to_string().clone(),
-                        trimmer: trimmer_factory(DataType::LargeUtf8, col.alignment(), col.pad_symbol())
+                        trimmer: trimmer_factory(
+                            DataType::LargeUtf8,
+                            col.alignment(),
+                            col.pad_symbol(),
+                        ),
                     })),
                 }
             }
@@ -223,7 +239,7 @@ struct HandlerInt32Builder {
     int32builder: Int32Builder,
     runes_in_column: usize,
     name: String,
-    trimmer: Box<dyn ColumnTrimmer>
+    trimmer: Box<dyn ColumnTrimmer>,
 }
 
 impl ColumnBuilder for HandlerInt32Builder {
@@ -231,7 +247,9 @@ impl ColumnBuilder for HandlerInt32Builder {
     where
         Self: Sized,
     {
-        let (start, stop) = self.trimmer.find_start_stop (data, self.runes_in_column as i16);
+        let (start, stop) = self
+            .trimmer
+            .find_start_stop(data, self.runes_in_column as i16);
 
         match atoi_simd::parse(&data[start..stop]) {
             Ok(n) => {
@@ -255,15 +273,16 @@ struct HandlerInt64Builder {
     int64builder: Int64Builder,
     runes_in_column: usize,
     name: String,
-    trimmer: Box<dyn ColumnTrimmer>
+    trimmer: Box<dyn ColumnTrimmer>,
 }
 impl ColumnBuilder for HandlerInt64Builder {
     fn parse_value(&mut self, data: &[u8]) -> usize
     where
         Self: Sized,
     {
-        let (start, stop) =
-            self.trimmer.find_start_stop(data, self.runes_in_column as i16);
+        let (start, stop) = self
+            .trimmer
+            .find_start_stop(data, self.runes_in_column as i16);
         match atoi_simd::parse(&data[start..stop]) {
             Ok(n) => {
                 self.int64builder.append_value(n);
@@ -289,14 +308,15 @@ struct HandlerStringBuilder {
     string_builder: StringBuilder,
     runes_in_column: usize,
     name: String,
-    trimmer: Box<dyn ColumnTrimmer>
+    trimmer: Box<dyn ColumnTrimmer>,
 }
 impl ColumnBuilder for HandlerStringBuilder {
     fn parse_value(&mut self, data: &[u8]) -> usize
     where
         Self: Sized,
     {
-        let column_length: usize = trimmer::count_rune_bytelength (data, self.runes_in_column as i16);
+        let column_length: usize =
+            trimmer::count_rune_bytelength(data, self.runes_in_column as i16);
         // Me dont like ... what is the cost ? Could it be done once for the whole chunk ?
         let text: &str = unsafe { from_utf8_unchecked(&data[..column_length]) };
 
@@ -324,7 +344,7 @@ struct HandlerBooleanBuilder {
     boolean_builder: BooleanBuilder,
     runes_in_column: usize,
     name: String,
-    trimmer: Box<dyn ColumnTrimmer>
+    trimmer: Box<dyn ColumnTrimmer>,
 }
 
 impl ColumnBuilder for HandlerBooleanBuilder {
@@ -332,7 +352,9 @@ impl ColumnBuilder for HandlerBooleanBuilder {
     where
         Self: Sized,
     {
-        let (start, stop) = self.trimmer.find_start_stop(data, self.runes_in_column as i16);
+        let (start, stop) = self
+            .trimmer
+            .find_start_stop(data, self.runes_in_column as i16);
 
         let text: &str = unsafe { from_utf8_unchecked(&data[start..stop]) };
 

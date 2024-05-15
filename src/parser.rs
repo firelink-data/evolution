@@ -301,5 +301,3 @@ impl LargeUtf8Parser {
         }
     }
 }
-
-
