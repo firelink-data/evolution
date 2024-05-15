@@ -26,10 +26,8 @@
 //
 
 use crate::datatype::DataType;
-use crate::parser;
 use padder::{Alignment, Symbol};
 use std::cmp::min;
-use std::path::PathBuf;
 
 pub(crate) trait ColumnTrimmer {
     fn find_start_stop(&self, data: &[u8], runes: i16) -> (usize, usize);
@@ -102,12 +100,10 @@ impl ColumnTrimmer for crate::trimmer::FloatLeftAligned {
             if let 48..=57 | 43..=46 = bb {
                 start += 1;
                 counted_runes += 1;
-                break;
+                continue;
             } else {
                 return (start, stop);
             }
-
-
         }
 
         (start, stop)
@@ -170,9 +166,10 @@ impl ColumnTrimmer for crate::trimmer::CharLeftAligned {
                     start += 1;
                     counted_runes += 1;
                 }
-                _ => {return (start, stop);}
+                _ => {
+                    return (start, stop);
+                }
             };
-
         }
 
         (start, stop)
@@ -232,10 +229,8 @@ impl ColumnTrimmer for crate::trimmer::NumLeftAligned {
             };
 
             if let 48..=57 = bb {
-                {
-                    start += 1;
-                    counted_runes += 1;
-                };
+                start += 1;
+                counted_runes += 1;
             } else {
                 (start, stop);
             }
