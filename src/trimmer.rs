@@ -291,9 +291,18 @@ pub(crate) fn trimmer_factory(dtype: DataType,alignment: Alignment, trim_symbol:
         (DataType::Int16,padder::Alignment::Right) => {Box::new(crate::trimmer::NumRightAligned { trim_symbol  })}
         (DataType::Int32,padder::Alignment::Right) => {Box::new(crate::trimmer::NumRightAligned { trim_symbol  })}
         (DataType::Int64,padder::Alignment::Right) => {Box::new(crate::trimmer::NumRightAligned { trim_symbol  })}
+        (DataType::Boolean,padder::Alignment::Center) => {Box::new(crate::trimmer::CharLeftAligned { trim_symbol  })}
+        (DataType::Float16,padder::Alignment::Center) => {Box::new(crate::trimmer::FloatLeftAligned { trim_symbol  })}
+        (DataType::Float32,padder::Alignment::Center) => {Box::new(crate::trimmer::FloatLeftAligned { trim_symbol  })}
+        (DataType::Float64,padder::Alignment::Center) => {Box::new(crate::trimmer::FloatLeftAligned { trim_symbol  })}
+        (DataType::Int16,padder::Alignment::Center) => {Box::new(crate::trimmer::NumLeftAligned { trim_symbol  })}
+        (DataType::Int32,padder::Alignment::Center) => {Box::new(crate::trimmer::NumLeftAligned { trim_symbol  })}
+        (DataType::Int64,padder::Alignment::Center) => {Box::new(crate::trimmer::NumLeftAligned { trim_symbol  })}
+
         (DataType::Utf8,_) => {Box::new(crate::trimmer::UtfNotAligned {   })}
         (DataType::LargeUtf8,_) => {Box::new(crate::trimmer::UtfNotAligned {   })}
-        _ => todo!()
+
+
     }
 
 
