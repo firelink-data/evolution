@@ -373,12 +373,12 @@ impl MockerBuilder {
             None => {
                 if n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING && multithreaded {
                     let mocker_buffer_size = MOCKER_BUFFER_NUM_ROWS / (n_threads - 1);
-                    info!("Optional field '--buffer-size' not provided.");
-                    info!("Mocker buffer size is now {} rows.", mocker_buffer_size);
+                    #[cfg(debug_assertions)]
+                    debug!("Optional field '--buffer-size' not provided, mocker buffer size is now {} rows.", mocker_buffer_size);
                     mocker_buffer_size
                 } else {
-                    info!("Optional field '--buffer-size' not provided.");
-                    info!("Mocker buffer size is now {} rows.", MOCKER_BUFFER_NUM_ROWS);
+                    #[cfg(debug_assertions)]
+                    debug!("Optional field '--buffer-size' not provided, mocker buffer size is now {} rows.", MOCKER_BUFFER_NUM_ROWS);
                     MOCKER_BUFFER_NUM_ROWS
                 }
             }
@@ -387,9 +387,9 @@ impl MockerBuilder {
         let thread_channel_capacity: usize = match self.thread_channel_capacity {
             Some(c) => c,
             None => {
-                info!("Optional field '--thread-channel-capacity' not provided.");
-                info!(
-                    "Mocker thread channel capacity is now {} messages.",
+                #[cfg(debug_assertions)]
+                debug!(
+                    "Optional field '--thread-channel-capacity' not provided, mocker thread channel capacity is now {} messages.",
                     MOCKER_THREAD_CHANNEL_CAPACITY
                 );
                 MOCKER_THREAD_CHANNEL_CAPACITY
@@ -479,6 +479,6 @@ fn master_thread_write(
         drop(buffer);
     }
 
-    info!("Master thread done, cleaning up resources.");
+    info!("Master thread done writing mocked data!");
     Ok(())
 }

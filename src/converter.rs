@@ -175,7 +175,8 @@ impl Converter {
             let byte_idx_last_line_break = line_break_indices
                 .last()
                 .ok_or("No line breaks found in the read buffer!")?;
-            let n_bytes_left_after_line_break = buffer_capacity - 1 - byte_idx_last_line_break;
+            let n_bytes_left_after_line_break =
+                buffer_capacity - byte_idx_last_line_break - NUM_CHARS_FOR_NEWLINE;
 
             reader.seek_relative(-(n_bytes_left_after_line_break as i64))?;
 
@@ -342,7 +343,7 @@ impl Converter {
         let mut remaining_bytes: usize = bytes_to_read;
         let mut bytes_processed: usize = 0;
         let mut bytes_overlapped: usize = 0;
-        let mut buffer_capacity = self.buffer_size;
+        let mut buffer_capacity: usize = self.buffer_size;
 
         // We wrap the file descriptor in a [`BufReader`] to improve the syscall
         // efficiency of small and repeated I/O calls to the same file.
@@ -386,7 +387,8 @@ impl Converter {
             let byte_idx_last_line_break = line_break_indices
                 .last()
                 .ok_or("No line breaks found in read buffer!")?;
-            let n_bytes_left_after_line_break = buffer_capacity - 1 - byte_idx_last_line_break;
+            let n_bytes_left_after_line_break =
+                buffer_capacity - byte_idx_last_line_break - NUM_CHARS_FOR_NEWLINE;
 
             reader.seek_relative(-(n_bytes_left_after_line_break as i64))?;
 
