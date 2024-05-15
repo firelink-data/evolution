@@ -232,7 +232,7 @@ impl ColumnTrimmer for crate::trimmer::NumLeftAligned {
                 start += 1;
                 counted_runes += 1;
             } else {
-                (start, stop);
+                return (start, stop);
             }
         }
 
