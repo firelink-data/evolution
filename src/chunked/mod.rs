@@ -30,12 +30,16 @@ use parquet::format;
 
 use std::cmp::min;
 use std::fs;
+use padder::Symbol;
+use crate::parser;
+use crate::parser::ColumnTrimmer;
+use crate::Trimmer::NumRightAligned;
 
-use self::slicer::SLICER_IN_CHUNK_SIZE;
+use self::residual_slicer::SLICER_IN_CHUNK_SIZE;
 
 pub(crate) mod arrow_converter;
-pub(crate) mod converter;
-pub(crate) mod slicer;
+pub(crate) mod residual_slicer;
+pub(crate) mod self_converter;
 
 pub(crate) struct ChunkAndResidue {
     pub(crate) chunk: Box<[u8; SLICER_IN_CHUNK_SIZE]>,
@@ -159,31 +163,9 @@ pub trait ColumnBuilder {
     //    fn name(&  self) -> &String;
 }
 
-fn column_length_num_rightaligned(data: &[u8], runes: i16) -> (usize, usize) {
-    let mut eat = data.iter();
-    let mut counted_runes = 0;
-    let mut start: usize = 0;
-    let stop: usize = min(data.len(), runes as usize);
 
-    while counted_runes < runes as usize {
-        let byten = eat.next();
-        let bb: u8 = match byten {
-            None => {
-                //TODO  we ran out of data,this is an error, fix later.
-                return (start, stop);
-            }
-            Some(b) => *b,
-        };
-
-        if let 48..=57 = bb {
-            return (start, stop);
-        }
-
-        start += 1;
-        counted_runes += 1;
-    }
-
-    (start, stop)
+fn  column_length_num_rightaligned(data: &[u8], runes: i16) -> (usize, usize) {
+     NumRightAligned::find_start_stop(data,runes)
 }
 
 fn column_length_char_rightaligned(data: &[u8], runes: i16) -> (usize, usize) {

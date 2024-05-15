@@ -39,11 +39,11 @@ pub(crate) const SLICER_MAX_RESIDUE_SIZE: usize = SLICER_IN_CHUNK_SIZE;
 
 pub(crate) const IN_MAX_CHUNKS: usize = 2;
 
-pub(crate) struct OldSlicer<'a> {
+pub(crate) struct ResidualSlicer<'a> {
     pub(crate) fn_find_last_nl: FnFindLastLineBreak<'a>,
 }
 
-impl<'a> Slicer<'a> for OldSlicer<'a> {
+impl<'a> Slicer<'a> for ResidualSlicer<'a> {
     fn slice_and_convert(
         &mut self,
         mut converter: Box<dyn 'a + Converter<'a>>,
