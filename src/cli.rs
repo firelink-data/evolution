@@ -236,18 +236,6 @@ impl Cli {
     pub fn run(&self) -> Result<()> {
         let n_threads: usize = get_available_threads(self.n_threads);
 
-        #[cfg(feature = "rayon")]
-        {
-            if n_threads > 1 {
-                rayon::ThreadPoolBuilder::new()
-                    .num_threads(n_threads)
-                    .build_global()
-                    .expect("Could not create Rayon thread pool!");
-                #[cfg(debug_assertions)]
-                debug!("Rayon parallelism enabled!");
-            };
-        }
-
         match &self.command {
             Commands::Convert {
                 in_file,
