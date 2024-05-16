@@ -42,8 +42,9 @@ atoi_simd = { version = "0.15.6", optional = true }
 arrow2 = "0.18.0"
 libc = "0.2.154"
 arrow = "51.0.0"
-parquet = "51.0.0"
+parquet = { version = "51.0.0", features = ["async"] }
 padder = { version = "1.2.0", features = ["serde"] }
+tokio = { version = "1.37.0", features = ["fs", "rt-multi-thread"] }
 
 [dev-dependencies]
 glob = "0.3.1"
