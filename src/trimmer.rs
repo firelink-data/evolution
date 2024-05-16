@@ -28,6 +28,7 @@
 use std::cmp::min;
 
 use padder::{Alignment, Symbol};
+use crate::converter::Converter;
 
 use crate::datatype::DataType;
 
@@ -35,6 +36,8 @@ pub(crate) trait ColumnTrimmer {
     fn find_start_stop(&self, data: &[u8], runes: i16) -> (usize, usize);
     // TODO @Willhelm perhaps add trim function here ?
 }
+//unsafe impl Send for  ColumnTrimmer {}
+//unsafe impl Sync for  ColumnTrimmer {}
 
 
 

@@ -346,7 +346,7 @@ struct HandlerBooleanBuilder {
     boolean_builder: BooleanBuilder,
     runes_in_column: usize,
     name: String,
-    trimmer: Box<dyn ColumnTrimmer>,
+    trimmer: Box<dyn ColumnTrimmer + Send + Sync >,
 }
 
 impl ColumnBuilder for HandlerBooleanBuilder {
