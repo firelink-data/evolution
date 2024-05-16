@@ -233,7 +233,7 @@ enum Commands {
 }
 
 impl Cli {
-    pub fn run(&self) -> Result<()> {
+    pub async fn run(&self) -> Result<()> {
         let n_threads: usize = get_available_threads(self.n_threads);
 
         match &self.command {
@@ -251,8 +251,10 @@ impl Cli {
                     .with_num_threads(n_threads)
                     .with_buffer_size(*buffer_size)
                     .with_thread_channel_capacity(*thread_channel_capacity)
-                    .build()?
-                    .convert()?;
+                    .build()
+                    .await?
+                    .convert()
+                    .await?;
             }
             #[cfg(feature = "rayon")]
             Commands::CConvert {

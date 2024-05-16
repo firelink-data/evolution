@@ -22,13 +22,16 @@
 // SOFTWARE.
 //
 // File created: 2024-05-05
-// Last updated: 2024-05-15
+// Last updated: 2024-05-17
 //
 
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
 use arrow::record_batch::RecordBatch;
 use parquet::arrow::ArrowWriter;
+use parquet::arrow::async_writer::AsyncArrowWriter;
 use parquet::file::properties::WriterProperties as ArrowWriterProperties;
+use tokio::fs::File as AsyncFile;
+use tokio::fs::OpenOptions as AsyncOpenOptions;
 
 use std::fmt::Debug;
 use std::fs::{File, OpenOptions};
@@ -179,6 +182,77 @@ impl Writer for FixedLengthFileWriter {
     }
 }
 
+pub(crate) struct AsyncParquetWriter {
+    inner: AsyncArrowWriter<AsyncFile>,
+}
+
+impl AsyncParquetWriter {
+    pub fn builder() -> AsyncParquetWriterBuilder {
+        AsyncParquetWriterBuilder {
+            ..Default::default()
+        }
+    }
+
+    pub async fn write_batch(&mut self, batch: &RecordBatch) -> Result<()> {
+        self.inner.write(batch).await?;
+        Ok(())
+    }
+
+    pub async fn finish(&mut self) -> Result<()> {
+        self.inner.flush().await?;
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct AsyncParquetWriterBuilder {
+    out_file: Option<PathBuf>,
+    schema: Option<ArrowSchemaRef>,
+    properties: Option<ArrowWriterProperties>,
+}
+
+impl AsyncParquetWriterBuilder {
+    pub fn with_out_file(mut self, path: PathBuf) -> Self {
+        self.out_file = Some(path);
+        self
+    }
+
+    pub fn with_properties(mut self, properties: ArrowWriterProperties) -> Self {
+        self.properties = Some(properties);
+        self
+    }
+
+    pub fn with_arrow_schema(mut self, schema: ArrowSchemaRef) -> Self {
+        self.schema = Some(schema);
+        self
+    }
+
+    pub async fn build(self) -> Result<AsyncParquetWriter> {
+        let out_file: PathBuf = self
+            .out_file
+            .ok_or("Required field 'out_file' is missing or None.")?;
+
+        let writer_file: AsyncFile = AsyncOpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(out_file)
+            .await?;
+
+        let properties: ArrowWriterProperties = self
+            .properties
+            .ok_or("Required field 'properties' is missing or None.")?;
+
+        let schema: ArrowSchemaRef = self
+            .schema
+            .ok_or("Required field 'schema' is missing or None.")?;
+
+        let buffer: Vec<u8> = Vec::with_capacity(10);
+
+        let inner: AsyncArrowWriter<AsyncFile> = AsyncArrowWriter::try_new(writer_file, schema, Some(properties))?;
+
+        Ok(AsyncParquetWriter { inner })
+    }
+}
 #[derive(Debug)]
 pub(crate) struct ParquetWriter {
     inner: ArrowWriter<File>,

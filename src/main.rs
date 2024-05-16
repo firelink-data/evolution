@@ -53,7 +53,8 @@ mod writer;
 use cli::Cli;
 
 /// Run the evolution program, parsing any CLI arguments using [`clap`].
-fn main() {
+#[tokio::main]
+async fn main() {
     let cli = Cli::parse();
 
     match logger::try_init_logging() {
@@ -64,7 +65,7 @@ fn main() {
         Err(e) => error!("Could not set up env logging: {:?}", e),
     };
 
-    match cli.run() {
+    match cli.run().await {
         Ok(_) => info!("All done! Bye. 👋🥳"),
         Err(e) => error!("{}", e),
     }

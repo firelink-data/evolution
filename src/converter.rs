@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-02-17
-// Last updated: 2024-05-15
+// Last updated: 2024-05-17
 //
 
 use arrow::array::ArrayRef;
@@ -52,7 +52,7 @@ use crate::error::{Result, SetupError};
 use crate::mocker::NUM_CHARS_FOR_NEWLINE;
 use crate::schema::FixedSchema;
 use crate::slicer::Slicer;
-use crate::writer::{ParquetWriter, Writer};
+use crate::writer::{AsyncParquetWriter, ParquetWriter, Writer};
 
 /// The size of the converter read buffer (in bytes).
 pub(crate) static CONVERTER_SLICE_BUFFER_SIZE: usize = 512 * 1024 * 1024;
@@ -70,11 +70,10 @@ pub(crate) static CONVERTER_THREAD_CHANNEL_CAPACITY: usize = 128;
 /// for, the buffer will simply allocate more memory when needed.
 pub(crate) static CONVERTER_LINE_BREAKS_BUFFER_SIZE: usize = 128 * 1024 * 1024;
 
-#[derive(Debug)]
 pub struct Converter {
     in_file: File,
     schema: FixedSchema,
-    writer: Box<dyn Writer>,
+    writer: AsyncParquetWriter,
     slicer: Slicer,
     n_threads: usize,
     multithreaded: bool,
@@ -93,7 +92,7 @@ impl Converter {
         }
     }
 
-    pub fn convert(&mut self) -> Result<()> {
+    pub async fn convert(&mut self) -> Result<()> {
         if self.multithreaded {
             #[cfg(feature = "rayon")]
             info!(
@@ -106,10 +105,10 @@ impl Converter {
                 "Converting in standard multithreaded mode using {} threads.",
                 self.n_threads
             );
-            self.convert_multithreaded()?
+            self.convert_multithreaded().await?
         } else {
             info!("Converting in single-threaded mode.");
-            self.convert_single_threaded()?
+            self.convert_single_threaded().await?
         }
 
         Ok(())
@@ -118,7 +117,7 @@ impl Converter {
     ///
     /// # Panics
     /// If could not move cursor back.
-    fn convert_multithreaded(&mut self) -> Result<()> {
+    async fn convert_multithreaded(&mut self) -> Result<()> {
         let bytes_to_read: usize = self.in_file.metadata()?.len() as usize;
 
         info!(
@@ -185,7 +184,7 @@ impl Converter {
                 &mut worker_line_break_indices,
             );
 
-            self.spawn_convert_threads(&buffer, &line_break_indices, &worker_line_break_indices)?;
+            self.spawn_convert_threads(&buffer, &line_break_indices, &worker_line_break_indices).await?;
 
             bytes_processed += buffer_capacity - n_bytes_left_after_line_break;
             bytes_overlapped += n_bytes_left_after_line_break;
@@ -205,7 +204,7 @@ impl Converter {
 
         #[cfg(debug_assertions)]
         debug!("Finishing and closing writer.");
-        self.writer.finish()?;
+        self.writer.finish().await?;
 
         #[cfg(feature = "rayon")]
         info!(
@@ -230,7 +229,7 @@ impl Converter {
     }
 
     #[cfg(feature = "rayon")]
-    fn spawn_convert_threads(
+    async fn spawn_convert_threads(
         &mut self,
         buffer: &Vec<u8>,
         line_breaks: &[usize],
@@ -263,7 +262,7 @@ impl Converter {
 
         #[cfg(debug_assertions)]
         debug!("Starting master writer thread.");
-        master_thread_write(receiver, &mut self.writer)?;
+        master_thread_write(receiver, &mut self.writer).await?;
 
         Ok(())
     }
@@ -332,7 +331,7 @@ impl Converter {
     /// We use [`libc::memset`] to directly write to and 'reset' the buffer in memory.
     /// This can cause a Segmentation fault if e.g. the memory is not allocated properly,
     /// or we are trying to write outside of the allocated memory area.
-    fn convert_single_threaded(&mut self) -> Result<()> {
+    async fn convert_single_threaded(&mut self) -> Result<()> {
         let bytes_to_read: usize = self.in_file.metadata()?.len() as usize;
 
         info!(
@@ -425,7 +424,7 @@ impl Converter {
 
             let batch = RecordBatch::try_from_iter(builder_write_buffer)?;
 
-            self.writer.write_batch(&batch)?;
+            self.writer.write_batch(&batch).await?;
 
             #[cfg(debug_assertions)]
             debug!("Bytes processed: {}", bytes_processed);
@@ -433,7 +432,7 @@ impl Converter {
             debug!("Remaining bytes: {}", remaining_bytes);
         }
 
-        self.writer.finish()?;
+        self.writer.finish().await?;
 
         info!("Done converting in single-threaded mode!");
 
@@ -503,12 +502,12 @@ pub fn worker_thread_convert(
     drop(channel);
 }
 
-pub fn master_thread_write(
+pub async fn master_thread_write(
     channel: channel::Receiver<RecordBatch>,
-    writer: &mut Box<dyn Writer>,
+    writer: &mut AsyncParquetWriter,
 ) -> Result<()> {
     for record_batch in channel {
-        writer.write_batch(&record_batch)?;
+        writer.write_batch(&record_batch).await?;
         drop(record_batch);
     }
 
@@ -575,7 +574,7 @@ impl ConverterBuilder {
     ///
     /// # Panics
     /// ...
-    pub fn build(self) -> Result<Converter> {
+    pub async fn build(self) -> Result<Converter> {
         let in_file: File = match self.in_file {
             Some(p) => File::open(p)?,
             None => {
@@ -637,13 +636,19 @@ impl ConverterBuilder {
 
         let arrow_schema: ArrowSchemaRef = schema.as_arrow_schema_ref();
 
-        let writer: Box<dyn Writer> = Box::new(
-            ParquetWriter::builder()
-                .with_out_file(out_file)
-                .with_properties(properties)
-                .with_arrow_schema(arrow_schema)
-                .build()?,
-        );
+        /*
+        let writer: ParquetWriter = ParquetWriter::builder()
+            .with_out_file(out_file)
+            .with_properties(properties)
+            .with_arrow_schema(arrow_schema)
+            .build()?;
+        */
+        let writer: AsyncParquetWriter = AsyncParquetWriter::builder()
+            .with_out_file(out_file)
+            .with_properties(properties)
+            .with_arrow_schema(arrow_schema)
+            .build()
+            .await?;
 
         let slicer = Slicer::builder().num_threads(n_threads).build()?;
 
