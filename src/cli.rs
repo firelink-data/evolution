@@ -42,9 +42,9 @@ use std::path::PathBuf;
 #[cfg(feature = "rayon")]
 use crate::chunked::arrow_converter::{MasterBuilders, Slice2Arrow};
 #[cfg(feature = "rayon")]
-use crate::chunked::converter::SampleSliceAggregator;
+use crate::chunked::residual_slicer::ResidualSlicer;
 #[cfg(feature = "rayon")]
-use crate::chunked::slicer::OldSlicer;
+use crate::chunked::self_converter::SampleSliceAggregator;
 #[cfg(feature = "rayon")]
 use crate::chunked::{find_last_nl, line_break_len_cr, Converter as ChunkedConverter, Slicer};
 use crate::converter::Converter;
@@ -276,7 +276,7 @@ impl Cli {
             } => {
                 let _in_file = fs::File::open(in_file)?;
 
-                let mut slicer_instance: Box<dyn Slicer> = Box::new(OldSlicer {
+                let mut slicer_instance: Box<dyn Slicer> = Box::new(ResidualSlicer {
                     fn_find_last_nl: find_last_nl,
                 });
 
