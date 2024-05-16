@@ -25,14 +25,18 @@
 // Last updated: 2024-05-15
 //
 
-use crate::datatype::DataType;
-use padder::{Alignment, Symbol};
 use std::cmp::min;
+
+use padder::{Alignment, Symbol};
+
+use crate::datatype::DataType;
 
 pub(crate) trait ColumnTrimmer {
     fn find_start_stop(&self, data: &[u8], runes: i16) -> (usize, usize);
     // TODO @Willhelm perhaps add trim function here ?
 }
+
+
 
 pub(crate) fn count_rune_bytelength(data: &[u8], runes: i16) -> usize {
     let mut eat = data.iter();
@@ -71,6 +75,7 @@ pub(crate) fn count_rune_bytelength(data: &[u8], runes: i16) -> usize {
 }
 
 pub(crate) struct UtfNotAligned {}
+
 impl ColumnTrimmer for UtfNotAligned {
     fn find_start_stop(&self, data: &[u8], runes: i16) -> (usize, usize) {
         (0, count_rune_bytelength(data, runes) - 1)
@@ -80,6 +85,7 @@ impl ColumnTrimmer for UtfNotAligned {
 pub(crate) struct FloatLeftAligned {
     trim_symbol: Symbol,
 }
+
 impl ColumnTrimmer for crate::trimmer::FloatLeftAligned {
     fn find_start_stop(&self, data: &[u8], runes: i16) -> (usize, usize) {
         let mut eat = data.iter();
@@ -113,6 +119,7 @@ impl ColumnTrimmer for crate::trimmer::FloatLeftAligned {
 pub(crate) struct FloatRightAligned {
     trim_symbol: Symbol,
 }
+
 impl ColumnTrimmer for FloatRightAligned {
     fn find_start_stop(&self, data: &[u8], runes: i16) -> (usize, usize) {
         let mut eat = data.iter();
@@ -141,9 +148,11 @@ impl ColumnTrimmer for FloatRightAligned {
         (start, stop)
     }
 }
+
 pub(crate) struct CharLeftAligned {
     trim_symbol: Symbol,
 }
+
 impl ColumnTrimmer for crate::trimmer::CharLeftAligned {
     fn find_start_stop(&self, data: &[u8], runes: i16) -> (usize, usize) {
         let mut eat = data.iter();
@@ -179,6 +188,7 @@ impl ColumnTrimmer for crate::trimmer::CharLeftAligned {
 pub(crate) struct CharRightAligned {
     trim_symbol: Symbol,
 }
+
 impl ColumnTrimmer for CharRightAligned {
     fn find_start_stop(&self, data: &[u8], runes: i16) -> (usize, usize) {
         let mut eat = data.iter();
@@ -211,6 +221,7 @@ impl ColumnTrimmer for CharRightAligned {
 pub(crate) struct NumLeftAligned {
     trim_symbol: Symbol,
 }
+
 impl ColumnTrimmer for crate::trimmer::NumLeftAligned {
     fn find_start_stop(&self, data: &[u8], runes: i16) -> (usize, usize) {
         let mut eat = data.iter();
@@ -243,6 +254,7 @@ impl ColumnTrimmer for crate::trimmer::NumLeftAligned {
 pub(crate) struct NumRightAligned {
     trim_symbol: Symbol,
 }
+
 impl ColumnTrimmer for NumRightAligned {
     fn find_start_stop(&self, data: &[u8], runes: i16) -> (usize, usize) {
         let mut eat = data.iter();
@@ -276,7 +288,7 @@ pub(crate) fn trimmer_factory(
     dtype: DataType,
     alignment: Alignment,
     trim_symbol: Symbol,
-) -> Box<dyn ColumnTrimmer> {
+) -> Box<dyn ColumnTrimmer + Send +Sync> {
     match (dtype, alignment) {
         (DataType::Boolean, padder::Alignment::Left) => {
             Box::new(crate::trimmer::CharLeftAligned { trim_symbol })

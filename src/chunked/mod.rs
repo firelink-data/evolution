@@ -28,9 +28,6 @@
 use arrow::array::ArrayRef;
 use parquet::format;
 
-use crate::parser;
-use padder::Symbol;
-use std::cmp::min;
 use std::fs;
 
 use self::residual_slicer::SLICER_IN_CHUNK_SIZE;

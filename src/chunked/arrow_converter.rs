@@ -239,7 +239,8 @@ struct HandlerInt32Builder {
     int32builder: Int32Builder,
     runes_in_column: usize,
     name: String,
-    trimmer: Box<dyn ColumnTrimmer>,
+    trimmer: Box<dyn ColumnTrimmer + Send + Sync>,
+
 }
 
 impl ColumnBuilder for HandlerInt32Builder {
@@ -273,7 +274,8 @@ struct HandlerInt64Builder {
     int64builder: Int64Builder,
     runes_in_column: usize,
     name: String,
-    trimmer: Box<dyn ColumnTrimmer>,
+    trimmer: Box<dyn ColumnTrimmer + Send + Sync>,
+
 }
 impl ColumnBuilder for HandlerInt64Builder {
     fn parse_value(&mut self, data: &[u8]) -> usize
@@ -308,7 +310,7 @@ struct HandlerStringBuilder {
     string_builder: StringBuilder,
     runes_in_column: usize,
     name: String,
-    trimmer: Box<dyn ColumnTrimmer>,
+    trimmer: Box<dyn ColumnTrimmer + Send + Sync>,
 }
 impl ColumnBuilder for HandlerStringBuilder {
     fn parse_value(&mut self, data: &[u8]) -> usize
