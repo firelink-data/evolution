@@ -240,7 +240,6 @@ struct HandlerInt32Builder {
     runes_in_column: usize,
     name: String,
     trimmer: Box<dyn ColumnTrimmer + Send + Sync>,
-
 }
 
 impl ColumnBuilder for HandlerInt32Builder {
@@ -275,7 +274,6 @@ struct HandlerInt64Builder {
     runes_in_column: usize,
     name: String,
     trimmer: Box<dyn ColumnTrimmer + Send + Sync>,
-
 }
 impl ColumnBuilder for HandlerInt64Builder {
     fn parse_value(&mut self, data: &[u8]) -> usize
@@ -346,7 +344,7 @@ struct HandlerBooleanBuilder {
     boolean_builder: BooleanBuilder,
     runes_in_column: usize,
     name: String,
-    trimmer: Box<dyn ColumnTrimmer + Send + Sync >,
+    trimmer: Box<dyn ColumnTrimmer + Send + Sync>,
 }
 
 impl ColumnBuilder for HandlerBooleanBuilder {

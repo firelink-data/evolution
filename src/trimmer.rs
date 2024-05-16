@@ -27,8 +27,8 @@
 
 use std::cmp::min;
 
-use padder::{Alignment, Symbol};
 use crate::converter::Converter;
+use padder::{Alignment, Symbol};
 
 use crate::datatype::DataType;
 
@@ -38,8 +38,6 @@ pub(crate) trait ColumnTrimmer {
 }
 //unsafe impl Send for  ColumnTrimmer {}
 //unsafe impl Sync for  ColumnTrimmer {}
-
-
 
 pub(crate) fn count_rune_bytelength(data: &[u8], runes: i16) -> usize {
     let mut eat = data.iter();
@@ -291,7 +289,7 @@ pub(crate) fn trimmer_factory(
     dtype: DataType,
     alignment: Alignment,
     trim_symbol: Symbol,
-) -> Box<dyn ColumnTrimmer + Send +Sync> {
+) -> Box<dyn ColumnTrimmer + Send + Sync> {
     match (dtype, alignment) {
         (DataType::Boolean, padder::Alignment::Left) => {
             Box::new(crate::trimmer::CharLeftAligned { trim_symbol })
