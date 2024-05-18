@@ -326,7 +326,7 @@ mod tests_writer {
             .build()
             .unwrap();
 
-        flfw.write(&vec![0u8; 64]).unwrap();
+        flfw.write(&[0u8; 64]).unwrap();
         fs::remove_file(path).unwrap();
     }
 

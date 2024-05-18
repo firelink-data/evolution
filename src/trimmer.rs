@@ -27,7 +27,6 @@
 
 use std::cmp::min;
 
-use crate::converter::Converter;
 use padder::{Alignment, Symbol};
 
 use crate::datatype::DataType;
