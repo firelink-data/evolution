@@ -29,6 +29,7 @@ use arrow::array::ArrayRef;
 use parquet::format;
 
 use std::fs;
+use std::time::Duration;
 
 use self::residual_slicer::SLICER_IN_CHUNK_SIZE;
 
@@ -50,8 +51,12 @@ pub(crate) trait Slicer<'a> {
 pub(crate) struct Stats {
     pub(crate) bytes_in: usize,
     pub(crate) bytes_out: usize,
-
     pub(crate) num_rows: i64,
+
+    pub(crate) read_duration: Duration,
+    pub(crate) parse_duration: Duration,
+    pub(crate) builder_write_duration: Duration
+    
 }
 
 pub(crate) type FnLineBreakLen = fn() -> usize;
@@ -147,7 +152,7 @@ pub(crate) trait Converter<'a> {
     fn get_line_break_handler(&self) -> FnFindLastLineBreak<'a>;
 
     //    fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
-    fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize);
+    fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize,Duration,Duration);
     fn finish(&mut self) -> parquet::errors::Result<format::FileMetaData>;
     fn get_finish_bytes_written(&mut self) -> usize;
 }

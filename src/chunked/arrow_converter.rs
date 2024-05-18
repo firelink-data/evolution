@@ -46,6 +46,7 @@ use crate::datatype::DataType;
 use crate::schema;
 use crate::trimmer::{trimmer_factory, ColumnTrimmer};
 use crate::{chunked, trimmer};
+use std::time::{Duration, Instant};
 
 pub(crate) struct Slice2Arrow<'a> {
     //    pub(crate) file_out: File,
@@ -163,9 +164,15 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         self.fn_line_break
     }
 
-    fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize) {
+    fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize,Duration,Duration) {
         let mut bytes_in: usize = 0;
         let mut bytes_out: usize = 0;
+        let mut parse_duration: Duration = Duration::new(0,0);
+        let mut builder_write_duration:Duration=Duration::new(0,0);
+        
+
+        let start_parse = Instant::now();
+        
 
         let arc_slices = Arc::new(&slices);
         self.masterbuilders
@@ -190,22 +197,27 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         for ii in slices.iter() {
             bytes_in += ii.len();
         }
-
+        parse_duration= start_parse.elapsed();
+        
         for b in self.masterbuilders.builders.iter_mut() {
             let mut br: Vec<(&str, ArrayRef)> = vec![];
 
             for bb in b.iter_mut() {
                 br.push(bb.finish());
             }
+            
 
+            let start_builder_write=Instant::now();
             let batch = RecordBatch::try_from_iter(br).unwrap();
 
             self.writer.write(&batch).expect("Error Writing batch");
             bytes_out += self.writer.bytes_written();
-            debug!("Batch write: accumulated bytes_written {}", bytes_out);
+            
+            builder_write_duration+=start_builder_write.elapsed();
         }
+        debug!("Batch write: accumulated bytes_written {}", bytes_out);
 
-        (bytes_in, bytes_out)
+        (bytes_in, bytes_out,parse_duration,builder_write_duration)
     }
 
     fn finish(&mut self) -> parquet::errors::Result<format::FileMetaData> {
