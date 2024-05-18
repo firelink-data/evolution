@@ -302,8 +302,8 @@ impl Cli {
                     slicer_instance.slice_and_convert(converter_instance, _in_file, n_threads)?;
 
                 info!(
-                    "Operation successful inbytes={} out bytes={} num of rows={}",
-                    stats.bytes_in, stats.bytes_out, stats.num_rows
+                    "Operation successful \ninbytes={} \nout bytes={} \nnum of rows={} \nread duration={:?} \nparse duration {:?}\nwrite duration={:?}",
+                    stats.bytes_in, stats.bytes_out, stats.num_rows,stats.read_duration,stats.parse_duration,stats.builder_write_duration
                 );
             }
             Commands::Mock {
