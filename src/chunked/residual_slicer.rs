@@ -62,9 +62,9 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
 
         let mut bytes_in = 0;
         let mut bytes_out = 0;
-        let mut read_duration_tot:Duration= Duration::new(0,0);
-        let mut parse_duration_tot: Duration = Duration::new(0,0);
-        let mut builder_write_duration_tot:Duration=Duration::new(0,0);
+        let mut read_duration_tot: Duration = Duration::new(0, 0);
+        let mut parse_duration_tot: Duration = Duration::new(0, 0);
+        let mut builder_write_duration_tot: Duration = Duration::new(0, 0);
 
         let mut remaining_file_length = infile.metadata().unwrap().len() as usize;
 
@@ -94,7 +94,7 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
 
             let chunk_len_effective_read: usize;
 
-            let start_read=Instant::now();
+            let start_read = Instant::now();
 
             (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
                 self.fn_find_last_nl,
@@ -106,15 +106,15 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
                 chunk_len_toread,
             );
 
-            read_duration_tot+=start_read.elapsed();
-            
+            read_duration_tot += start_read.elapsed();
+
             remaining_file_length -= chunk_len_effective_read;
-            let (bin, bout,parse_duration,builder_write_duration) = converter.process(slices);
+            let (bin, bout, parse_duration, builder_write_duration) = converter.process(slices);
             bytes_in += bin;
             bytes_out += bout;
-            parse_duration_tot+=parse_duration;
-            builder_write_duration_tot+=builder_write_duration;
-            
+            parse_duration_tot += parse_duration;
+            builder_write_duration_tot += builder_write_duration;
+
             if remaining_file_length == 0 {
                 break;
             }
@@ -125,15 +125,17 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
         if 0 != residue_len {
             slices = residual_to_slice(&residue, &mut cr.chunk, residue_len);
 
-            let (bin, bout,parse_duration,builder_write_duration) = converter.process(slices);
+            let (bin, bout, parse_duration, builder_write_duration) = converter.process(slices);
             bytes_in += bin;
             bytes_out += bout;
-            parse_duration_tot+=parse_duration;
-            builder_write_duration_tot+=builder_write_duration;
-
+            parse_duration_tot += parse_duration;
+            builder_write_duration_tot += builder_write_duration;
         }
 
-        info!("Bytes in= {}\n out= {}\nparse duration= {:?}\n \n builder write_duration {:?}\n", bytes_in, bytes_out,parse_duration_tot,builder_write_duration_tot);
+        info!(
+            "Bytes in= {}\n out= {}\nparse duration= {:?}\n \n builder write_duration {:?}\n",
+            bytes_in, bytes_out, parse_duration_tot, builder_write_duration_tot
+        );
 
         match converter.finish() {
             Ok(x) => Result::Ok(Stats {

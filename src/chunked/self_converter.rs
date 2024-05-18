@@ -47,10 +47,10 @@ impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
         self.fn_line_break
     }
 
-    fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize,Duration,Duration) {
+    fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize, Duration, Duration) {
         let mut bytes_processed: usize = 0;
-        let duration=Duration::new(0,0);
-        
+        let duration = Duration::new(0, 0);
+
         slices
             .par_iter()
             .enumerate()
@@ -60,7 +60,7 @@ impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
             let l = val.len();
             bytes_processed += l;
         }
-        (bytes_processed,0,duration,duration)
+        (bytes_processed, 0, duration, duration)
     }
 
     fn finish(&mut self) -> Result<parquet::format::FileMetaData, parquet::errors::ParquetError> {
