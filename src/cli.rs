@@ -271,7 +271,7 @@ impl Cli {
                 let converter_instance: Box<dyn ChunkedConverter> = match converter {
                     Converters::Arrow => {
                         let mut master_builders = MasterBuilders::builders_factory(
-                            out_file.canonicalize().unwrap(),
+                            out_file.clone().to_path_buf(),
                             schema.to_path_buf(),
                             n_threads as i16,
                         );
