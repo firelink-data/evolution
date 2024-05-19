@@ -47,6 +47,11 @@ use crate::schema;
 use crate::trimmer::{trimmer_factory, ColumnTrimmer};
 use crate::{chunked, trimmer};
 use std::time::{Duration, Instant};
+use arrow::datatypes::SchemaRef;
+use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use crossbeam::atomic::AtomicConsume;
+
+static GLOBAL_COUNTER: AtomicUsize = ATOMIC_USIZE_INIT;
 
 pub(crate) struct Slice2Arrow<'a> {
     //    pub(crate) file_out: File,
@@ -58,6 +63,7 @@ pub(crate) struct Slice2Arrow<'a> {
 
 pub(crate) struct MasterBuilders {
     builders: Vec<Vec<Box<dyn Sync + Send + ColumnBuilder>>>,
+    outfile: PathBuf
     //      schema: arrow_schema::SchemaRef
 }
 
@@ -65,7 +71,17 @@ unsafe impl Send for MasterBuilders {}
 unsafe impl Sync for MasterBuilders {}
 
 impl MasterBuilders {
-    pub fn writer_factory(&mut self, out_file: &PathBuf) -> ArrowWriter<File> {
+    pub fn schema_factory(&mut self) -> SchemaRef {
+        let b: &mut Vec<Box<dyn Sync + Send + ColumnBuilder>> = self.builders.get_mut(0).unwrap();
+        let mut br: Vec<(&str, ArrayRef)> = vec![];
+        for bb in b.iter_mut() {
+            br.push(bb.finish());
+        }
+
+        let batch = RecordBatch::try_from_iter(br).unwrap();
+        batch.schema()
+    }
+    pub fn writer_factory( out_file: &PathBuf, schema: SchemaRef) -> ArrowWriter<File> {
         let _out_file = fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -75,20 +91,14 @@ impl MasterBuilders {
         let props = WriterProperties::builder()
             .set_compression(Compression::SNAPPY)
             .build();
+        
 
-        let b: &mut Vec<Box<dyn Sync + Send + ColumnBuilder>> = self.builders.get_mut(0).unwrap();
-        let mut br: Vec<(&str, ArrayRef)> = vec![];
-        for bb in b.iter_mut() {
-            br.push(bb.finish());
-        }
-
-        let batch = RecordBatch::try_from_iter(br).unwrap();
         let writer: ArrowWriter<File> =
-            ArrowWriter::try_new(_out_file, batch.schema(), Some(props.clone())).unwrap();
+            ArrowWriter::try_new(_out_file,schema , Some(props.clone())).unwrap();
         writer
     }
 
-    pub fn builders_factory(schema_path: PathBuf, instances: i16) -> Self {
+    pub fn builders_factory(out_file : PathBuf,schema_path: PathBuf, instances: i16) -> Self {
         let schema = schema::FixedSchema::from_path(schema_path).unwrap();
         let antal_col = schema.num_columns();
         let mut builders: Vec<Vec<Box<dyn ColumnBuilder + Sync + Send>>> = Vec::new();
@@ -152,7 +162,7 @@ impl MasterBuilders {
             }
             builders.push(buildersmut);
         }
-        MasterBuilders { builders }
+        MasterBuilders {builders: builders ,outfile:out_file}
     }
 }
 
@@ -197,6 +207,8 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         }
         parse_duration = start_parse.elapsed();
 
+        let mut rb: Vec<RecordBatch>=Vec::new();
+        
         for b in self.masterbuilders.builders.iter_mut() {
             let mut br: Vec<(&str, ArrayRef)> = vec![];
 
@@ -205,13 +217,25 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
             }
 
             let start_builder_write = Instant::now();
-            let batch = RecordBatch::try_from_iter(br).unwrap();
-
-            self.writer.write(&batch).expect("Error Writing batch");
-            bytes_out += self.writer.bytes_written();
-
+            rb.push(RecordBatch::try_from_iter(br).unwrap());
             builder_write_duration += start_builder_write.elapsed();
         }
+//        let writer: ArrowWriter<File> = 
+        let schema=self.masterbuilders.schema_factory();
+        let _outfile=self.masterbuilders.outfile.clone();
+        
+        rayon::spawn(move || {
+            let mut writer=crate::chunked::arrow_converter::MasterBuilders::writer_factory(&_outfile,schema.clone());
+            for ba in  rb.iter_mut() {
+                writer.write(ba).expect("Error Writing batch");
+                GLOBAL_COUNTER.fetch_add(writer.bytes_written(), Ordering::Relaxed);
+            }
+            writer.close();
+
+        });
+
+        bytes_out += GLOBAL_COUNTER.load_consume();
+        
         debug!("Batch write: accumulated bytes_written {}", bytes_out);
 
         (bytes_in, bytes_out, parse_duration, builder_write_duration)

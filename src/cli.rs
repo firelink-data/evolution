@@ -271,10 +271,12 @@ impl Cli {
                 let converter_instance: Box<dyn ChunkedConverter> = match converter {
                     Converters::Arrow => {
                         let mut master_builders = MasterBuilders::builders_factory(
+                            out_file.canonicalize().unwrap(),
                             schema.to_path_buf(),
                             n_threads as i16,
                         );
-                        let writer: ArrowWriter<File> = master_builders.writer_factory(out_file);
+                        let schema=master_builders.schema_factory();
+                        let writer: ArrowWriter<File> =  MasterBuilders::writer_factory(out_file,schema);
 
                         let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow {
                             writer,
