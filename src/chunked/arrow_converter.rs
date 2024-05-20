@@ -46,18 +46,17 @@ use crate::datatype::DataType;
 use crate::schema;
 use crate::trimmer::{trimmer_factory, ColumnTrimmer};
 use crate::{chunked, trimmer};
-use std::time::{Duration, Instant};
-use arrow::datatypes::SchemaRef;
-use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use arrow::datatypes::{Field, Schema, SchemaRef};
 use crossbeam::atomic::AtomicConsume;
-use std::sync::mpsc::{sync_channel, SyncSender, Receiver, RecvError};
+use parquet::errors::{ParquetError, Result};
+use parquet::file::metadata::FileMetaData;
+use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use std::sync::mpsc::{sync_channel, Receiver, RecvError, SyncSender};
 use std::thread;
 use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
 use thread::spawn;
-use parquet::file::metadata::FileMetaData;
-use parquet::errors::{ParquetError, Result};
 //use crossbeam::channel::{Receiver, Sender};
-
 
 static GLOBAL_COUNTER: AtomicUsize = ATOMIC_USIZE_INIT;
 
@@ -88,7 +87,7 @@ impl MasterBuilders {
         let batch = RecordBatch::try_from_iter(br).unwrap();
         batch.schema()
     }
-    pub fn writer_factory( out_file: &PathBuf, schema: SchemaRef) -> ArrowWriter<File> {
+    pub fn writer_factory(out_file: &PathBuf, schema: SchemaRef) -> ArrowWriter<File> {
         let _out_file = fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -99,13 +98,12 @@ impl MasterBuilders {
             .set_compression(Compression::SNAPPY)
             .build();
 
-
         let writer: ArrowWriter<File> =
-            ArrowWriter::try_new(_out_file,schema , Some(props.clone())).unwrap();
+            ArrowWriter::try_new(_out_file, schema, Some(props.clone())).unwrap();
         writer
     }
 
-    pub fn builders_factory(out_file : PathBuf,schema_path: PathBuf, instances: i16) -> Self {
+    pub fn builders_factory(out_file: PathBuf, schema_path: PathBuf, instances: i16) -> Self {
         let schema = schema::FixedSchema::from_path(schema_path).unwrap();
         let antal_col = schema.num_columns();
         let mut builders: Vec<Vec<Box<dyn ColumnBuilder + Sync + Send>>> = Vec::new();
@@ -169,7 +167,11 @@ impl MasterBuilders {
             }
             builders.push(buildersmut);
         }
-        MasterBuilders {builders: builders ,outfile:out_file, sender: None }
+        MasterBuilders {
+            builders: builders,
+            outfile: out_file,
+            sender: None,
+        }
     }
 }
 
@@ -214,8 +216,8 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         }
         parse_duration = start_parse.elapsed();
 
-        let mut rb: Vec<RecordBatch>=Vec::new();
-        
+        let mut rb: Vec<RecordBatch> = Vec::new();
+
         for b in self.masterbuilders.builders.iter_mut() {
             let mut br: Vec<(&str, ArrayRef)> = vec![];
 
@@ -224,36 +226,42 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
             }
 
             let start_builder_write = Instant::now();
-            let record_batch=RecordBatch::try_from_iter(br).unwrap();
-//            rb.push(RecordBatch::try_from_iter(br).unwrap());
-            
-            self.masterbuilders.sender.clone().unwrap().send(record_batch);
-            
+            let record_batch = RecordBatch::try_from_iter(br).unwrap();
+            //            rb.push(RecordBatch::try_from_iter(br).unwrap());
+
+            let _ = self
+                .masterbuilders
+                .sender
+                .clone()
+                .unwrap()
+                .send(record_batch);
+
             builder_write_duration += start_builder_write.elapsed();
         }
-//        let writer: ArrowWriter<File> =
+        //        let writer: ArrowWriter<File> =
 
         debug!("Batch write: accumulated bytes_written {}", bytes_out);
 
         (bytes_in, bytes_out, parse_duration, builder_write_duration)
     }
 
-    fn setup(&mut self)->(JoinHandle< Result<format::FileMetaData>>,SyncSender<RecordBatch>) {
-        let schema=self.masterbuilders.schema_factory();
-        let _outfile=self. masterbuilders.outfile.clone();
-        let mut writer=crate::chunked::arrow_converter::MasterBuilders::writer_factory(&_outfile,schema.clone());
+    fn setup(&mut self) -> JoinHandle<Result<format::FileMetaData>> {
+        let schema = self.masterbuilders.schema_factory();
+        let _outfile = self.masterbuilders.outfile.clone();
+        let mut writer = crate::chunked::arrow_converter::MasterBuilders::writer_factory(
+            &_outfile,
+            schema.clone(),
+        );
         let (sender, receiver) = sync_channel::<RecordBatch>(1);
 
-        let t:JoinHandle< Result<format::FileMetaData>>= thread::spawn(move|| {
-
-            'outer:            loop {
-
-                let message=receiver.recv();
+        let t: JoinHandle<Result<format::FileMetaData>> = thread::spawn(move || {
+            'outer: loop {
+                let message = receiver.recv();
                 match message {
                     Ok(rb) => {
                         writer.write(&rb).expect("Error Writing batch");
-                        if (rb.num_rows()==0) {
-                            break 'outer
+                        if (rb.num_rows() == 0) {
+                            break 'outer;
                         }
                     }
                     Err(e) => {
@@ -262,20 +270,28 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
                         break 'outer;
                     }
                 }
-
             }
             info!("closing the writer for parquet");
 
-             writer.finish()
+            writer.finish()
         });
-        self.masterbuilders.sender=Some(sender.clone());
-        (t,sender)
+        self.masterbuilders.sender = Some(sender.clone());
+        t
 
-//        bytes_out += crate::chunked::arrow_converter::GLOBAL_COUNTER.load_consume();
+        //        bytes_out += crate::chunked::arrow_converter::GLOBAL_COUNTER.load_consume();
     }
 
     fn shutdown(&mut self) {
-        drop(&self.masterbuilders.sender);
+        //        converter.shutdown();
+        let schema = Schema::new(vec![Field::new(
+            "id",
+            arrow::datatypes::DataType::Int32,
+            false,
+        )]);
+
+        let emptyrb = arrow::record_batch::RecordBatch::new_empty(Arc::new(schema));
+
+        let _ = &self.masterbuilders.sender.clone().unwrap().send(emptyrb);
     }
 }
 
