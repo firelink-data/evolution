@@ -81,8 +81,8 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
         };
 
 
-        converter.setup();
-
+        let j=converter.setup();
+        
         rayon::ThreadPoolBuilder::new()
             .stack_size(((SLICER_IN_CHUNK_SIZE as f32) * 2f32) as usize)
             .build_global()
@@ -136,11 +136,14 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
             builder_write_duration_tot += builder_write_duration;
         }
 
+        
+        let _ = j.join(); // Make sure 
         info!(
             "Bytes in= {}\n out= {}\nparse duration= {:?}\n \n builder write_duration {:?}\n",
             bytes_in, bytes_out, parse_duration_tot, builder_write_duration_tot
         );
-
+        
+        
 
         Ok(Stats {
             bytes_in,

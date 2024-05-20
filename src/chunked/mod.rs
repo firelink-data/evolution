@@ -29,9 +29,12 @@ use arrow::array::ArrayRef;
 use parquet::format;
 
 use std::fs;
+use std::thread::JoinHandle;
 use std::time::Duration;
 
 use self::residual_slicer::SLICER_IN_CHUNK_SIZE;
+use parquet::errors::{ParquetError, Result};
+
 
 pub(crate) mod arrow_converter;
 pub(crate) mod residual_slicer;
@@ -152,7 +155,8 @@ pub(crate) trait Converter<'a> {
 
     //    fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
     fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize, Duration, Duration);
-    fn setup(&mut self);
+    fn setup(&mut self)->JoinHandle< Result<format::FileMetaData>>;
+    fn shutdown(&mut self);
 
 }
 

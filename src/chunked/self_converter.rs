@@ -30,7 +30,11 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIter
 
 use std::fs::File;
 use std::io::Write;
+use std::thread::JoinHandle;
 use std::time::Duration;
+use parquet::format;
+use parquet::file::metadata::FileMetaData;
+use parquet::errors::{ParquetError, Result};
 
 use super::{Converter, FnFindLastLineBreak};
 
@@ -63,7 +67,12 @@ impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
         (bytes_processed, 0, duration, duration)
     }
 
-    fn setup(&mut self) {
+    fn setup(&mut self) ->JoinHandle< Result<format::FileMetaData>> {
+
+        todo!()
+    }
+
+    fn shutdown(&mut self) {
         todo!()
     }
 }

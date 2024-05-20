@@ -50,9 +50,12 @@ use std::time::{Duration, Instant};
 use arrow::datatypes::SchemaRef;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use crossbeam::atomic::AtomicConsume;
-use std::sync::mpsc::{sync_channel, SyncSender,Receiver};
+use std::sync::mpsc::{sync_channel, SyncSender, Receiver, RecvError};
 use std::thread;
+use std::thread::JoinHandle;
 use thread::spawn;
+use parquet::file::metadata::FileMetaData;
+use parquet::errors::{ParquetError, Result};
 //use crossbeam::channel::{Receiver, Sender};
 
 
@@ -231,21 +234,34 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         (bytes_in, bytes_out, parse_duration, builder_write_duration)
     }
 
-    fn setup(&mut self) {
+    fn setup(&mut self)->JoinHandle< Result<format::FileMetaData>> {
         let schema=self.masterbuilders.schema_factory();
         let _outfile=self. masterbuilders.outfile.clone();
         let mut writer=crate::chunked::arrow_converter::MasterBuilders::writer_factory(&_outfile,schema.clone());
         let (sender, receiver) = sync_channel::<RecordBatch>(1);
 
-        let t= spawn(move|| {
+        let t:JoinHandle< Result<format::FileMetaData>>= thread::spawn(move|| {
             loop {
-                let rb=receiver.recv().unwrap();
-                writer.write(&rb).expect("Error Writing batch");
-            }            
+                let message=receiver.recv();
+                match message {
+                    Ok(rb) => {
+                        writer.write(&rb).expect("Error Writing batch");
+                    }
+                    Err(e) => {break;}
+                }
+
+            }
+
+             writer.finish()
         });
         self.masterbuilders.sender=Some(sender);
-        
+        t
+
 //        bytes_out += crate::chunked::arrow_converter::GLOBAL_COUNTER.load_consume();
+    }
+
+    fn shutdown(&mut self) {
+        drop(&self.masterbuilders.sender);
     }
 }
 
