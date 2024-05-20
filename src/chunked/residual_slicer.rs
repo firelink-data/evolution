@@ -27,10 +27,15 @@
 
 use log::info;
 
+use arrow::array::Int32Array;
+use arrow::datatypes::{DataType, Field, Schema};
+use arrow::ipc::RecordBatch;
 use std::cmp;
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Read};
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use super::{ChunkAndResidue, Converter, FnFindLastLineBreak, IterRevolver, Slicer, Stats};
@@ -84,6 +89,8 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
             .build_global()
             .unwrap();
 
+        let j = converter.setup();
+
         loop {
             let cr = ir.next().unwrap();
 
@@ -131,23 +138,25 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
             parse_duration_tot += parse_duration;
             builder_write_duration_tot += builder_write_duration;
         }
+        info!("about to shudown converter...");
+
+        converter.shutdown();
+        info!("converter has been shutdown");
+        let _ = j.join(); // Make sure writer thread is done.
 
         info!(
             "Bytes in= {}\n out= {}\nparse duration= {:?}\n \n builder write_duration {:?}\n",
             bytes_in, bytes_out, parse_duration_tot, builder_write_duration_tot
         );
 
-        match converter.finish() {
-            Ok(x) => Result::Ok(Stats {
-                bytes_in,
-                bytes_out: converter.get_finish_bytes_written(),
-                num_rows: x.num_rows,
-                read_duration: read_duration_tot,
-                parse_duration: parse_duration_tot,
-                builder_write_duration: builder_write_duration_tot,
-            }),
-            Err(_x) => Result::Err("Could not produce Parquet"),
-        }
+        Ok(Stats {
+            bytes_in,
+            bytes_out: bytes_out,
+            num_rows: 0,
+            read_duration: read_duration_tot,
+            parse_duration: parse_duration_tot,
+            builder_write_duration: builder_write_duration_tot,
+        })
     }
 }
 

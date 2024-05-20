@@ -25,13 +25,16 @@
 // Last updated: 2024-05-15
 //
 
-use arrow::array::ArrayRef;
+use arrow::array::{ArrayRef, RecordBatch};
 use parquet::format;
 
 use std::fs;
+use std::sync::mpsc::SyncSender;
+use std::thread::JoinHandle;
 use std::time::Duration;
 
 use self::residual_slicer::SLICER_IN_CHUNK_SIZE;
+use parquet::errors::{ParquetError, Result};
 
 pub(crate) mod arrow_converter;
 pub(crate) mod residual_slicer;
@@ -152,8 +155,8 @@ pub(crate) trait Converter<'a> {
 
     //    fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
     fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize, Duration, Duration);
-    fn finish(&mut self) -> parquet::errors::Result<format::FileMetaData>;
-    fn get_finish_bytes_written(&mut self) -> usize;
+    fn setup(&mut self) -> JoinHandle<Result<format::FileMetaData>>;
+    fn shutdown(&mut self);
 }
 
 pub trait ColumnBuilder {

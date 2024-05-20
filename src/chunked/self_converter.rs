@@ -28,8 +28,14 @@
 use log::info;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
+use arrow::array::RecordBatch;
+use parquet::errors::{ParquetError, Result};
+use parquet::file::metadata::FileMetaData;
+use parquet::format;
 use std::fs::File;
 use std::io::Write;
+use std::sync::mpsc::SyncSender;
+use std::thread::JoinHandle;
 use std::time::Duration;
 
 use super::{Converter, FnFindLastLineBreak};
@@ -63,11 +69,11 @@ impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
         (bytes_processed, 0, duration, duration)
     }
 
-    fn finish(&mut self) -> Result<parquet::format::FileMetaData, parquet::errors::ParquetError> {
+    fn setup(&mut self) -> JoinHandle<Result<format::FileMetaData>> {
         todo!()
     }
 
-    fn get_finish_bytes_written(&mut self) -> usize {
+    fn shutdown(&mut self) {
         todo!()
     }
 }
