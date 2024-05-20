@@ -275,11 +275,8 @@ impl Cli {
                             schema.to_path_buf(),
                             n_threads as i16,
                         );
-                        let schema=master_builders.schema_factory();
-                        let writer: ArrowWriter<File> =  MasterBuilders::writer_factory(out_file,schema);
 
                         let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow {
-                            writer,
                             fn_line_break: find_last_nl,
                             fn_line_break_len: line_break_len_cr,
                             masterbuilders: master_builders,

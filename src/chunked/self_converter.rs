@@ -63,11 +63,7 @@ impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
         (bytes_processed, 0, duration, duration)
     }
 
-    fn finish(&mut self) -> Result<parquet::format::FileMetaData, parquet::errors::ParquetError> {
-        todo!()
-    }
-
-    fn get_finish_bytes_written(&mut self) -> usize {
+    fn setup(&mut self) {
         todo!()
     }
 }

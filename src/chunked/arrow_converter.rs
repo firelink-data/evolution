@@ -50,12 +50,16 @@ use std::time::{Duration, Instant};
 use arrow::datatypes::SchemaRef;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use crossbeam::atomic::AtomicConsume;
+use std::sync::mpsc::{sync_channel, SyncSender,Receiver};
+use std::thread;
+use thread::spawn;
+//use crossbeam::channel::{Receiver, Sender};
+
 
 static GLOBAL_COUNTER: AtomicUsize = ATOMIC_USIZE_INIT;
 
 pub(crate) struct Slice2Arrow<'a> {
     //    pub(crate) file_out: File,
-    pub(crate) writer: ArrowWriter<File>,
     pub(crate) fn_line_break: FnFindLastLineBreak<'a>,
     pub(crate) fn_line_break_len: FnLineBreakLen,
     pub(crate) masterbuilders: MasterBuilders,
@@ -63,8 +67,8 @@ pub(crate) struct Slice2Arrow<'a> {
 
 pub(crate) struct MasterBuilders {
     builders: Vec<Vec<Box<dyn Sync + Send + ColumnBuilder>>>,
-    outfile: PathBuf
-    //      schema: arrow_schema::SchemaRef
+    outfile: PathBuf,
+    sender: Option<SyncSender<RecordBatch>>,
 }
 
 unsafe impl Send for MasterBuilders {}
@@ -91,7 +95,7 @@ impl MasterBuilders {
         let props = WriterProperties::builder()
             .set_compression(Compression::SNAPPY)
             .build();
-        
+
 
         let writer: ArrowWriter<File> =
             ArrowWriter::try_new(_out_file,schema , Some(props.clone())).unwrap();
@@ -162,7 +166,7 @@ impl MasterBuilders {
             }
             builders.push(buildersmut);
         }
-        MasterBuilders {builders: builders ,outfile:out_file}
+        MasterBuilders {builders: builders ,outfile:out_file, sender: None }
     }
 }
 
@@ -220,33 +224,28 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
             rb.push(RecordBatch::try_from_iter(br).unwrap());
             builder_write_duration += start_builder_write.elapsed();
         }
-//        let writer: ArrowWriter<File> = 
-        let schema=self.masterbuilders.schema_factory();
-        let _outfile=self.masterbuilders.outfile.clone();
-        
-        rayon::spawn(move || {
-            let mut writer=crate::chunked::arrow_converter::MasterBuilders::writer_factory(&_outfile,schema.clone());
-            for ba in  rb.iter_mut() {
-                writer.write(ba).expect("Error Writing batch");
-                GLOBAL_COUNTER.fetch_add(writer.bytes_written(), Ordering::Relaxed);
-            }
-            writer.close();
+//        let writer: ArrowWriter<File> =
 
-        });
-
-        bytes_out += GLOBAL_COUNTER.load_consume();
-        
         debug!("Batch write: accumulated bytes_written {}", bytes_out);
 
         (bytes_in, bytes_out, parse_duration, builder_write_duration)
     }
 
-    fn finish(&mut self) -> parquet::errors::Result<format::FileMetaData> {
-        self.writer.finish()
-    }
+    fn setup(&mut self) {
+        let schema=self.masterbuilders.schema_factory();
+        let _outfile=self. masterbuilders.outfile.clone();
+        let mut writer=crate::chunked::arrow_converter::MasterBuilders::writer_factory(&_outfile,schema.clone());
+        let (sender, receiver) = sync_channel::<RecordBatch>(1);
 
-    fn get_finish_bytes_written(&mut self) -> usize {
-        self.writer.bytes_written()
+        let t= spawn(move|| {
+            loop {
+                let rb=receiver.recv().unwrap();
+                writer.write(&rb).expect("Error Writing batch");
+            }            
+        });
+        self.masterbuilders.sender=Some(sender);
+        
+//        bytes_out += crate::chunked::arrow_converter::GLOBAL_COUNTER.load_consume();
     }
 }
 

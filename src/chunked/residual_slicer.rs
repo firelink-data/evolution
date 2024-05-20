@@ -31,6 +31,7 @@ use std::cmp;
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Read};
+use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 use super::{ChunkAndResidue, Converter, FnFindLastLineBreak, IterRevolver, Slicer, Stats};
@@ -78,6 +79,9 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
             len: in_buffers.len(),
             phantom: std::marker::PhantomData,
         };
+
+
+        converter.setup();
 
         rayon::ThreadPoolBuilder::new()
             .stack_size(((SLICER_IN_CHUNK_SIZE as f32) * 2f32) as usize)
@@ -137,19 +141,18 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
             bytes_in, bytes_out, parse_duration_tot, builder_write_duration_tot
         );
 
-        match converter.finish() {
-            Ok(x) => Result::Ok(Stats {
-                bytes_in,
-                bytes_out: converter.get_finish_bytes_written(),
-                num_rows: x.num_rows,
-                read_duration: read_duration_tot,
-                parse_duration: parse_duration_tot,
-                builder_write_duration: builder_write_duration_tot,
-            }),
-            Err(_x) => Result::Err("Could not produce Parquet"),
+
+        Ok(Stats {
+            bytes_in,
+            bytes_out: bytes_out,
+            num_rows: 0,
+            read_duration: read_duration_tot,
+            parse_duration: parse_duration_tot,
+            builder_write_duration: builder_write_duration_tot,
+        })
         }
     }
-}
+
 
 fn residual_to_slice<'a>(
     residue: &[u8; SLICER_IN_CHUNK_SIZE],

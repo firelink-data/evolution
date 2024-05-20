@@ -152,8 +152,8 @@ pub(crate) trait Converter<'a> {
 
     //    fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
     fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize, Duration, Duration);
-    fn finish(&mut self) -> parquet::errors::Result<format::FileMetaData>;
-    fn get_finish_bytes_written(&mut self) -> usize;
+    fn setup(&mut self);
+
 }
 
 pub trait ColumnBuilder {
