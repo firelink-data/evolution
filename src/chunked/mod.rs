@@ -25,10 +25,11 @@
 // Last updated: 2024-05-15
 //
 
-use arrow::array::ArrayRef;
+use arrow::array::{ArrayRef, RecordBatch};
 use parquet::format;
 
 use std::fs;
+use std::sync::mpsc::SyncSender;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -155,7 +156,7 @@ pub(crate) trait Converter<'a> {
 
     //    fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
     fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize, Duration, Duration);
-    fn setup(&mut self)->JoinHandle< Result<format::FileMetaData>>;
+    fn setup(&mut self)->(JoinHandle< Result<format::FileMetaData>>,SyncSender<RecordBatch>);
     fn shutdown(&mut self);
 
 }

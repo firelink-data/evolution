@@ -30,8 +30,10 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIter
 
 use std::fs::File;
 use std::io::Write;
+use std::sync::mpsc::SyncSender;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use arrow::array::RecordBatch;
 use parquet::format;
 use parquet::file::metadata::FileMetaData;
 use parquet::errors::{ParquetError, Result};
@@ -67,7 +69,7 @@ impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
         (bytes_processed, 0, duration, duration)
     }
 
-    fn setup(&mut self) ->JoinHandle< Result<format::FileMetaData>> {
+    fn setup(&mut self) ->(JoinHandle< Result<format::FileMetaData>>,SyncSender<RecordBatch>) {
 
         todo!()
     }

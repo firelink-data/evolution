@@ -27,7 +27,7 @@
 
 use arrow::array::{ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
-use log::debug;
+use log::{debug, info};
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
@@ -224,7 +224,11 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
             }
 
             let start_builder_write = Instant::now();
-            rb.push(RecordBatch::try_from_iter(br).unwrap());
+            let record_batch=RecordBatch::try_from_iter(br).unwrap();
+//            rb.push(RecordBatch::try_from_iter(br).unwrap());
+            
+            self.masterbuilders.sender.clone().unwrap().send(record_batch);
+            
             builder_write_duration += start_builder_write.elapsed();
         }
 //        let writer: ArrowWriter<File> =
@@ -234,28 +238,38 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         (bytes_in, bytes_out, parse_duration, builder_write_duration)
     }
 
-    fn setup(&mut self)->JoinHandle< Result<format::FileMetaData>> {
+    fn setup(&mut self)->(JoinHandle< Result<format::FileMetaData>>,SyncSender<RecordBatch>) {
         let schema=self.masterbuilders.schema_factory();
         let _outfile=self. masterbuilders.outfile.clone();
         let mut writer=crate::chunked::arrow_converter::MasterBuilders::writer_factory(&_outfile,schema.clone());
         let (sender, receiver) = sync_channel::<RecordBatch>(1);
 
         let t:JoinHandle< Result<format::FileMetaData>>= thread::spawn(move|| {
-            loop {
+
+            'outer:            loop {
+
                 let message=receiver.recv();
                 match message {
                     Ok(rb) => {
                         writer.write(&rb).expect("Error Writing batch");
+                        if (rb.num_rows()==0) {
+                            break 'outer
+                        }
                     }
-                    Err(e) => {break;}
+                    Err(e) => {
+                        info!("got RecvError in channel , break to outer");
+
+                        break 'outer;
+                    }
                 }
 
             }
+            info!("closing the writer for parquet");
 
              writer.finish()
         });
-        self.masterbuilders.sender=Some(sender);
-        t
+        self.masterbuilders.sender=Some(sender.clone());
+        (t,sender)
 
 //        bytes_out += crate::chunked::arrow_converter::GLOBAL_COUNTER.load_consume();
     }

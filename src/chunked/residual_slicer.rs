@@ -31,8 +31,12 @@ use std::cmp;
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Read};
+use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
+use arrow::array::Int32Array;
+use arrow::datatypes::{DataType, Field, Schema};
+use arrow::ipc::RecordBatch;
 
 use super::{ChunkAndResidue, Converter, FnFindLastLineBreak, IterRevolver, Slicer, Stats};
 
@@ -81,63 +85,76 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
         };
 
 
-        let j=converter.setup();
         
         rayon::ThreadPoolBuilder::new()
             .stack_size(((SLICER_IN_CHUNK_SIZE as f32) * 2f32) as usize)
             .build_global()
             .unwrap();
+        {
+            let (j, s) = converter.setup();
 
-        loop {
+            loop {
+                let cr = ir.next().unwrap();
+
+                let mut chunk_len_toread = SLICER_IN_CHUNK_SIZE;
+                if remaining_file_length < SLICER_IN_CHUNK_SIZE {
+                    chunk_len_toread = remaining_file_length;
+                }
+
+                let chunk_len_effective_read: usize;
+
+                let start_read = Instant::now();
+
+                (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
+                    self.fn_find_last_nl,
+                    &mut residue,
+                    &mut cr.chunk,
+                    &infile,
+                    n_threads,
+                    residue_len,
+                    chunk_len_toread,
+                );
+
+                read_duration_tot += start_read.elapsed();
+
+                remaining_file_length -= chunk_len_effective_read;
+                let (bin, bout, parse_duration, builder_write_duration) = converter.process(slices);
+                bytes_in += bin;
+                bytes_out += bout;
+                parse_duration_tot += parse_duration;
+                builder_write_duration_tot += builder_write_duration;
+
+                if remaining_file_length == 0 {
+                    break;
+                }
+            }
+
             let cr = ir.next().unwrap();
 
-            let mut chunk_len_toread = SLICER_IN_CHUNK_SIZE;
-            if remaining_file_length < SLICER_IN_CHUNK_SIZE {
-                chunk_len_toread = remaining_file_length;
+            if 0 != residue_len {
+                slices = residual_to_slice(&residue, &mut cr.chunk, residue_len);
+
+                let (bin, bout, parse_duration, builder_write_duration) = converter.process(slices);
+                bytes_in += bin;
+                bytes_out += bout;
+                parse_duration_tot += parse_duration;
+                builder_write_duration_tot += builder_write_duration;
             }
+            info!("about to shudown converter...");
 
-            let chunk_len_effective_read: usize;
-
-            let start_read = Instant::now();
-
-            (residue_len, chunk_len_effective_read, slices) = read_chunk_and_slice(
-                self.fn_find_last_nl,
-                &mut residue,
-                &mut cr.chunk,
-                &infile,
-                n_threads,
-                residue_len,
-                chunk_len_toread,
-            );
-
-            read_duration_tot += start_read.elapsed();
-
-            remaining_file_length -= chunk_len_effective_read;
-            let (bin, bout, parse_duration, builder_write_duration) = converter.process(slices);
-            bytes_in += bin;
-            bytes_out += bout;
-            parse_duration_tot += parse_duration;
-            builder_write_duration_tot += builder_write_duration;
-
-            if remaining_file_length == 0 {
-                break;
-            }
+            
+//        converter.shutdown();
+            let schema = Schema::new(vec![
+                Field::new("id", DataType::Int32, false)
+            ]);
+            
+            let emptyrb=arrow::record_batch::RecordBatch::new_empty(Arc::new(schema));
+                            
+            s.send(emptyrb);
+            drop(s);
+            info!("converter has been shutdown");
+            let _ = j.join(); // Make sure writer thread is done.
         }
-
-        let cr = ir.next().unwrap();
-
-        if 0 != residue_len {
-            slices = residual_to_slice(&residue, &mut cr.chunk, residue_len);
-
-            let (bin, bout, parse_duration, builder_write_duration) = converter.process(slices);
-            bytes_in += bin;
-            bytes_out += bout;
-            parse_duration_tot += parse_duration;
-            builder_write_duration_tot += builder_write_duration;
-        }
-
-        
-        let _ = j.join(); // Make sure 
         info!(
             "Bytes in= {}\n out= {}\nparse duration= {:?}\n \n builder write_duration {:?}\n",
             bytes_in, bytes_out, parse_duration_tot, builder_write_duration_tot
