@@ -250,8 +250,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
             schema.clone(),
         );
 
-        let (sender, mut receiver) = bounded::<RecordBatch>(10);
-        //        let (sender, receiver) = sync_channel::<RecordBatch>(100);
+        let (sender, mut receiver) = bounded::<RecordBatch>(100);
 
         let t: JoinHandle<Result<format::FileMetaData>> = thread::spawn(move || {
             'outer: loop {
