@@ -256,7 +256,6 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 
                 match message {
                     Ok(rb) => {
-                        break 'outer;
                         writer.write(&rb.record_batch).expect("Error Writing batch");
                         if (rb.record_batch.num_rows() == 0) {
                             break 'outer;
