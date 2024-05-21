@@ -49,6 +49,7 @@ use crate::trimmer::{trimmer_factory, ColumnTrimmer};
 use crate::{chunked, trimmer};
 use arrow::datatypes::{Field, Schema, SchemaRef};
 use crossbeam::atomic::AtomicConsume;
+use libc::bsearch;
 use parquet::errors::{ParquetError, Result};
 use parquet::file::metadata::FileMetaData;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
@@ -57,7 +58,6 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thread::spawn;
-use libc::bsearch;
 //use crossbeam::channel::{Receiver, Sender};
 
 static GLOBAL_COUNTER: AtomicUsize = ATOMIC_USIZE_INIT;
@@ -76,8 +76,8 @@ pub(crate) struct MasterBuilders {
 }
 
 pub(crate) struct OrderedRecordBatch {
-    record_batch : RecordBatch,
-    batch_nr: i32
+    record_batch: RecordBatch,
+    batch_nr: i32,
 }
 
 unsafe impl Send for MasterBuilders {}
@@ -219,14 +219,16 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
                         for bb in n.iter_mut() {
                             br.push(bb.finish());
                         }
-                        let record_batch = OrderedRecordBatch { record_batch: RecordBatch::try_from_iter(br).unwrap(), batch_nr: i as i32 };
+                        let record_batch = OrderedRecordBatch {
+                            record_batch: RecordBatch::try_from_iter(br).unwrap(),
+                            batch_nr: i as i32,
+                        };
                         let _ = self
                             .masterbuilders
                             .sender
                             .clone()
                             .unwrap()
                             .send(record_batch);
-
                     }
                 }
             });
@@ -248,8 +250,6 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         );
         let (sender, receiver) = sync_channel::<OrderedRecordBatch>(100);
 
-
-        
         let t: JoinHandle<Result<format::FileMetaData>> = thread::spawn(move || {
             'outer: loop {
                 let message = receiver.recv();
@@ -259,18 +259,14 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
                         break 'outer;
                         writer.write(&rb.record_batch).expect("Error Writing batch");
                         if (rb.record_batch.num_rows() == 0) {
-                        break 'outer;
+                            break 'outer;
                         }
                     }
                     Err(e) => {
                         info!("got RecvError in channel , break to outer");
                         break 'outer;
                     }
-                    
-
-
                 }
-                
             }
             info!("closing the writer for parquet");
             writer.finish()
@@ -289,7 +285,10 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
             false,
         )]);
 
-        let emptyrb = OrderedRecordBatch { record_batch: arrow::record_batch::RecordBatch::new_empty(Arc::new(schema)), batch_nr: 0 };
+        let emptyrb = OrderedRecordBatch {
+            record_batch: arrow::record_batch::RecordBatch::new_empty(Arc::new(schema)),
+            batch_nr: 0,
+        };
 
         let _ = &self.masterbuilders.sender.clone().unwrap().send(emptyrb);
     }
