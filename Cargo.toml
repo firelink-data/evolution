@@ -44,7 +44,7 @@ libc = "0.2.154"
 arrow = "51.0.0"
 parquet = "51.0.0"
 padder = { version = "1.2.0", features = ["serde"] }
-
+sorted-list = "0.2.0"
 [dev-dependencies]
 glob = "0.3.1"
 
