@@ -24,11 +24,11 @@
 // File created: 2023-12-11
 // Last updated: 2024-05-15
 //
-use sorted_list::SortedList;
 
 use arrow::array::{ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
 use log::{debug, info};
+use ordered_channel::bounded;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
@@ -48,8 +48,10 @@ use crate::schema;
 use crate::trimmer::{trimmer_factory, ColumnTrimmer};
 use crate::{chunked, trimmer};
 use arrow::datatypes::{Field, Schema, SchemaRef};
+use atomic_counter::{AtomicCounter, ConsistentCounter};
 use crossbeam::atomic::AtomicConsume;
 use libc::bsearch;
+use ordered_channel::Sender;
 use parquet::errors::{ParquetError, Result};
 use parquet::file::metadata::FileMetaData;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
@@ -58,6 +60,7 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thread::spawn;
+//use ordered_channel::Sender;
 //use crossbeam::channel::{Receiver, Sender};
 
 static GLOBAL_COUNTER: AtomicUsize = ATOMIC_USIZE_INIT;
@@ -67,17 +70,13 @@ pub(crate) struct Slice2Arrow<'a> {
     pub(crate) fn_line_break: FnFindLastLineBreak<'a>,
     pub(crate) fn_line_break_len: FnLineBreakLen,
     pub(crate) masterbuilders: MasterBuilders,
+    pub(crate) consistent_counter: ConsistentCounter,
 }
 
 pub(crate) struct MasterBuilders {
     builders: Vec<Vec<Box<dyn Sync + Send + ColumnBuilder>>>,
     outfile: PathBuf,
-    sender: Option<SyncSender<OrderedRecordBatch>>,
-}
-
-pub(crate) struct OrderedRecordBatch {
-    record_batch: RecordBatch,
-    batch_nr: i32,
+    sender: Option<Sender<RecordBatch>>,
 }
 
 unsafe impl Send for MasterBuilders {}
@@ -197,6 +196,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         let mut builder_write_duration: Duration = Duration::new(0, 0);
 
         let start_parse = Instant::now();
+        let offset: usize = self.consistent_counter.get();
 
         let arc_slices = Arc::new(&slices);
         self.masterbuilders
@@ -219,16 +219,14 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
                         for bb in n.iter_mut() {
                             br.push(bb.finish());
                         }
-                        let record_batch = OrderedRecordBatch {
-                            record_batch: RecordBatch::try_from_iter(br).unwrap(),
-                            batch_nr: i as i32,
-                        };
+                        let record_batch = RecordBatch::try_from_iter(br).unwrap();
+
                         let _ = self
                             .masterbuilders
                             .sender
                             .clone()
                             .unwrap()
-                            .send(record_batch);
+                            .send(offset + i, record_batch);
                     }
                 }
             });
@@ -236,6 +234,9 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         for ii in slices.iter() {
             bytes_in += ii.len();
         }
+        let offset: usize = self
+            .consistent_counter
+            .add(self.masterbuilders.builders.len());
 
         parse_duration = start_parse.elapsed();
         (bytes_in, bytes_out, parse_duration, builder_write_duration)
@@ -248,16 +249,18 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
             &_outfile,
             schema.clone(),
         );
-        let (sender, receiver) = sync_channel::<OrderedRecordBatch>(100);
+
+        let (sender, mut receiver) = bounded::<RecordBatch>(10);
+        //        let (sender, receiver) = sync_channel::<RecordBatch>(100);
 
         let t: JoinHandle<Result<format::FileMetaData>> = thread::spawn(move || {
             'outer: loop {
-                let message = receiver.recv();
+                let mut message = receiver.recv();
 
                 match message {
                     Ok(rb) => {
-                        writer.write(&rb.record_batch).expect("Error Writing batch");
-                        if (rb.record_batch.num_rows() == 0) {
+                        writer.write(&rb).expect("Error Writing batch");
+                        if (rb.num_rows() == 0) {
                             break 'outer;
                         }
                     }
@@ -284,12 +287,9 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
             false,
         )]);
 
-        let emptyrb = OrderedRecordBatch {
-            record_batch: arrow::record_batch::RecordBatch::new_empty(Arc::new(schema)),
-            batch_nr: 0,
-        };
-
-        let _ = &self.masterbuilders.sender.clone().unwrap().send(emptyrb);
+        let emptyrb = arrow::record_batch::RecordBatch::new_empty(Arc::new(schema));
+        let c = self.consistent_counter.get();
+        let _ = &self.masterbuilders.sender.clone().unwrap().send(c, emptyrb);
     }
 }
 

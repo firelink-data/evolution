@@ -33,6 +33,7 @@ use log::info;
 #[cfg(feature = "rayon")]
 use parquet::arrow::ArrowWriter;
 
+use atomic_counter::ConsistentCounter;
 #[cfg(feature = "rayon")]
 use std::fs;
 #[cfg(feature = "rayon")]
@@ -280,6 +281,7 @@ impl Cli {
                             fn_line_break: find_last_nl,
                             fn_line_break_len: line_break_len_cr,
                             masterbuilders: master_builders,
+                            consistent_counter: ConsistentCounter::new(0),
                         });
                         s2a
                     }
