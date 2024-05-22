@@ -27,8 +27,8 @@
 
 use std::cmp::min;
 
-use padder::{Alignment, Symbol};
 use crate::chunked::trimmer;
+use padder::{Alignment, Symbol};
 
 use crate::datatype::DataType;
 

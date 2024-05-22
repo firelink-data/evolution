@@ -25,7 +25,7 @@
 // Last updated: 2024-05-15
 //
 
-use crate::chunked::trimmer::{ColumnTrimmer, trimmer_factory};
+use crate::chunked::trimmer::{trimmer_factory, ColumnTrimmer};
 use arrow::array::{ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
 use log::{debug, info};
@@ -43,10 +43,14 @@ use std::path::PathBuf;
 use std::str::from_utf8_unchecked;
 use std::sync::Arc;
 
-use super::{arrow_file_output, ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen, Stats, trimmer};
+use super::{
+    arrow_file_output, trimmer, ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen,
+    Stats,
+};
+use crate::chunked;
+use crate::chunked::threaded_file_output::{ipc_file_out, parquet_file_out};
 use crate::datatype::DataType;
 use crate::schema;
-use crate::{chunked};
 use arrow::datatypes::{Field, Schema, SchemaRef};
 use atomic_counter::{AtomicCounter, ConsistentCounter};
 use crossbeam::atomic::AtomicConsume;
@@ -54,14 +58,13 @@ use libc::bsearch;
 use ordered_channel::Sender;
 use parquet::errors::{ParquetError, Result};
 use parquet::file::metadata::FileMetaData;
+use rayon::join;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::sync::mpsc::{sync_channel, Receiver, RecvError, SyncSender};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thread::spawn;
-use rayon::join;
-use crate::chunked::threaded_file_output::{ipc_file_out, parquet_file_out};
 //use ordered_channel::Sender;
 //use crossbeam::channel::{Receiver, Sender};
 
@@ -232,15 +235,13 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
     fn setup(&mut self) -> JoinHandle<Result<Stats>> {
         let schema = self.masterbuilders.schema_factory();
         let _outfile = self.masterbuilders.outfile.clone();
-        
-        let mut pfo: Box<dyn arrow_file_output> = Box::new(ipc_file_out { sender: None } );
-        let (sender,joinhandler)=pfo.setup(schema,_outfile);
-            
-        self.masterbuilders.sender = Some(sender);
-       joinhandler
-        
-    }
 
+        let mut pfo: Box<dyn arrow_file_output> = Box::new(ipc_file_out { sender: None });
+        let (sender, joinhandler) = pfo.setup(schema, _outfile);
+
+        self.masterbuilders.sender = Some(sender);
+        joinhandler
+    }
 
     fn shutdown(&mut self) {
         //        converter.shutdown();

@@ -25,7 +25,7 @@
 // Last updated: 2024-05-15
 //
 
-use crate::chunked::trimmer::{ColumnTrimmer, trimmer_factory};
+use crate::chunked::trimmer::{trimmer_factory, ColumnTrimmer};
 use arrow::array::{ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
 use log::{debug, info};
@@ -43,11 +43,16 @@ use std::path::PathBuf;
 use std::str::from_utf8_unchecked;
 use std::sync::Arc;
 
-use super::{arrow_file_output, ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen, Stats, trimmer};
+use super::{
+    arrow_file_output, trimmer, ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen,
+    Stats,
+};
+use crate::chunked;
 use crate::datatype::DataType;
 use crate::schema;
-use crate::{chunked};
 use arrow::datatypes::{Field, Schema, SchemaRef};
+use arrow_ipc::writer::IpcWriteOptions;
+use arrow_ipc::CompressionType;
 use atomic_counter::{AtomicCounter, ConsistentCounter};
 use crossbeam::atomic::AtomicConsume;
 use libc::bsearch;
@@ -60,8 +65,6 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thread::spawn;
-use arrow_ipc::CompressionType;
-use arrow_ipc::writer::IpcWriteOptions;
 use Compression::SNAPPY;
 
 pub(crate) struct parquet_file_out {
@@ -69,21 +72,21 @@ pub(crate) struct parquet_file_out {
 }
 
 impl arrow_file_output for parquet_file_out {
-    fn setup(&mut self, schema: SchemaRef, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
-
+    fn setup(
+        &mut self,
+        schema: SchemaRef,
+        outfile: PathBuf,
+    ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         let _out_file = fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(outfile)
             .expect("aaa");
 
-        let props = WriterProperties::builder()
-            .set_compression(SNAPPY)
-            .build();
+        let props = WriterProperties::builder().set_compression(SNAPPY).build();
 
         let mut writer: ArrowWriter<File> =
             ArrowWriter::try_new(_out_file, schema, Some(props.clone())).unwrap();
-
 
         let (sender, mut receiver) = bounded::<RecordBatch>(100);
 
@@ -115,33 +118,39 @@ impl arrow_file_output for parquet_file_out {
                 builder_write_duration: Default::default(),
             })
         });
-        (sender,t)
+        (sender, t)
     }
-
 }
 
 pub struct ipc_file_out {
     pub(crate) sender: Option<Sender<RecordBatch>>,
-
 }
 
 impl arrow_file_output for ipc_file_out {
-    fn setup(&mut self, schema: SchemaRef, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
-
+    fn setup(
+        &mut self,
+        schema: SchemaRef,
+        outfile: PathBuf,
+    ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         let _out_file = fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(outfile)
             .expect("aaa");
 
+        let p = IpcWriteOptions::try_with_compression(
+            Default::default(),
+            Some(CompressionType::LZ4_FRAME),
+        );
 
-        let p= IpcWriteOptions::try_with_compression(Default::default(),Some(CompressionType::LZ4_FRAME) );
-        
-        let mut writer=arrow_ipc::writer::FileWriter::try_new_with_options(_out_file, &schema, Default::default()).expect("TODO: panic message");
-        
-        let props = WriterProperties::builder()
-            .set_compression(SNAPPY)
-            .build();
+        let mut writer = arrow_ipc::writer::FileWriter::try_new_with_options(
+            _out_file,
+            &schema,
+            Default::default(),
+        )
+        .expect("TODO: panic message");
+
+        let props = WriterProperties::builder().set_compression(SNAPPY).build();
 
         let (sender, mut receiver) = bounded::<RecordBatch>(1000);
 
@@ -173,6 +182,6 @@ impl arrow_file_output for ipc_file_out {
                 builder_write_duration: Default::default(),
             })
         });
-        (sender,t)
+        (sender, t)
     }
 }

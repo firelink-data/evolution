@@ -25,17 +25,17 @@
 // Last updated: 2024-05-15
 //
 
-use std::fmt::Debug;
 use arrow::array::{ArrayRef, RecordBatch};
 use parquet::format;
+use std::fmt::Debug;
 
+use arrow::datatypes::SchemaRef;
+use ordered_channel::Sender;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::mpsc::SyncSender;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use arrow::datatypes::SchemaRef;
-use ordered_channel::Sender;
 
 use self::residual_slicer::SLICER_IN_CHUNK_SIZE;
 use parquet::errors::{ParquetError, Result};
@@ -43,8 +43,8 @@ use parquet::errors::{ParquetError, Result};
 pub(crate) mod arrow_converter;
 pub(crate) mod residual_slicer;
 pub(crate) mod self_converter;
-mod trimmer;
 mod threaded_file_output;
+mod trimmer;
 
 pub(crate) struct ChunkAndResidue {
     pub(crate) chunk: Box<[u8; SLICER_IN_CHUNK_SIZE]>,
@@ -172,5 +172,9 @@ pub trait ColumnBuilder {
 }
 
 pub trait arrow_file_output {
-    fn setup(&mut self,schema:SchemaRef,outfile:PathBuf)-> (Sender<RecordBatch>, JoinHandle<Result<Stats>>);
+    fn setup(
+        &mut self,
+        schema: SchemaRef,
+        outfile: PathBuf,
+    ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>);
 }
