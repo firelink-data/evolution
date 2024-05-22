@@ -25,6 +25,7 @@
 // Last updated: 2024-05-15
 //
 
+use crate::chunked::Stats;
 use log::info;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
@@ -69,7 +70,7 @@ impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
         (bytes_processed, 0, duration, duration)
     }
 
-    fn setup(&mut self) -> JoinHandle<Result<format::FileMetaData>> {
+    fn setup(&mut self) -> JoinHandle<Result<Stats>> {
         todo!()
     }
 

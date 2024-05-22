@@ -25,6 +25,7 @@
 // Last updated: 2024-05-15
 //
 
+use crate::chunked::trimmer::{ColumnTrimmer, trimmer_factory};
 use arrow::array::{ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
 use log::{debug, info};
@@ -42,11 +43,10 @@ use std::path::PathBuf;
 use std::str::from_utf8_unchecked;
 use std::sync::Arc;
 
-use super::{ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen};
+use super::{arrow_file_output, ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen, Stats, trimmer};
 use crate::datatype::DataType;
 use crate::schema;
-use crate::trimmer::{trimmer_factory, ColumnTrimmer};
-use crate::{chunked, trimmer};
+use crate::{chunked};
 use arrow::datatypes::{Field, Schema, SchemaRef};
 use atomic_counter::{AtomicCounter, ConsistentCounter};
 use crossbeam::atomic::AtomicConsume;
@@ -60,6 +60,8 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thread::spawn;
+use rayon::join;
+use crate::chunked::threaded_file_output::{ipc_file_out, parquet_file_out};
 //use ordered_channel::Sender;
 //use crossbeam::channel::{Receiver, Sender};
 
@@ -92,21 +94,6 @@ impl MasterBuilders {
 
         let batch = RecordBatch::try_from_iter(br).unwrap();
         batch.schema()
-    }
-    pub fn writer_factory(out_file: &PathBuf, schema: SchemaRef) -> ArrowWriter<File> {
-        let _out_file = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(out_file)
-            .expect("aaa");
-
-        let props = WriterProperties::builder()
-            .set_compression(Compression::SNAPPY)
-            .build();
-
-        let writer: ArrowWriter<File> =
-            ArrowWriter::try_new(_out_file, schema, Some(props.clone())).unwrap();
-        writer
     }
 
     pub fn builders_factory(out_file: PathBuf, schema_path: PathBuf, instances: i16) -> Self {
@@ -242,41 +229,18 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         (bytes_in, bytes_out, parse_duration, builder_write_duration)
     }
 
-    fn setup(&mut self) -> JoinHandle<Result<format::FileMetaData>> {
+    fn setup(&mut self) -> JoinHandle<Result<Stats>> {
         let schema = self.masterbuilders.schema_factory();
         let _outfile = self.masterbuilders.outfile.clone();
-        let mut writer = crate::chunked::arrow_converter::MasterBuilders::writer_factory(
-            &_outfile,
-            schema.clone(),
-        );
-
-        let (sender, mut receiver) = bounded::<RecordBatch>(100);
-
-        let t: JoinHandle<Result<format::FileMetaData>> = thread::spawn(move || {
-            'outer: loop {
-                let mut message = receiver.recv();
-
-                match message {
-                    Ok(rb) => {
-                        writer.write(&rb).expect("Error Writing batch");
-                        if (rb.num_rows() == 0) {
-                            break 'outer;
-                        }
-                    }
-                    Err(e) => {
-                        info!("got RecvError in channel , break to outer");
-                        break 'outer;
-                    }
-                }
-            }
-            info!("closing the writer for parquet");
-            writer.finish()
-        });
-        self.masterbuilders.sender = Some(sender.clone());
-        t
-
-        //        bytes_out += crate::chunked::arrow_converter::GLOBAL_COUNTER.load_consume();
+        
+        let mut pfo: Box<dyn arrow_file_output> = Box::new(ipc_file_out { sender: None } );
+        let (sender,joinhandler)=pfo.setup(schema,_outfile);
+            
+        self.masterbuilders.sender = Some(sender);
+       joinhandler
+        
     }
+
 
     fn shutdown(&mut self) {
         //        converter.shutdown();

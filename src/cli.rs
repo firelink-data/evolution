@@ -33,12 +33,12 @@ use log::info;
 #[cfg(feature = "rayon")]
 use parquet::arrow::ArrowWriter;
 
-use atomic_counter::ConsistentCounter;
 #[cfg(feature = "rayon")]
 use std::fs;
 #[cfg(feature = "rayon")]
 use std::fs::File;
 use std::path::PathBuf;
+use atomic_counter::ConsistentCounter;
 
 #[cfg(feature = "rayon")]
 use crate::chunked::arrow_converter::{MasterBuilders, Slice2Arrow};
