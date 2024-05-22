@@ -92,7 +92,7 @@ pub struct Cli {
         long = "target",
         value_name = "TARGET-ENCODING",
         action = ArgAction::Set,
-        default_value = "Parquet",
+        default_value = "parquet",
     )]
     target: Targets,
 
