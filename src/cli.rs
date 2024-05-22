@@ -33,8 +33,6 @@ use log::info;
 #[cfg(feature = "rayon")]
 use parquet::arrow::ArrowWriter;
 
-use arrow::datatypes::SchemaRef;
-use atomic_counter::ConsistentCounter;
 #[cfg(feature = "rayon")]
 use std::fs;
 #[cfg(feature = "rayon")]
@@ -49,7 +47,6 @@ use crate::chunked::residual_slicer::ResidualSlicer;
 use crate::chunked::self_converter::SampleSliceAggregator;
 #[cfg(feature = "rayon")]
 use crate::chunked::{find_last_nl, line_break_len_cr, Converter as ChunkedConverter, Slicer};
-use crate::cli;
 use crate::converter::Converter;
 use crate::error::Result;
 use crate::mocker::Mocker;
