@@ -76,9 +76,8 @@ pub(crate) struct Slice2Arrow<'a> {
     pub(crate) fn_line_break_len: FnLineBreakLen,
     pub(crate) masterbuilders: MasterBuilders,
     pub(crate) consistent_counter: ConsistentCounter,
-    pub(crate) threaded_write: (Sender<RecordBatch>,JoinHandle<Result<Stats>>)
+    pub(crate) threaded_write: (Sender<RecordBatch>, JoinHandle<Result<Stats>>),
 }
-
 
 pub(crate) struct MasterBuilders {
     builders: Vec<Vec<Box<dyn Sync + Send + ColumnBuilder>>>,

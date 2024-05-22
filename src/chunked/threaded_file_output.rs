@@ -48,6 +48,7 @@ use super::{
     Stats,
 };
 use crate::chunked;
+use crate::cli::Targets;
 use crate::datatype::DataType;
 use crate::schema;
 use arrow::datatypes::{Field, Schema, SchemaRef};
@@ -66,22 +67,27 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thread::spawn;
 use Compression::SNAPPY;
-use crate::cli::Targets;
 
 pub(crate) struct parquet_file_out {
     pub(crate) sender: Option<Sender<RecordBatch>>,
 }
-pub(crate) fn output_factory (target: Targets,schema: SchemaRef,_outfile:PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+pub(crate) fn output_factory(
+    target: Targets,
+    schema: SchemaRef,
+    _outfile: PathBuf,
+) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
     match target {
         Targets::Parquet => {
-             let mut pfo: Box<dyn arrow_file_output> = Box::new(parquet_file_out { sender: None });
-             pfo.setup(schema, _outfile)
+            let mut pfo: Box<dyn arrow_file_output> = Box::new(parquet_file_out { sender: None });
+            pfo.setup(schema, _outfile)
         }
         Targets::IPC => {
             let mut pfo: Box<dyn arrow_file_output> = Box::new(ipc_file_out { sender: None });
             pfo.setup(schema, _outfile)
         }
-        Targets::None => {todo!()}
+        Targets::None => {
+            todo!()
+        }
     }
 }
 impl arrow_file_output for parquet_file_out {
