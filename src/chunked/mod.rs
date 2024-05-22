@@ -43,7 +43,7 @@ use parquet::errors::{ParquetError, Result};
 pub(crate) mod arrow_converter;
 pub(crate) mod residual_slicer;
 pub(crate) mod self_converter;
-mod threaded_file_output;
+pub(crate) mod threaded_file_output;
 mod trimmer;
 
 pub(crate) struct ChunkAndResidue {

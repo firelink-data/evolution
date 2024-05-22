@@ -38,6 +38,8 @@ use std::fs;
 #[cfg(feature = "rayon")]
 use std::fs::File;
 use std::path::PathBuf;
+use arrow::datatypes::SchemaRef;
+use atomic_counter::ConsistentCounter;
 
 #[cfg(feature = "rayon")]
 use crate::chunked::arrow_converter::{MasterBuilders, Slice2Arrow};
@@ -47,6 +49,7 @@ use crate::chunked::residual_slicer::ResidualSlicer;
 use crate::chunked::self_converter::SampleSliceAggregator;
 #[cfg(feature = "rayon")]
 use crate::chunked::{find_last_nl, line_break_len_cr, Converter as ChunkedConverter, Slicer};
+use crate::chunked::threaded_file_output::output_factory;
 use crate::converter::Converter;
 use crate::error::Result;
 use crate::mocker::Mocker;
@@ -56,6 +59,14 @@ use crate::threads::get_available_threads;
 #[derive(clap::ValueEnum, Clone)]
 enum Converters {
     Arrow,
+    None,
+}
+
+#[cfg(feature = "rayon")]
+#[derive(clap::ValueEnum, Clone)]
+pub(crate) enum Targets {
+    Parquet,
+    IPC,
     None,
 }
 
@@ -77,6 +88,13 @@ enum Slicers {
 pub struct Cli {
     #[command(subcommand)]
     command: Commands,
+    #[arg(
+        long = "target",
+        value_name = "TARGET-ENCODING",
+        action = ArgAction::Set,
+        default_value = "Parquet",
+    )]
+    target: Targets,
 
     /// Set the number of threads (logical cores) to use when multi-threading.
     #[arg(
@@ -88,6 +106,7 @@ pub struct Cli {
     )]
     n_threads: usize,
 }
+
 
 #[derive(Subcommand)]
 enum Commands {
@@ -275,12 +294,14 @@ impl Cli {
                             schema.to_path_buf(),
                             n_threads as i16,
                         );
-
+                        let sc=master_builders.schema_factory();
+                        
                         let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow {
                             fn_line_break: find_last_nl,
                             fn_line_break_len: line_break_len_cr,
                             masterbuilders: master_builders,
                             consistent_counter: ConsistentCounter::new(0),
+                            threaded_write: output_factory(self.target.clone(),sc ,out_file.clone().to_path_buf()),
                         });
                         s2a
                     }
