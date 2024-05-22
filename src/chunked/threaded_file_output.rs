@@ -137,7 +137,7 @@ impl arrow_file_output for parquet_file_out {
                 builder_write_duration: Default::default(),
             })
         });
-        self.sender=Some(sender.clone());
+        self.sender = Some(sender.clone());
         (sender, t)
     }
 }
@@ -202,7 +202,7 @@ impl arrow_file_output for ipc_file_out {
                 builder_write_duration: Default::default(),
             })
         });
-        self.sender=Some(sender.clone());
+        self.sender = Some(sender.clone());
         (sender, t)
     }
 }

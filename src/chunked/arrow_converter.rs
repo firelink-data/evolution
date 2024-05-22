@@ -236,12 +236,12 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
     }
 
     fn setup(&mut self) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
-        let o=output_factory(
+        let o = output_factory(
             self.target.clone(),
             self.masterbuilders.schema_factory(),
             self.masterbuilders.outfile.clone(),
         );
-        self.masterbuilders.sender=Some(o.0.clone());
+        self.masterbuilders.sender = Some(o.0.clone());
         o
     }
 
