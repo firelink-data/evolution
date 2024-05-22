@@ -39,6 +39,7 @@ use rayon::prelude::*;
 
 use std::fs;
 use std::fs::File;
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::str::from_utf8_unchecked;
 use std::sync::Arc;
@@ -48,7 +49,7 @@ use super::{
     Stats,
 };
 use crate::chunked;
-use crate::chunked::threaded_file_output::{ipc_file_out, parquet_file_out};
+use crate::chunked::threaded_file_output::{ipc_file_out, output_factory, parquet_file_out};
 use crate::datatype::DataType;
 use crate::schema;
 use arrow::datatypes::{Field, Schema, SchemaRef};
@@ -65,6 +66,7 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thread::spawn;
+use crate::cli::Targets;
 //use ordered_channel::Sender;
 //use crossbeam::channel::{Receiver, Sender};
 
@@ -76,7 +78,7 @@ pub(crate) struct Slice2Arrow<'a> {
     pub(crate) fn_line_break_len: FnLineBreakLen,
     pub(crate) masterbuilders: MasterBuilders,
     pub(crate) consistent_counter: ConsistentCounter,
-    pub(crate) threaded_write: (Sender<RecordBatch>, JoinHandle<Result<Stats>>),
+    pub(crate) target: Targets
 }
 
 pub(crate) struct MasterBuilders {
@@ -233,16 +235,10 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         (bytes_in, bytes_out, parse_duration, builder_write_duration)
     }
 
-    fn setup(&mut self) -> JoinHandle<Result<Stats>> {
-        let schema = self.masterbuilders.schema_factory();
-        let _outfile = self.masterbuilders.outfile.clone();
-
-        let mut pfo: Box<dyn arrow_file_output> = Box::new(ipc_file_out { sender: None });
-        let (sender, joinhandler) = pfo.setup(schema, _outfile);
-
-        self.masterbuilders.sender = Some(sender);
-        joinhandler
+    fn setup(&mut self) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+        output_factory(self.target.clone(), self.masterbuilders.schema_factory(), self.masterbuilders.outfile.clone())
     }
+
 
     fn shutdown(&mut self) {
         //        converter.shutdown();
@@ -255,6 +251,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         let emptyrb = arrow::record_batch::RecordBatch::new_empty(Arc::new(schema));
         let c = self.consistent_counter.get();
         let _ = &self.masterbuilders.sender.clone().unwrap().send(c, emptyrb);
+
     }
 }
 

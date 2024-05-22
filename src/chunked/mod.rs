@@ -161,7 +161,7 @@ pub(crate) trait Converter<'a> {
 
     //    fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
     fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize, Duration, Duration);
-    fn setup(&mut self) -> JoinHandle<Result<Stats>>;
+    fn setup(&mut self)->(Sender<RecordBatch>, JoinHandle<Result<Stats>>);
     fn shutdown(&mut self);
 }
 

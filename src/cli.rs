@@ -300,11 +300,7 @@ impl Cli {
                             fn_line_break_len: line_break_len_cr,
                             masterbuilders: master_builders,
                             consistent_counter: ConsistentCounter::new(0),
-                            threaded_write: output_factory(
-                                self.target.clone(),
-                                sc,
-                                out_file.clone().to_path_buf(),
-                            ),
+                            target: self.target.clone(),
                         });
                         s2a
                     }

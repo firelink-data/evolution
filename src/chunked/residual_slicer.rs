@@ -89,7 +89,7 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
             .build_global()
             .unwrap();
 
-        let j = converter.setup();
+        let threaded_writer=converter.setup();
 
         loop {
             let cr = ir.next().unwrap();
@@ -141,8 +141,8 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
         info!("about to shudown converter...");
 
         converter.shutdown();
+        threaded_writer.1.join();
         info!("converter has been shutdown");
-        let _ = j.join(); // Make sure writer thread is done.
 
         info!(
             "Bytes in= {}\n out= {}\nparse duration= {:?}\n \n builder write_duration {:?}\n",

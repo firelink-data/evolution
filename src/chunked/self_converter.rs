@@ -38,6 +38,7 @@ use std::io::Write;
 use std::sync::mpsc::SyncSender;
 use std::thread::JoinHandle;
 use std::time::Duration;
+use ordered_channel::Sender;
 
 use super::{Converter, FnFindLastLineBreak};
 
@@ -70,9 +71,10 @@ impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
         (bytes_processed, 0, duration, duration)
     }
 
-    fn setup(&mut self) -> JoinHandle<Result<Stats>> {
+    fn setup(&mut self) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         todo!()
     }
+
 
     fn shutdown(&mut self) {
         todo!()
