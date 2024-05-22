@@ -50,6 +50,7 @@ use super::{
 };
 use crate::chunked;
 use crate::chunked::threaded_file_output::{ipc_file_out, output_factory, parquet_file_out};
+use crate::cli::Targets;
 use crate::datatype::DataType;
 use crate::schema;
 use arrow::datatypes::{Field, Schema, SchemaRef};
@@ -66,7 +67,6 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thread::spawn;
-use crate::cli::Targets;
 //use ordered_channel::Sender;
 //use crossbeam::channel::{Receiver, Sender};
 
@@ -78,7 +78,7 @@ pub(crate) struct Slice2Arrow<'a> {
     pub(crate) fn_line_break_len: FnLineBreakLen,
     pub(crate) masterbuilders: MasterBuilders,
     pub(crate) consistent_counter: ConsistentCounter,
-    pub(crate) target: Targets
+    pub(crate) target: Targets,
 }
 
 pub(crate) struct MasterBuilders {
@@ -236,9 +236,12 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
     }
 
     fn setup(&mut self) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
-        output_factory(self.target.clone(), self.masterbuilders.schema_factory(), self.masterbuilders.outfile.clone())
+        output_factory(
+            self.target.clone(),
+            self.masterbuilders.schema_factory(),
+            self.masterbuilders.outfile.clone(),
+        )
     }
-
 
     fn shutdown(&mut self) {
         //        converter.shutdown();
@@ -251,7 +254,6 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         let emptyrb = arrow::record_batch::RecordBatch::new_empty(Arc::new(schema));
         let c = self.consistent_counter.get();
         let _ = &self.masterbuilders.sender.clone().unwrap().send(c, emptyrb);
-
     }
 }
 

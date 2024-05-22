@@ -89,7 +89,7 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
             .build_global()
             .unwrap();
 
-        let threaded_writer=converter.setup();
+        let threaded_writer = converter.setup();
 
         loop {
             let cr = ir.next().unwrap();
