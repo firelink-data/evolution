@@ -25,6 +25,7 @@
 // Last updated: 2024-05-15
 //
 
+use atomic_counter::ConsistentCounter;
 use clap::{value_parser, ArgAction, Parser, Subcommand};
 #[cfg(all(feature = "rayon", debug_assertions))]
 use log::debug;
