@@ -47,9 +47,9 @@ use crate::chunked::arrow_converter::{MasterBuilders, Slice2Arrow};
 use crate::chunked::residual_slicer::ResidualSlicer;
 #[cfg(feature = "rayon")]
 use crate::chunked::self_converter::SampleSliceAggregator;
-use crate::chunked::threaded_file_output::output_factory;
 #[cfg(feature = "rayon")]
 use crate::chunked::{find_last_nl, line_break_len_cr, Converter as ChunkedConverter, Slicer};
+use crate::cli;
 use crate::converter::Converter;
 use crate::error::Result;
 use crate::mocker::Mocker;
@@ -62,9 +62,8 @@ enum Converters {
     None,
 }
 
-#[cfg(feature = "rayon")]
 #[derive(clap::ValueEnum, Clone)]
-pub(crate) enum Targets {
+pub enum Targets {
     Parquet,
     IPC,
     None,

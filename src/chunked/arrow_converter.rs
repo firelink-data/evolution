@@ -50,7 +50,7 @@ use super::{
 };
 use crate::chunked;
 use crate::chunked::threaded_file_output::{ipc_file_out, output_factory, parquet_file_out};
-use crate::cli::Targets;
+pub use crate::cli::Targets;
 use crate::datatype::DataType;
 use crate::schema;
 use arrow::datatypes::{Field, Schema, SchemaRef};
