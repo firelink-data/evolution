@@ -27,8 +27,12 @@
 
 use arrow::array::{ArrayRef, RecordBatch};
 use parquet::format;
+use std::fmt::Debug;
 
+use arrow::datatypes::SchemaRef;
+use ordered_channel::Sender;
 use std::fs;
+use std::path::PathBuf;
 use std::sync::mpsc::SyncSender;
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -39,6 +43,8 @@ use parquet::errors::{ParquetError, Result};
 pub(crate) mod arrow_converter;
 pub(crate) mod residual_slicer;
 pub(crate) mod self_converter;
+pub(crate) mod threaded_file_output;
+mod trimmer;
 
 pub(crate) struct ChunkAndResidue {
     pub(crate) chunk: Box<[u8; SLICER_IN_CHUNK_SIZE]>,
@@ -155,7 +161,7 @@ pub(crate) trait Converter<'a> {
 
     //    fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
     fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize, Duration, Duration);
-    fn setup(&mut self) -> JoinHandle<Result<format::FileMetaData>>;
+    fn setup(&mut self) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>);
     fn shutdown(&mut self);
 }
 
@@ -163,4 +169,12 @@ pub trait ColumnBuilder {
     fn parse_value(&mut self, name: &[u8]) -> usize;
     fn finish(&mut self) -> (&str, ArrayRef);
     //    fn name(&  self) -> &String;
+}
+
+pub trait arrow_file_output {
+    fn setup(
+        &mut self,
+        schema: SchemaRef,
+        outfile: PathBuf,
+    ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>);
 }

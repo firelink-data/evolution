@@ -27,6 +27,7 @@
 
 use std::cmp::min;
 
+use crate::chunked::trimmer;
 use padder::{Alignment, Symbol};
 
 use crate::datatype::DataType;
@@ -86,7 +87,7 @@ pub(crate) struct FloatLeftAligned {
     trim_symbol: Symbol,
 }
 
-impl ColumnTrimmer for crate::trimmer::FloatLeftAligned {
+impl ColumnTrimmer for trimmer::FloatLeftAligned {
     fn find_start_stop(&self, data: &[u8], runes: i16) -> (usize, usize) {
         let mut eat = data.iter();
         let mut counted_runes = 0;
@@ -153,7 +154,7 @@ pub(crate) struct CharLeftAligned {
     trim_symbol: Symbol,
 }
 
-impl ColumnTrimmer for crate::trimmer::CharLeftAligned {
+impl ColumnTrimmer for trimmer::CharLeftAligned {
     fn find_start_stop(&self, data: &[u8], runes: i16) -> (usize, usize) {
         let mut eat = data.iter();
         let mut counted_runes = 0;
@@ -222,7 +223,7 @@ pub(crate) struct NumLeftAligned {
     trim_symbol: Symbol,
 }
 
-impl ColumnTrimmer for crate::trimmer::NumLeftAligned {
+impl ColumnTrimmer for trimmer::NumLeftAligned {
     fn find_start_stop(&self, data: &[u8], runes: i16) -> (usize, usize) {
         let mut eat = data.iter();
         let mut counted_runes = 0;
@@ -291,70 +292,70 @@ pub(crate) fn trimmer_factory(
 ) -> Box<dyn ColumnTrimmer + Send + Sync> {
     match (dtype, alignment) {
         (DataType::Boolean, padder::Alignment::Left) => {
-            Box::new(crate::trimmer::CharLeftAligned { trim_symbol })
+            Box::new(trimmer::CharLeftAligned { trim_symbol })
         }
         (DataType::Float16, padder::Alignment::Left) => {
-            Box::new(crate::trimmer::FloatLeftAligned { trim_symbol })
+            Box::new(trimmer::FloatLeftAligned { trim_symbol })
         }
         (DataType::Float32, padder::Alignment::Left) => {
-            Box::new(crate::trimmer::FloatLeftAligned { trim_symbol })
+            Box::new(trimmer::FloatLeftAligned { trim_symbol })
         }
         (DataType::Float64, padder::Alignment::Left) => {
-            Box::new(crate::trimmer::FloatLeftAligned { trim_symbol })
+            Box::new(trimmer::FloatLeftAligned { trim_symbol })
         }
         (DataType::Int16, padder::Alignment::Left) => {
-            Box::new(crate::trimmer::NumLeftAligned { trim_symbol })
+            Box::new(trimmer::NumLeftAligned { trim_symbol })
         }
         (DataType::Int32, padder::Alignment::Left) => {
-            Box::new(crate::trimmer::NumLeftAligned { trim_symbol })
+            Box::new(trimmer::NumLeftAligned { trim_symbol })
         }
         (DataType::Int64, padder::Alignment::Left) => {
-            Box::new(crate::trimmer::NumLeftAligned { trim_symbol })
+            Box::new(trimmer::NumLeftAligned { trim_symbol })
         }
         (DataType::Boolean, padder::Alignment::Right) => {
-            Box::new(crate::trimmer::CharRightAligned { trim_symbol })
+            Box::new(trimmer::CharRightAligned { trim_symbol })
         }
         (DataType::Float16, padder::Alignment::Right) => {
-            Box::new(crate::trimmer::FloatRightAligned { trim_symbol })
+            Box::new(trimmer::FloatRightAligned { trim_symbol })
         }
         (DataType::Float32, padder::Alignment::Right) => {
-            Box::new(crate::trimmer::FloatRightAligned { trim_symbol })
+            Box::new(trimmer::FloatRightAligned { trim_symbol })
         }
         (DataType::Float64, padder::Alignment::Right) => {
-            Box::new(crate::trimmer::FloatRightAligned { trim_symbol })
+            Box::new(trimmer::FloatRightAligned { trim_symbol })
         }
         (DataType::Int16, padder::Alignment::Right) => {
-            Box::new(crate::trimmer::NumRightAligned { trim_symbol })
+            Box::new(trimmer::NumRightAligned { trim_symbol })
         }
         (DataType::Int32, padder::Alignment::Right) => {
-            Box::new(crate::trimmer::NumRightAligned { trim_symbol })
+            Box::new(trimmer::NumRightAligned { trim_symbol })
         }
         (DataType::Int64, padder::Alignment::Right) => {
-            Box::new(crate::trimmer::NumRightAligned { trim_symbol })
+            Box::new(trimmer::NumRightAligned { trim_symbol })
         }
         (DataType::Boolean, padder::Alignment::Center) => {
-            Box::new(crate::trimmer::CharLeftAligned { trim_symbol })
+            Box::new(trimmer::CharLeftAligned { trim_symbol })
         }
         (DataType::Float16, padder::Alignment::Center) => {
-            Box::new(crate::trimmer::FloatLeftAligned { trim_symbol })
+            Box::new(trimmer::FloatLeftAligned { trim_symbol })
         }
         (DataType::Float32, padder::Alignment::Center) => {
-            Box::new(crate::trimmer::FloatLeftAligned { trim_symbol })
+            Box::new(trimmer::FloatLeftAligned { trim_symbol })
         }
         (DataType::Float64, padder::Alignment::Center) => {
-            Box::new(crate::trimmer::FloatLeftAligned { trim_symbol })
+            Box::new(trimmer::FloatLeftAligned { trim_symbol })
         }
         (DataType::Int16, padder::Alignment::Center) => {
-            Box::new(crate::trimmer::NumLeftAligned { trim_symbol })
+            Box::new(trimmer::NumLeftAligned { trim_symbol })
         }
         (DataType::Int32, padder::Alignment::Center) => {
-            Box::new(crate::trimmer::NumLeftAligned { trim_symbol })
+            Box::new(trimmer::NumLeftAligned { trim_symbol })
         }
         (DataType::Int64, padder::Alignment::Center) => {
-            Box::new(crate::trimmer::NumLeftAligned { trim_symbol })
+            Box::new(trimmer::NumLeftAligned { trim_symbol })
         }
 
-        (DataType::Utf8, _) => Box::new(crate::trimmer::UtfNotAligned {}),
-        (DataType::LargeUtf8, _) => Box::new(crate::trimmer::UtfNotAligned {}),
+        (DataType::Utf8, _) => Box::new(trimmer::UtfNotAligned {}),
+        (DataType::LargeUtf8, _) => Box::new(trimmer::UtfNotAligned {}),
     }
 }

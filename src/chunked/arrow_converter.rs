@@ -25,6 +25,7 @@
 // Last updated: 2024-05-15
 //
 
+use crate::chunked::trimmer::{trimmer_factory, ColumnTrimmer};
 use arrow::array::{ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
 use arrow::record_batch::RecordBatch;
 use log::{debug, info};
@@ -38,15 +39,20 @@ use rayon::prelude::*;
 
 use std::fs;
 use std::fs::File;
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::str::from_utf8_unchecked;
 use std::sync::Arc;
 
-use super::{ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen};
+use super::{
+    arrow_file_output, trimmer, ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen,
+    Stats,
+};
+use crate::chunked;
+use crate::chunked::threaded_file_output::{ipc_file_out, output_factory, parquet_file_out};
+pub use crate::cli::Targets;
 use crate::datatype::DataType;
 use crate::schema;
-use crate::trimmer::{trimmer_factory, ColumnTrimmer};
-use crate::{chunked, trimmer};
 use arrow::datatypes::{Field, Schema, SchemaRef};
 use atomic_counter::{AtomicCounter, ConsistentCounter};
 use crossbeam::atomic::AtomicConsume;
@@ -54,6 +60,7 @@ use libc::bsearch;
 use ordered_channel::Sender;
 use parquet::errors::{ParquetError, Result};
 use parquet::file::metadata::FileMetaData;
+use rayon::join;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::sync::mpsc::{sync_channel, Receiver, RecvError, SyncSender};
 use std::thread;
@@ -71,6 +78,7 @@ pub(crate) struct Slice2Arrow<'a> {
     pub(crate) fn_line_break_len: FnLineBreakLen,
     pub(crate) masterbuilders: MasterBuilders,
     pub(crate) consistent_counter: ConsistentCounter,
+    pub(crate) target: Targets,
 }
 
 pub(crate) struct MasterBuilders {
@@ -92,21 +100,6 @@ impl MasterBuilders {
 
         let batch = RecordBatch::try_from_iter(br).unwrap();
         batch.schema()
-    }
-    pub fn writer_factory(out_file: &PathBuf, schema: SchemaRef) -> ArrowWriter<File> {
-        let _out_file = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(out_file)
-            .expect("aaa");
-
-        let props = WriterProperties::builder()
-            .set_compression(Compression::SNAPPY)
-            .build();
-
-        let writer: ArrowWriter<File> =
-            ArrowWriter::try_new(_out_file, schema, Some(props.clone())).unwrap();
-        writer
     }
 
     pub fn builders_factory(out_file: PathBuf, schema_path: PathBuf, instances: i16) -> Self {
@@ -242,40 +235,14 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         (bytes_in, bytes_out, parse_duration, builder_write_duration)
     }
 
-    fn setup(&mut self) -> JoinHandle<Result<format::FileMetaData>> {
-        let schema = self.masterbuilders.schema_factory();
-        let _outfile = self.masterbuilders.outfile.clone();
-        let mut writer = crate::chunked::arrow_converter::MasterBuilders::writer_factory(
-            &_outfile,
-            schema.clone(),
+    fn setup(&mut self) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+        let o = output_factory(
+            self.target.clone(),
+            self.masterbuilders.schema_factory(),
+            self.masterbuilders.outfile.clone(),
         );
-
-        let (sender, mut receiver) = bounded::<RecordBatch>(100);
-
-        let t: JoinHandle<Result<format::FileMetaData>> = thread::spawn(move || {
-            'outer: loop {
-                let mut message = receiver.recv();
-
-                match message {
-                    Ok(rb) => {
-                        writer.write(&rb).expect("Error Writing batch");
-                        if (rb.num_rows() == 0) {
-                            break 'outer;
-                        }
-                    }
-                    Err(e) => {
-                        info!("got RecvError in channel , break to outer");
-                        break 'outer;
-                    }
-                }
-            }
-            info!("closing the writer for parquet");
-            writer.finish()
-        });
-        self.masterbuilders.sender = Some(sender.clone());
-        t
-
-        //        bytes_out += crate::chunked::arrow_converter::GLOBAL_COUNTER.load_consume();
+        self.masterbuilders.sender = Some(o.0.clone());
+        o
     }
 
     fn shutdown(&mut self) {

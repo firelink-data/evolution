@@ -25,10 +25,12 @@
 // Last updated: 2024-05-15
 //
 
+use crate::chunked::Stats;
 use log::info;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 use arrow::array::RecordBatch;
+use ordered_channel::Sender;
 use parquet::errors::{ParquetError, Result};
 use parquet::file::metadata::FileMetaData;
 use parquet::format;
@@ -69,7 +71,7 @@ impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
         (bytes_processed, 0, duration, duration)
     }
 
-    fn setup(&mut self) -> JoinHandle<Result<format::FileMetaData>> {
+    fn setup(&mut self) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         todo!()
     }
 

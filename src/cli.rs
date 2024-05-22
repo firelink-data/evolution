@@ -25,6 +25,7 @@
 // Last updated: 2024-05-15
 //
 
+use atomic_counter::ConsistentCounter;
 use clap::{value_parser, ArgAction, Parser, Subcommand};
 #[cfg(all(feature = "rayon", debug_assertions))]
 use log::debug;
@@ -33,7 +34,6 @@ use log::info;
 #[cfg(feature = "rayon")]
 use parquet::arrow::ArrowWriter;
 
-use atomic_counter::ConsistentCounter;
 #[cfg(feature = "rayon")]
 use std::fs;
 #[cfg(feature = "rayon")]
@@ -60,6 +60,13 @@ enum Converters {
     None,
 }
 
+#[derive(clap::ValueEnum, Clone)]
+pub enum Targets {
+    Parquet,
+    IPC,
+    None,
+}
+
 #[cfg(feature = "rayon")]
 #[derive(clap::ValueEnum, Clone)]
 enum Slicers {
@@ -78,6 +85,13 @@ enum Slicers {
 pub struct Cli {
     #[command(subcommand)]
     command: Commands,
+    #[arg(
+        long = "target",
+        value_name = "TARGET-ENCODING",
+        action = ArgAction::Set,
+        default_value = "parquet",
+    )]
+    target: Targets,
 
     /// Set the number of threads (logical cores) to use when multi-threading.
     #[arg(
@@ -276,12 +290,14 @@ impl Cli {
                             schema.to_path_buf(),
                             n_threads as i16,
                         );
+                        let sc = master_builders.schema_factory();
 
                         let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow {
                             fn_line_break: find_last_nl,
                             fn_line_break_len: line_break_len_cr,
                             masterbuilders: master_builders,
                             consistent_counter: ConsistentCounter::new(0),
+                            target: self.target.clone(),
                         });
                         s2a
                     }
