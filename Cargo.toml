@@ -2,6 +2,7 @@
 members = [
     "evolution",
     "crates/evolution-common",
+    "crates/evolution-schema",
     # "crates/*",
 ]
 resolver = "2"

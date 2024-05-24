@@ -1,10 +1,13 @@
 [package]
 name = "evolution-common"
 version = "1.0.0"
-description = "Common util components of Evolution."
+description = "Common util components of evolution."
 edition = { workspace = true }
 authors = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
+
+[dependencies]
+serde = { version = "1.0.202", features = ["derive"] }

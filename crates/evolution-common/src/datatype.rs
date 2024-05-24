@@ -21,9 +21,27 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-// File created: 2024-05-24
+// File created: 2024-05-10
 // Last updated: 2024-05-24
 //
 
-pub mod datatype;
-pub mod error;
+use serde::{Deserialize, Serialize};
+
+/// Enum of datatypes as a subset of the [`arrow::datatypes::DataType`].
+/// 
+/// # Note
+/// This is needed so we can derive [`Deserialize`] and [`Serialize`] because
+/// the arrow datatypes do not implement these traits.
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Serialize)]
+pub enum DataType {
+    Boolean,
+    Float16,
+    Float32,
+    Float64,
+    Int16,
+    Int32,
+    Int64,
+    Utf8,
+    LargeUtf8,
+}
+

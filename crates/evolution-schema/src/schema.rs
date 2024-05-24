@@ -21,9 +21,21 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-// File created: 2024-05-24
+// File created: 2023-11-25
 // Last updated: 2024-05-24
 //
 
-pub mod datatype;
-pub mod error;
+use evolution_common::datatype::DataType;
+use padder::{Alignment, Symbol};
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize)]
+pub struct FixedColumn {
+    name: String,
+    offset: usize,
+    length: usize,
+    dtype: DataType,
+    alignment: Alignment,
+    pad_symbol: Symbol,
+    is_nullable: bool,
+}

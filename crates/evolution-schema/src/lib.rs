@@ -25,5 +25,5 @@
 // Last updated: 2024-05-24
 //
 
-pub mod datatype;
-pub mod error;
+pub mod schema;
+
