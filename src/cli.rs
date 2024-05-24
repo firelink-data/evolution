@@ -64,6 +64,10 @@ enum Converters {
 pub enum Targets {
     Parquet,
     IPC,
+    Iceberg,
+    Delta,
+    Flight,
+    Orc,
     None,
 }
 

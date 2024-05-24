@@ -43,7 +43,7 @@ use parquet::errors::{ParquetError, Result};
 pub(crate) mod arrow_converter;
 pub(crate) mod residual_slicer;
 pub(crate) mod self_converter;
-pub(crate) mod threaded_file_output;
+pub(crate) mod recordbatch_output;
 mod trimmer;
 
 pub(crate) struct ChunkAndResidue {
@@ -171,7 +171,7 @@ pub trait ColumnBuilder {
     //    fn name(&  self) -> &String;
 }
 
-pub trait arrow_file_output {
+pub trait RecordBatchOutput {
     fn setup(
         &mut self,
         schema: SchemaRef,

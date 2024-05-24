@@ -45,11 +45,11 @@ use std::str::from_utf8_unchecked;
 use std::sync::Arc;
 
 use super::{
-    arrow_file_output, trimmer, ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen,
+    RecordBatchOutput, trimmer, ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen,
     Stats,
 };
 use crate::chunked;
-use crate::chunked::threaded_file_output::{ipc_file_out, output_factory, parquet_file_out};
+use crate::chunked::recordbatch_output::{IpcFileOut, output_factory, ParquetFileOut};
 pub use crate::cli::Targets;
 use crate::datatype::DataType;
 use crate::schema;

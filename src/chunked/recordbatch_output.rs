@@ -44,7 +44,7 @@ use std::str::from_utf8_unchecked;
 use std::sync::Arc;
 
 use super::{
-    arrow_file_output, trimmer, ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen,
+    RecordBatchOutput, trimmer, ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen,
     Stats,
 };
 use crate::chunked;
@@ -68,9 +68,7 @@ use std::time::{Duration, Instant};
 use thread::spawn;
 use Compression::SNAPPY;
 
-pub(crate) struct parquet_file_out {
-    pub(crate) sender: Option<Sender<RecordBatch>>,
-}
+
 pub(crate) fn output_factory(
     target: Targets,
     schema: SchemaRef,
@@ -78,19 +76,62 @@ pub(crate) fn output_factory(
 ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
     match target {
         Targets::Parquet => {
-            let mut pfo: Box<dyn arrow_file_output> = Box::new(parquet_file_out { sender: None });
+            let mut pfo: Box<dyn RecordBatchOutput> = Box::new(ParquetFileOut { sender: None });
             pfo.setup(schema, _outfile)
         }
         Targets::IPC => {
-            let mut pfo: Box<dyn arrow_file_output> = Box::new(ipc_file_out { sender: None });
+            let mut pfo: Box<dyn RecordBatchOutput> = Box::new(IpcFileOut { sender: None });
             pfo.setup(schema, _outfile)
         }
         Targets::None => {
             todo!()
         }
+        Targets::Iceberg => {
+            todo!()
+        }
+        Targets::Delta => {
+            todo!()
+        }
+        Targets::Flight => {
+            todo!()
+        }
+        Targets::Orc => {
+            todo!()
+        }
     }
 }
-impl arrow_file_output for parquet_file_out {
+
+pub(crate) struct DeltaOut {
+    pub(crate) sender: Option<Sender<RecordBatch>>,
+}
+impl RecordBatchOutput for DeltaOut {
+    fn setup(&mut self, schema: SchemaRef, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+        todo!()
+    }
+}
+pub(crate) struct IcebergOut {
+    pub(crate) sender: Option<Sender<RecordBatch>>,
+}
+impl RecordBatchOutput for IcebergOut {
+    fn setup(&mut self, schema: SchemaRef, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+        todo!()
+    }
+}
+pub(crate) struct FlightOut {
+    pub(crate) sender: Option<Sender<RecordBatch>>,
+}
+
+impl RecordBatchOutput for FlightOut {
+    fn setup(&mut self, schema: SchemaRef, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+        todo!()
+    }
+}
+
+
+pub(crate) struct ParquetFileOut {
+    pub(crate) sender: Option<Sender<RecordBatch>>,
+}
+impl RecordBatchOutput for ParquetFileOut {
     fn setup(
         &mut self,
         schema: SchemaRef,
@@ -142,11 +183,12 @@ impl arrow_file_output for parquet_file_out {
     }
 }
 
-pub struct ipc_file_out {
+pub struct IpcFileOut {
     pub(crate) sender: Option<Sender<RecordBatch>>,
 }
 
-impl arrow_file_output for ipc_file_out {
+
+impl RecordBatchOutput for IpcFileOut {
     fn setup(
         &mut self,
         schema: SchemaRef,
