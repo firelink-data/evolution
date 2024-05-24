@@ -27,7 +27,9 @@
 
 use clap::Parser;
 use cli::Cli;
-use log::{debug, error, info};
+#[cfg(debug_assertions)]
+use log::debug;
+use log::{error, info};
 
 mod cli;
 mod logger;
