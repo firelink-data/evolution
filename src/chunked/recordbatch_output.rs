@@ -74,31 +74,33 @@ pub(crate) fn output_factory(
     schema: SchemaRef,
     _outfile: PathBuf,
 ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
-    match target {
+    let mut pfo: Box<dyn RecordBatchOutput> =match target {
         Targets::Parquet => {
-            let mut pfo: Box<dyn RecordBatchOutput> = Box::new(ParquetFileOut { sender: None });
-            pfo.setup(schema, _outfile)
+             Box::new(ParquetFileOut { sender: None })
         }
         Targets::IPC => {
-            let mut pfo: Box<dyn RecordBatchOutput> = Box::new(IpcFileOut { sender: None });
-            pfo.setup(schema, _outfile)
-        }
-        Targets::None => {
-            todo!()
+             Box::new(IpcFileOut { sender: None })
         }
         Targets::Iceberg => {
-            todo!()
+            Box::new(IcebergOut { sender: None })
         }
         Targets::Delta => {
-            todo!()
+            Box::new(DeltaOut { sender: None })
         }
         Targets::Flight => {
-            todo!()
+            Box::new(FlightOut { sender: None })
         }
         Targets::Orc => {
             todo!()
         }
-    }
+        Targets::None => {
+            todo!()
+        }
+
+    };
+
+    pfo.setup(schema, _outfile)
+
 }
 
 pub(crate) struct DeltaOut {
