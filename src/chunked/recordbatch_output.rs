@@ -25,10 +25,9 @@
 // Last updated: 2024-05-15
 //
 
+use std::env::VarError;
 use crate::chunked::trimmer::{trimmer_factory, ColumnTrimmer};
 use arrow::array::{ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
-use arrow::record_batch::RecordBatch;
-use log::{debug, info};
 use ordered_channel::bounded;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
@@ -39,7 +38,7 @@ use rayon::prelude::*;
 
 use std::fs;
 use std::fs::File;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::from_utf8_unchecked;
 use std::sync::Arc;
 
@@ -67,6 +66,19 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thread::spawn;
 use Compression::SNAPPY;
+use chrono::prelude::*;
+use deltalake::arrow::array::*;
+use deltalake::arrow::record_batch::RecordBatch;
+use deltalake::errors::DeltaTableError;
+use deltalake::kernel::{ PrimitiveType, StructField, StructType};
+use deltalake::parquet::{
+    basic::{ZstdLevel},
+    
+};
+use deltalake::writer::{DeltaWriter, RecordBatchWriter};
+use deltalake::*;
+//use deltalake::writer::test_utils::create_initialized_table;
+use tracing::*;
 
 
 pub(crate) fn output_factory(
@@ -106,8 +118,50 @@ pub(crate) fn output_factory(
 pub(crate) struct DeltaOut {
     pub(crate) sender: Option<Sender<RecordBatch>>,
 }
+
+impl DeltaOut {
+    async fn deltasetup ()->Result<parquet::errors::ParquetError> {
+        let table_uri = std::env::var("TABLE_URI").map_err(|e| DeltaTableError::GenericError {
+            source: Box::new(e),
+        })?;
+        info!("Using the location of: {:?}", table_uri);
+
+        let table_path = deltalake::Path::parse(&table_uri)?;
+
+        let maybe_table = deltalake::open_table(&table_path).await;
+        let mut table = match maybe_table {
+            Ok(table) => table,
+            Err(DeltaTableError::NotATable(_)) => {
+                info!("It doesn't look like our delta table has been created");
+                DeltaOps::try_from_uri(table_path)
+                    .await
+                    .unwrap()
+                    .create()
+//            .with_columns(WeatherRecord::columns())
+                    .await
+                    .unwrap()
+
+            }
+            Err(err) => panic!("{:?}", err),
+        };
+
+        let writer_properties = WriterProperties::builder()
+            .set_compression(Compression::ZSTD(ZstdLevel::try_new(3).unwrap()))
+            .build();
+
+        let mut writer = RecordBatchWriter::for_table(&table)
+            .expect("Failed to make RecordBatchWriter")
+            .with_writer_properties(writer_properties);
+
+    todo!()
+    }
+}
+
 impl RecordBatchOutput for DeltaOut {
+    
     fn setup(&mut self, schema: SchemaRef, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+
+
         todo!()
     }
 }
