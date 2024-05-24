@@ -1,0 +1,20 @@
+[package]
+name = "evolution"
+version = "2.0.0"
+edition = { workspace = true }
+description = "🦖 Efficiently evolve your old fixed-length data files into more modern file formats."
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+license = { workspace = true }
+readme = "README.md"
+default-run = "evolution"
+
+[dependencies]
+chrono = "0.4.38"
+clap = { version = "4.5.4", features = ["derive", "default"] }
+colored = "2.1.0"
+env_logger = "0.11.3"
+log = "0.4.21"
+evolution-common = { path = "../crates/evolution-common" }
+
