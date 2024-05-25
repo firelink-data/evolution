@@ -26,7 +26,7 @@
 //
 
 use arrow::datatypes::{DataType as ArrowDataType, Field, Schema, SchemaRef as ArrowSchemaRef};
-use deltalake::kernel::{DataType as DeltaDataType, PrimitiveType as DeltaPrimitiveType, StructField};
+use deltalake::kernel::{DataType as DeltaDataType, StructField};
 use padder::{Alignment, Symbol};
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
@@ -116,17 +116,23 @@ impl FixedColumn {
         }
     }
 
-    pub fn as_delta_primitive(&self) -> DeltaPrimitiveType {
+    /// Get the datatype of the column as a [`DeltaDataType`] variant.
+    ///
+    /// # Note
+    /// Currently this method will map the Float16 datatype to the Float32 variant. This
+    /// is because [`deltalake`] does not define a Float16 variant in its [`DeltaDataType`].
+    pub fn as_delta_dtype(&self) -> DeltaDataType {
         match self.dtype {
-            DataType::Boolean => DeltaPrimitiveType::Boolean,
-            DataType::Float16 => DeltaPrimitiveType::Float,
-            DataType::Float32 => DeltaPrimitiveType::Float,
-            DataType::Float64 => DeltaPrimitiveType::Float,
-            DataType::Int16 => DeltaPrimitiveType::Integer,
-            DataType::Int32 => DeltaPrimitiveType::Integer,
-            DataType::Int64 => DeltaPrimitiveType::Integer,
-            DataType::Utf8 => DeltaPrimitiveType::String,
-            DataType::LargeUtf8 => DeltaPrimitiveType::String,
+            DataType::Boolean => DeltaDataType::BOOLEAN,
+            // Note that this might have unwanted side-effects due to datatype changing!
+            DataType::Float16 => DeltaDataType::FLOAT,
+            DataType::Float32 => DeltaDataType::FLOAT,
+            DataType::Float64 => DeltaDataType::DOUBLE,
+            DataType::Int16 => DeltaDataType::SHORT,
+            DataType::Int32 => DeltaDataType::INTEGER,
+            DataType::Int64 => DeltaDataType::LONG,
+            DataType::Utf8 => DeltaDataType::STRING,
+            DataType::LargeUtf8 => DeltaDataType::STRING,
         }
     }
 
@@ -284,7 +290,7 @@ impl FixedSchema {
         self
             .columns
             .iter()
-            .map(|c| StructField::new(c.name(), DeltaDataType::Primitive(c.as_delta_primitive()), c.is_nullable()))
+            .map(|c| StructField::new(c.name(), c.as_delta_dtype(), c.is_nullable()))
             .collect::<Vec<StructField>>()
     }
 
