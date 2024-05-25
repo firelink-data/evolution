@@ -90,6 +90,16 @@ impl Column {
         self.pad_symbol
     }
 
+    /// Get whether or not the column is allowed to be nullable. 
+    ///
+    /// # Note
+    /// If a column is defined as not nullable and parsing of a fixed-length file column fails to find
+    /// a valid value, then a NULL value will not be appended to the column builder.
+    /// Instead, the program will terminate.
+    pub fn is_nullable(&self) -> bool {
+        self.is_nullable
+    }
+
     /// Get the datatype of the column as a [`ArrowDataType`] variant.
     /// 
     /// # Note
@@ -112,11 +122,12 @@ impl Column {
     /// Get the datatype of the column as a [`DeltaDataType`] variant.
     ///
     /// # Note
-    /// Currently this method will map the `half` (Float16) datatype to the float32 variant.
-    /// This is because [`deltalake`] does define a 
+    /// Currently this method will map the Float16 datatype to the Float32 variant. This
+    /// is because [`deltalake`] does not define a Float16 variant in its [`DeltaDataType`].
     pub fn as_delta_dtype(&self) -> DeltaDataType {
         match self.dtype {
             DataType::Boolean => DeltaDataType::BOOLEAN,
+            // Note that this might have unwanted side-effects due to datatype changing!
             DataType::Float16 => DeltaDataType::FLOAT,
             DataType::Float32 => DeltaDataType::FLOAT,
             DataType::Float64 => DeltaDataType::DOUBLE,
