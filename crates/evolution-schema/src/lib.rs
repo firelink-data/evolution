@@ -22,8 +22,9 @@
 // SOFTWARE.
 //
 // File created: 2024-05-24
-// Last updated: 2024-05-24
+// Last updated: 2024-05-25
 //
 
+pub mod column;
 pub mod schema;
 
