@@ -45,6 +45,7 @@ arrow = "51.0.0"
 parquet = "51.0.0"
 arrow-ipc = "51.0.0"
 deltalake = "0.17.3"
+deltalake-core = "0.17.3"
 padder = { version = "1.2.0", features = ["serde"] }
 ordered-channel="1.1.0"
 atomic-counter = "1.0.1"
