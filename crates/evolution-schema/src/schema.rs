@@ -115,10 +115,7 @@ impl FixedSchema {
 
     /// Get the total length of a fixed-length row.
     pub fn row_length(&self) -> usize {
-        self.columns
-            .iter()
-            .map(|c| c.length())
-            .sum()
+        self.columns.iter().map(|c| c.length()).sum()
     }
 
     /// Get the names of the columns.
@@ -204,11 +201,7 @@ mod tests_schema {
         ];
 
         let a: FixedSchema = FixedSchema::from_path(path).unwrap();
-        let b: FixedSchema = FixedSchema::new(
-            String::from("ValidTestSchema"),
-            8914781578,
-            columns,
-        );
+        let b: FixedSchema = FixedSchema::new(String::from("ValidTestSchema"), 8914781578, columns);
 
         assert_eq!(a.name(), b.name());
         assert_ne!(a.version(), b.version());
