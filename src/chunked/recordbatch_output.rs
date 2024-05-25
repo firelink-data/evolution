@@ -120,11 +120,7 @@ pub(crate) struct DeltaOut {
 }
 
 impl DeltaOut {
-<<<<<<< HEAD
     async fn deltasetup(schema: FixedSchema) -> Result<parquet::errors::ParquetError> {
-=======
-    async fn deltasetup ()->Result<(), DeltaTableError> {
->>>>>>> 5b89d4a62fc1dd26f82409798e7ca5c9343a347a
         let table_uri = std::env::var("TABLE_URI").map_err(|e| DeltaTableError::GenericError {
             source: Box::new(e),
         })?;
