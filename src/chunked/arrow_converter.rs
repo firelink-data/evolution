@@ -262,8 +262,11 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         let emptyrb = arrow::record_batch::RecordBatch::new_empty(Arc::new(schema));
         let c = self.consistent_counter.get();
         let _ = &self.masterbuilders.sender.clone().unwrap().send(c, emptyrb);
-        
-        
+
+        //     jh.spawn_blocking(async move {threaded_writer.1.await;});
+//        threaded_writer.1.await.expect("The task being joined has panicked");;
+
+
     }
 }
 
