@@ -31,18 +31,17 @@ use evolution_common::datatype::DataType;
 use padder::{Alignment, Symbol};
 use serde::{Deserialize, Serialize};
 
-/// A blank trait to allow developers to create their own schema and associated column implementations. 
+/// A blank trait to allow developers to create their own column implementations.
 pub trait Column {}
-pub type ColumnRef = Box<dyn Column>; 
+pub type ColumnRef = Box<dyn Column>;
 
-/// Representation of a column in a fixed-length file (.flf), containing all allowed fields.
-/// 
+/// Representation of a column in a fixed-length file (.flf), containing the only allowed fields.
+///
 /// # Note
-/// This struct is meant to be deserialzied from a .json schema file, and as such, capitalization
-/// of the field values is important. For example, the dtype field has to be exactly one of the 
-/// [`DataType`] enum variants, spelled exactly the same. Otherwise, the serde crate can't
-/// deserialize the values when initializing a new struct.
-#[derive(Deserialize, Serialize)]
+/// This struct is meant to be created when deserialzied a .json schema file representing a [`crate::schema::FixedSchema`],
+/// and as such, capitalization of the field values is extremely important. For example, the dtype field has to be exactly
+/// one of the [`DataType`] enum variants, spelled exactly the same. Otherwise, serde can't deserialize the values.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct FixedColumn {
     /// The symbolic name of the column.
     name: String,
@@ -63,8 +62,29 @@ pub struct FixedColumn {
 }
 
 impl FixedColumn {
+    /// Create a new [`FixedColumn`] from the provided field values.
+    pub fn new(
+        name: String,
+        offset: usize,
+        length: usize,
+        dtype: DataType,
+        alignment: Alignment,
+        pad_symbol: Symbol,
+        is_nullable: bool,
+    ) -> Self {
+        Self {
+            name,
+            offset,
+            length,
+            dtype,
+            alignment,
+            pad_symbol,
+            is_nullable,
+        }
+    }
+
     /// Get the name of the column.
-    pub fn name(&self) -> &str {
+    pub fn name(&self) -> &String {
         &self.name
     }
 
@@ -93,21 +113,17 @@ impl FixedColumn {
         self.pad_symbol
     }
 
-    /// Get whether or not the column is allowed to be nullable. 
+    /// Get whether or not the column is allowed to be nullable.
     ///
     /// # Note
-    /// If a column is defined as not nullable and parsing of a fixed-length file column fails to find
-    /// a valid value, then a NULL value will not be appended to the column builder.
-    /// Instead, the program will terminate.
+    /// If a column is defined as not nullable and parsing of a fixed-length file column fails
+    /// to find a valid value, then a NULL value will not be appended to the column builder.
+    /// Instead, the program will terminate due to this occurring.
     pub fn is_nullable(&self) -> bool {
         self.is_nullable
     }
 
     /// Get the datatype of the column as a [`ArrowDataType`] variant.
-    /// 
-    /// # Note
-    /// This method is primarily used when creating a new [`arrow::datatypes::Schema`] from
-    /// an existing [`evolution_schema::schema::Schema`].
     pub fn as_arrow_dtype(&self) -> ArrowDataType {
         match self.dtype {
             DataType::Boolean => ArrowDataType::Boolean,
@@ -125,8 +141,8 @@ impl FixedColumn {
     /// Get the datatype of the column as a [`DeltaDataType`] variant.
     ///
     /// # Note
-    /// Currently this method will map the Float16 datatype to the Float32 variant. This
-    /// is because [`deltalake`] does not define a Float16 variant in its [`DeltaDataType`].
+    /// Currently this method will map [`DataType::Float16`] to the [`DataType::Float32`] variant. This
+    /// is because the [`deltalake`] crate does not yet define a Float16 variant in its [`DeltaDataType`].
     pub fn as_delta_dtype(&self) -> DeltaDataType {
         match self.dtype {
             DataType::Boolean => DeltaDataType::BOOLEAN,
@@ -150,7 +166,6 @@ mod tests_column {
     use super::*;
 
     use std::fs;
-    use std::io;
     use std::path::PathBuf;
 
     #[test]
@@ -158,9 +173,35 @@ mod tests_column {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("res/test_valid_column.json");
 
-        let json = fs::File::open(path).unwrap();
-        let reader = io::BufReader::new(json);
+        let a: FixedColumn = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+        let b: FixedColumn = FixedColumn::new(
+            String::from("NotCoolColumn"),
+            0 as usize,
+            2 as usize,
+            DataType::Float16,
+            Alignment::Center,
+            Symbol::Asterisk,
+            true,
+        );
 
-        let _: FixedColumn = serde_json::from_reader(reader).unwrap();
+        assert_ne!(a.name(), b.name());
+        assert_ne!(a.offset(), b.offset());
+        assert_ne!(a.length(), b.length());
+        assert_ne!(a.dtype(), b.dtype());
+        assert_eq!(a.alignment(), b.alignment());
+        assert_ne!(a.pad_symbol(), b.pad_symbol());
+        assert_ne!(a.is_nullable(), b.is_nullable());
+
+        // This is hopefully subject to change...
+        assert_ne!(a.as_arrow_dtype(), b.as_arrow_dtype());
+        assert_eq!(a.as_delta_dtype(), b.as_delta_dtype());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_deserialize_invalid_column_from_file() {
+        let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("res/test_invalid_column.json");
+        let _: FixedColumn = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
     }
 }
