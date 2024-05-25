@@ -34,7 +34,6 @@ use log::{error, info};
 mod cli;
 mod logger;
 
-
 fn main() {
     match logger::try_init_logging() {
         Ok(_) => {

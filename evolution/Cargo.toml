@@ -2,7 +2,7 @@
 name = "evolution"
 version = "2.0.0"
 edition = { workspace = true }
-description = "🦖 Efficiently evolve your old fixed-length data files into more modern file formats."
+description = "🦖 Efficiently evolve your old fixed-length data files into more modern file formats, fully parallelized!"
 homepage = { workspace = true }
 repository = { workspace = true }
 authors = { workspace = true }
@@ -17,4 +17,5 @@ colored = "2.1.0"
 env_logger = "0.11.3"
 log = "0.4.21"
 evolution-common = { path = "../crates/evolution-common" }
+evolution-target = { path = "../crates/evolution-target" }
 

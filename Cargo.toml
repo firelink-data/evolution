@@ -3,6 +3,8 @@ members = [
     "evolution",
     "crates/evolution-common",
     "crates/evolution-schema",
+    "crates/evolution-mocker",
+    "crates/evolution-target",
     # "crates/*",
 ]
 resolver = "2"

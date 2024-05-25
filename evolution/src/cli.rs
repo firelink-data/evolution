@@ -22,12 +22,14 @@
 // SOFTWARE.
 //
 // File created: 2024-02-05
-// Last updated: 2024-05-24
+// Last updated: 2024-05-25
 //
 
 use clap::{value_parser, ArgAction, Parser, Subcommand};
-
 use evolution_common::error::Result;
+use evolution_target::target::Target;
+
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(
@@ -41,27 +43,113 @@ pub(crate) struct Cli {
     #[command(subcommand)]
     command: Commands,
 
+    /// Enable multithreading and set the number of threads (logical cores) to use.
     #[arg(
         short = 'N',
         long = "n-threads",
-        value_name = "NUM_THREADS",
         action = ArgAction::Set,
         default_value = "1",
         value_parser = value_parser!(usize),
+        required = false,
     )]
     n_threads: usize,
-
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    Convert {},
-    Mock {},
+    /// Convert a fixed-length file to another file format.
+    Convert {
+        /// The fixed-length file to convert.
+        #[arg(
+            short = 'i',
+            long = "in-file",
+            action = ArgAction::Set,
+            required = true,
+        )]
+        in_file: PathBuf,
+
+        /// The json schema for the input file.
+        #[arg(
+            short = 's',
+            long = "schema",
+            action = ArgAction::Set,
+            required = true,
+        )]
+        schema: PathBuf,
+
+        /// The target output file.
+        #[arg(
+            short = 'o',
+            long = "out-file",
+            action = ArgAction::Set,
+            required = true,
+        )]
+        out_file: PathBuf,
+
+        /// The type of output to target.
+        #[arg(
+            short = 't',
+            long = "target",
+            action = ArgAction::Set,
+            default_value = "parquet",
+            value_parser = value_parser!(Target),
+            required = false,
+        )]
+        target: Target,
+    },
+
+    /// Generate mocked fixed-length files.
+    Mock {
+        /// The json schema to generate data based on.
+        #[arg(
+            short = 's',
+            long = "schema",
+            action = ArgAction::Set,
+            required = true,
+        )]
+        schema: PathBuf,
+
+        /// The target output file.
+        #[arg(
+            short = 'o',
+            long = "out-file",
+            action = ArgAction::Set,
+            required = true,
+        )]
+        out_file: PathBuf,
+
+        /// The number of rows to generate.
+        #[arg(
+            short = 'n',
+            long = "n-rows",
+            action = ArgAction::Set,
+            default_value = "100000",
+            value_parser = value_parser!(usize),
+            required = false,
+        )]
+        n_rows: usize,
+    },
 }
 
 impl Cli {
     pub fn run(&self) -> Result<()> {
-        todo!()
+        match &self.command {
+            Commands::Convert {
+                in_file,
+                schema,
+                out_file,
+                target,
+            } => {
+                todo!()
+            },
+            Commands::Mock {
+                schema,
+                out_file,
+                n_rows,
+            } => {
+                todo!()
+            }
+        }
     }
 }
 
