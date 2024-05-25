@@ -37,8 +37,9 @@ use parquet::format;
 use std::fs::File;
 use std::io::Write;
 use std::sync::mpsc::SyncSender;
-use std::thread::JoinHandle;
+use tokio::task::JoinHandle;
 use std::time::Duration;
+use tokio::runtime::Runtime;
 
 use super::{Converter, FnFindLastLineBreak};
 
@@ -71,11 +72,11 @@ impl<'a> Converter<'a> for SampleSliceAggregator<'a> {
         (bytes_processed, 0, duration, duration)
     }
 
-    fn setup(&mut self) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+    fn setup(&mut self, rt: Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         todo!()
     }
 
-    fn shutdown(&mut self) {
+    fn shutdown(&mut self,jh:JoinHandle<Result<Stats>>) {
         todo!()
     }
 }

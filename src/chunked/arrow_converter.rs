@@ -64,9 +64,11 @@ use rayon::join;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::sync::mpsc::{sync_channel, Receiver, RecvError, SyncSender};
 use std::thread;
-use std::thread::JoinHandle;
+use tokio::task::JoinHandle;
 use std::time::{Duration, Instant};
 use thread::spawn;
+use tokio::runtime;
+use tokio::runtime::Runtime;
 use crate::schema::FixedSchema;
 //use ordered_channel::Sender;
 //use crossbeam::channel::{Receiver, Sender};
@@ -237,18 +239,19 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         (bytes_in, bytes_out, parse_duration, builder_write_duration)
     }
 
-    fn setup(&mut self) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+    fn setup(&mut self, rt: runtime::Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         let o = output_factory(
             self.target.clone(),
             self.fixed_schema.clone(),
             self.masterbuilders.schema_factory(),
             self.masterbuilders.outfile.clone(),
+            rt
         );
         self.masterbuilders.sender = Some(o.0.clone());
         o
     }
-
-    fn shutdown(&mut self) {
+    
+    fn shutdown(&mut self,jh:JoinHandle<Result<Stats>>) {
         //        converter.shutdown();
         let schema = Schema::new(vec![Field::new(
             "id",
@@ -259,6 +262,8 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         let emptyrb = arrow::record_batch::RecordBatch::new_empty(Arc::new(schema));
         let c = self.consistent_counter.get();
         let _ = &self.masterbuilders.sender.clone().unwrap().send(c, emptyrb);
+        
+        
     }
 }
 

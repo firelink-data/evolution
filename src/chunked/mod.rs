@@ -34,7 +34,8 @@ use ordered_channel::Sender;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::mpsc::SyncSender;
-use std::thread::JoinHandle;
+use tokio::task::JoinHandle;
+use tokio::runtime::Runtime;
 use std::time::Duration;
 
 use self::residual_slicer::SLICER_IN_CHUNK_SIZE;
@@ -162,8 +163,8 @@ pub(crate) trait Converter<'a> {
 
     //    fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
     fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize, Duration, Duration);
-    fn setup(&mut self) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>);
-    fn shutdown(&mut self);
+    fn setup(&mut self, rt: Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>);
+    fn shutdown(&mut self,jh:JoinHandle<Result<Stats>>);
 }
 
 pub trait ColumnBuilder {
@@ -178,6 +179,6 @@ pub trait RecordBatchOutput {
         schema: SchemaRef,
         fixed_schema: FixedSchema,
         outfile: PathBuf,
-        
+        rt: tokio::runtime::Runtime
     ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>);
 }
