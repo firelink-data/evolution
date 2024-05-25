@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-05-07
-// Last updated: 2024-05-15
+// Last updated: 2024-05-25
 //
 
 use std::env::VarError;
@@ -120,7 +120,7 @@ pub(crate) struct DeltaOut {
 }
 
 impl DeltaOut {
-    async fn deltasetup ()->Result<parquet::errors::ParquetError> {
+    async fn deltasetup(schema: FixedSchema) -> Result<parquet::errors::ParquetError> {
         let table_uri = std::env::var("TABLE_URI").map_err(|e| DeltaTableError::GenericError {
             source: Box::new(e),
         })?;
@@ -137,7 +137,7 @@ impl DeltaOut {
                     .await
                     .unwrap()
                     .create()
-//            .with_columns(WeatherRecord::columns())
+                    .with_columns(schema.into_delta_columns())
                     .await
                     .unwrap()
 
@@ -159,9 +159,8 @@ impl DeltaOut {
 
 impl RecordBatchOutput for DeltaOut {
     
-    fn setup(&mut self, schema: SchemaRef, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
-
-
+    fn setup(&mut self, schema: FxiedSchema, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+        let dout = DeltaOut.deltasetup()?
         todo!()
     }
 }

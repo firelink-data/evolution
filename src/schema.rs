@@ -22,10 +22,11 @@
 // SOFTWARE.
 //
 // File created: 2023-11-25
-// Last updated: 2024-05-15
+// Last updated: 2024-05-25
 //
 
 use arrow::datatypes::{DataType as ArrowDataType, Field, Schema, SchemaRef as ArrowSchemaRef};
+use deltalake::kernel::{DataType as DeltaDataType, PrimitiveType as DeltaPrimitiveType, StructField};
 use padder::{Alignment, Symbol};
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
@@ -95,6 +96,11 @@ impl FixedColumn {
         self.pad_symbol
     }
 
+    /// Get whether or not the column is nullable.
+    pub fn is_nullable(&self) -> bool {
+        self.is_nullable
+    }
+
     /// Find the matching [`ArrowDataType`] for the [`FixedColumn`]s dtype.
     pub fn as_arrow_dtype(&self) -> ArrowDataType {
         match self.dtype {
@@ -107,6 +113,20 @@ impl FixedColumn {
             DataType::Int64 => ArrowDataType::Int64,
             DataType::Utf8 => ArrowDataType::Utf8,
             DataType::LargeUtf8 => ArrowDataType::LargeUtf8,
+        }
+    }
+
+    pub fn as_delta_primitive(&self) -> DeltaPrimitiveType {
+        match self.dtype {
+            DataType::Boolean => DeltaPrimitiveType::Boolean,
+            DataType::Float16 => DeltaPrimitiveType::Float,
+            DataType::Float32 => DeltaPrimitiveType::Float,
+            DataType::Float64 => DeltaPrimitiveType::Float,
+            DataType::Int16 => DeltaPrimitiveType::Integer,
+            DataType::Int32 => DeltaPrimitiveType::Integer,
+            DataType::Int64 => DeltaPrimitiveType::Integer,
+            DataType::Utf8 => DeltaPrimitiveType::String,
+            DataType::LargeUtf8 => DeltaPrimitiveType::String,
         }
     }
 
@@ -257,6 +277,15 @@ impl FixedSchema {
             .collect();
 
         Schema::new(fields)
+    }
+
+    /// Create a new vec containing a [`StructField`] for each [`FixedColumn`] in the schema.
+    pub fn into_delta_columns(&self) -> Vec<StructField> {
+        self
+            .columns
+            .iter()
+            .map(|c| StructField::new(c.name(), DeltaDataType::Primitive(c.as_delta_primitive()), c.is_nullable()))
+            .collect::<Vec<StructField>>()
     }
 
     ///
