@@ -31,6 +31,10 @@ use evolution_common::datatype::DataType;
 use padder::{Alignment, Symbol};
 use serde::{Deserialize, Serialize};
 
+/// A blank trait to allow developers to create their own schema and associated column implementations. 
+pub trait Column {}
+pub type ColumnRef = Box<dyn Column>; 
+
 /// Representation of a column in a fixed-length file (.flf), containing all allowed fields.
 /// 
 /// # Note
@@ -39,7 +43,7 @@ use serde::{Deserialize, Serialize};
 /// [`DataType`] enum variants, spelled exactly the same. Otherwise, the serde crate can't
 /// deserialize the values when initializing a new struct.
 #[derive(Deserialize, Serialize)]
-pub struct Column {
+pub struct FixedColumn {
     /// The symbolic name of the column.
     name: String,
     /// The starting offset index for the column (in runes).
@@ -58,8 +62,7 @@ pub struct Column {
     is_nullable: bool,
 }
 
-
-impl Column {
+impl FixedColumn {
     /// Get the name of the column.
     pub fn name(&self) -> &str {
         &self.name
@@ -140,6 +143,7 @@ impl Column {
     }
 }
 
+impl Column for FixedColumn {}
 
 #[cfg(test)]
 mod tests_column {
@@ -157,6 +161,6 @@ mod tests_column {
         let json = fs::File::open(path).unwrap();
         let reader = io::BufReader::new(json);
 
-        let _: Column = serde_json::from_reader(reader).unwrap();
+        let _: FixedColumn = serde_json::from_reader(reader).unwrap();
     }
 }
