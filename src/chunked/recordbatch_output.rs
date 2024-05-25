@@ -46,6 +46,7 @@ use super::{
     RecordBatchOutput, trimmer, ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen,
     Stats,
 };
+use crate::schema::FixedSchema;
 use crate::chunked;
 use crate::cli::Targets;
 use crate::datatype::DataType;
@@ -123,10 +124,10 @@ impl DeltaOut {
     async fn deltasetup(schema: FixedSchema) -> Result<parquet::errors::ParquetError> {
         let table_uri = std::env::var("TABLE_URI").map_err(|e| DeltaTableError::GenericError {
             source: Box::new(e),
-        })?;
+        }).unwrap();
         info!("Using the location of: {:?}", table_uri);
 
-        let table_path = deltalake::Path::parse(&table_uri)?;
+        let table_path = deltalake::Path::parse(&table_uri).unwrap();
 
         let maybe_table = deltalake::open_table(&table_path).await;
         let mut table = match maybe_table {
@@ -159,8 +160,8 @@ impl DeltaOut {
 
 impl RecordBatchOutput for DeltaOut {
     
-    fn setup(&mut self, schema: FxiedSchema, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
-        let dout = DeltaOut.deltasetup()?
+    fn setup(&mut self, schema: FixedSchema, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+        let dout = DeltaOut.deltasetup(schema)?
         todo!()
     }
 }
