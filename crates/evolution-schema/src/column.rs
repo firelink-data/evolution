@@ -26,6 +26,7 @@
 //
 
 use arrow::datatypes::DataType as ArrowDataType;
+use deltalake::kernel::DataType as DeltaDataType;
 use evolution_common::datatype::DataType;
 use padder::{Alignment, Symbol};
 use serde::{Deserialize, Serialize};
@@ -105,6 +106,25 @@ impl Column {
             DataType::Int64 => ArrowDataType::Int64,
             DataType::Utf8 => ArrowDataType::Utf8,
             DataType::LargeUtf8 => ArrowDataType::LargeUtf8,
+        }
+    }
+
+    /// Get the datatype of the column as a [`DeltaDataType`] variant.
+    ///
+    /// # Note
+    /// Currently this method will map the `half` (Float16) datatype to the float32 variant.
+    /// This is because [`deltalake`] does define a 
+    pub fn as_delta_dtype(&self) -> DeltaDataType {
+        match self.dtype {
+            DataType::Boolean => DeltaDataType::BOOLEAN,
+            DataType::Float16 => DeltaDataType::FLOAT,
+            DataType::Float32 => DeltaDataType::FLOAT,
+            DataType::Float64 => DeltaDataType::DOUBLE,
+            DataType::Int16 => DeltaDataType::SHORT,
+            DataType::Int32 => DeltaDataType::INTEGER,
+            DataType::Int64 => DeltaDataType::LONG,
+            DataType::Utf8 => DeltaDataType::STRING,
+            DataType::LargeUtf8 => DeltaDataType::STRING,
         }
     }
 }
