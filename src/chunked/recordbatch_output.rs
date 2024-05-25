@@ -84,6 +84,7 @@ use tracing::*;
 
 pub(crate) fn output_factory(
     target: Targets,
+    fixed_schema: FixedSchema,
     schema: SchemaRef,
     _outfile: PathBuf,
 ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
@@ -112,7 +113,7 @@ pub(crate) fn output_factory(
 
     };
 
-    pfo.setup(schema, _outfile)
+    pfo.setup(schema,fixed_schema, _outfile)
 
 }
 
@@ -160,8 +161,9 @@ impl DeltaOut {
 
 impl RecordBatchOutput for DeltaOut {
     
-    fn setup(&mut self, schema: FixedSchema, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
-        let dout = DeltaOut.deltasetup(schema)?
+    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+//        let dout = Self::deltasetup(fixed_schema)?;
+
         todo!()
     }
 }
@@ -169,7 +171,7 @@ pub(crate) struct IcebergOut {
     pub(crate) sender: Option<Sender<RecordBatch>>,
 }
 impl RecordBatchOutput for IcebergOut {
-    fn setup(&mut self, schema: SchemaRef, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         todo!()
     }
 }
@@ -178,7 +180,7 @@ pub(crate) struct FlightOut {
 }
 
 impl RecordBatchOutput for FlightOut {
-    fn setup(&mut self, schema: SchemaRef, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         todo!()
     }
 }
@@ -188,11 +190,7 @@ pub(crate) struct ParquetFileOut {
     pub(crate) sender: Option<Sender<RecordBatch>>,
 }
 impl RecordBatchOutput for ParquetFileOut {
-    fn setup(
-        &mut self,
-        schema: SchemaRef,
-        outfile: PathBuf,
-    ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         let _out_file = fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -245,11 +243,7 @@ pub struct IpcFileOut {
 
 
 impl RecordBatchOutput for IpcFileOut {
-    fn setup(
-        &mut self,
-        schema: SchemaRef,
-        outfile: PathBuf,
-    ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         let _out_file = fs::OpenOptions::new()
             .create(true)
             .append(true)

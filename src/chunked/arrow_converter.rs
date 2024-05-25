@@ -67,6 +67,7 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thread::spawn;
+use crate::schema::FixedSchema;
 //use ordered_channel::Sender;
 //use crossbeam::channel::{Receiver, Sender};
 
@@ -79,6 +80,7 @@ pub(crate) struct Slice2Arrow<'a> {
     pub(crate) masterbuilders: MasterBuilders,
     pub(crate) consistent_counter: ConsistentCounter,
     pub(crate) target: Targets,
+    pub(crate) fixed_schema: FixedSchema
 }
 
 pub(crate) struct MasterBuilders {
@@ -238,6 +240,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
     fn setup(&mut self) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         let o = output_factory(
             self.target.clone(),
+            self.fixed_schema.clone(),
             self.masterbuilders.schema_factory(),
             self.masterbuilders.outfile.clone(),
         );

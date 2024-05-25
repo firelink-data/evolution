@@ -39,6 +39,7 @@ use std::time::Duration;
 
 use self::residual_slicer::SLICER_IN_CHUNK_SIZE;
 use parquet::errors::{ParquetError, Result};
+use crate::schema::FixedSchema;
 
 pub(crate) mod arrow_converter;
 pub(crate) mod residual_slicer;
@@ -175,6 +176,8 @@ pub trait RecordBatchOutput {
     fn setup(
         &mut self,
         schema: SchemaRef,
+        fixed_schema: FixedSchema,
         outfile: PathBuf,
+        
     ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>);
 }

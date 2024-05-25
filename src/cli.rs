@@ -51,6 +51,7 @@ use crate::chunked::{find_last_nl, line_break_len_cr, Converter as ChunkedConver
 use crate::converter::Converter;
 use crate::error::Result;
 use crate::mocker::Mocker;
+use crate::schema::FixedSchema;
 use crate::threads::get_available_threads;
 
 #[cfg(feature = "rayon")]
@@ -302,6 +303,7 @@ impl Cli {
                             masterbuilders: master_builders,
                             consistent_counter: ConsistentCounter::new(0),
                             target: self.target.clone(),
+                            fixed_schema: FixedSchema::from_path(schema.to_path_buf()).unwrap(),
                         });
                         s2a
                     }
