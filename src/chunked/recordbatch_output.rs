@@ -80,7 +80,8 @@ use deltalake::writer::{DeltaWriter, RecordBatchWriter};
 use deltalake::*;
 //use deltalake::writer::test_utils::create_initialized_table;
 use tracing::*;
-
+use tokio::runtime::Builder;
+use tokio::time::{sleep};
 
 pub(crate) fn output_factory(
     target: Targets,
@@ -122,10 +123,10 @@ pub(crate) struct DeltaOut {
 }
 
 impl DeltaOut {
-    async fn deltasetup(schema: FixedSchema) -> Result<parquet::errors::ParquetError> {
+    async fn deltasetup(schema: FixedSchema) -> Result<(), DeltaTableError> {
         let table_uri = std::env::var("TABLE_URI").map_err(|e| DeltaTableError::GenericError {
             source: Box::new(e),
-        }).unwrap();
+        })?;
         info!("Using the location of: {:?}", table_uri);
 
         let table_path = deltalake::Path::parse(&table_uri).unwrap();
@@ -157,13 +158,26 @@ impl DeltaOut {
 
     todo!()
     }
+    async fn myDelta(schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf) {
+        let dout = Self::deltasetup(fixed_schema);
+    }
+
 }
 
-impl RecordBatchOutput for DeltaOut {
-    
-    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
-//        let dout = Self::deltasetup(fixed_schema)?;
 
+impl RecordBatchOutput for DeltaOut {
+
+    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+        let runtime = Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .unwrap();
+
+        runtime.spawn(Self::myDelta(schema,fixed_schema,outfile));
+        
+//        let dout = Self::deltasetup(fixed_schema);
+        
         todo!()
     }
 }
