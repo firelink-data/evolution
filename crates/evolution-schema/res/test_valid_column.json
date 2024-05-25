@@ -1,8 +1,8 @@
 {
-    "name": "xd",
+    "name": "MyCoolColumn",
     "offset": 14981,
     "length": 4819,
-    "dtype": "LargeUtf8",
+    "dtype": "Float32",
     "alignment": "Center",
     "pad_symbol": "Hyphen",
     "is_nullable": false
