@@ -139,7 +139,7 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
             parse_duration_tot += parse_duration;
             builder_write_duration_tot += builder_write_duration;
         }
-        info!("about to shudown converter...");
+        info!("about to shutdown converter...");
 
         converter.shutdown(&rt, threaded_writer.1);
         info!("converter has been shutdown");

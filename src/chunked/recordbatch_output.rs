@@ -112,14 +112,14 @@ pub(crate) struct DeltaOut {
 }
 
 impl DeltaOut {
-    async fn deltasetup(schema: FixedSchema) -> Result<DeltaTable, DeltaTableError> {
-        let table_uri = std::env::var("TABLE_URI").map_err(|e| DeltaTableError::GenericError {
-            source: Box::new(e),
-        })?;
+    async fn deltasetup(schema: FixedSchema, out: PathBuf) -> Result<DeltaTable, DeltaTableError> {
+        //        let table_uri = std::env::var("TABLE_URI").map_err(|e| DeltaTableError::GenericError {
+        //            source: Box::new(e),
+        //        })?;
 
-        info!("Using the location of: {:?}", table_uri);
+        info!("Using the location of: {:?}", out);
 
-        let table_path = deltalake::Path::parse(&table_uri).unwrap();
+        let table_path = deltalake::Path::parse(out.to_str().unwrap()).unwrap();
 
         let maybe_table = deltalake::open_table(&table_path).await;
         let mut table = match maybe_table {
@@ -145,7 +145,7 @@ impl DeltaOut {
         fixed_schema: FixedSchema,
         outfile: PathBuf,
     ) -> (Result<Stats>) {
-        let mut table = Self::deltasetup(fixed_schema).await.unwrap();
+        let mut table = Self::deltasetup(fixed_schema, outfile).await.unwrap();
 
         let writer_properties = WriterProperties::builder()
             .set_compression(Compression::ZSTD(ZstdLevel::try_new(3).unwrap()))
