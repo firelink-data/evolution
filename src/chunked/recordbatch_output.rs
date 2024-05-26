@@ -113,13 +113,10 @@ pub(crate) struct DeltaOut {
 
 impl DeltaOut {
     async fn deltasetup(schema: FixedSchema, out: PathBuf) -> Result<DeltaTable, DeltaTableError> {
-        //        let table_uri = std::env::var("TABLE_URI").map_err(|e| DeltaTableError::GenericError {
-        //            source: Box::new(e),
-        //        })?;
-
+        
         info!("Using the location of: {:?}", out);
 
-        let table_path = deltalake::Path::parse(out.to_str().unwrap()).unwrap();
+        let table_path =out.to_str().unwrap();
 
         let maybe_table = deltalake::open_table(&table_path).await;
         let mut table = match maybe_table {
