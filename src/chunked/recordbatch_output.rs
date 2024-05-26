@@ -58,10 +58,12 @@ use atomic_counter::{AtomicCounter, ConsistentCounter};
 use crossbeam::atomic::AtomicConsume;
 use libc::{bsearch, send};
 use ordered_channel::Sender;
+use ordered_channel::Receiver;
+
 use parquet::errors::{ParquetError, Result};
 use parquet::file::metadata::FileMetaData;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
-use std::sync::mpsc::{sync_channel, Receiver, RecvError, SyncSender};
+//use std::sync::mpsc::{sync_channel, Receiver, RecvError, SyncSender};
 use std::thread;
 //use std::thread::JoinHandle;
 use tokio::task::JoinHandle;
@@ -205,7 +207,7 @@ pub(crate) struct ParquetFileOut {
     pub(crate) sender: Option<Sender<RecordBatch>>,
 }
 impl ParquetFileOut {
-    pub(crate) async fn myParquet(schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf,rt:tokio::runtime::Runtime)->(Result<Stats>) {
+    pub(crate) async fn myParquet(sender:Sender<RecordBatch>,mut receiver:  Receiver<RecordBatch>, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf)->(Result<Stats>) {
 //        Self::deltasetup(fixed_schema).await.unwrap();
         let _out_file = fs::OpenOptions::new()
             .create(true)
@@ -217,11 +219,7 @@ impl ParquetFileOut {
 
         let mut writer: ArrowWriter<File> =
             ArrowWriter::try_new(_out_file, schema, Some(props.clone())).unwrap();
-
-        let (sender, mut receiver) = bounded::<RecordBatch>(100);
-
-        self.sender = Some(sender.clone());
-
+        
             'outer: loop {
                 let mut message = receiver.recv();
 
@@ -254,8 +252,11 @@ impl ParquetFileOut {
 }
 impl RecordBatchOutput for ParquetFileOut {
     fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf,rt: tokio::runtime::Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+        let (sender, mut receiver) = bounded::<RecordBatch>(100);
 
-        let j:JoinHandle<Result<Stats>>=rt.spawn(Self::myParquet(schema,fixed_schema,outfile,rt));
+        self.sender = Some(sender.clone());
+
+        let j:JoinHandle<Result<Stats>>=rt.spawn(Self::myParquet(sender,receiver,schema,fixed_schema,outfile));
 
 //        let j:JoinHandle<Result<Stats>>=rt.spawn(Self::myDelta(schema,fixed_schema,outfile));
 
