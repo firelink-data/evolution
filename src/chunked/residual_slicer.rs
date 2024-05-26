@@ -90,7 +90,7 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
             .build_global()
             .unwrap();
         let rt = Runtime::new().unwrap();
-        let threaded_writer = converter.setup(rt);
+        let threaded_writer = converter.setup(&rt);
 
         loop {
             let cr = ir.next().unwrap();
@@ -141,7 +141,7 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
         }
         info!("about to shudown converter...");
 
-        converter.shutdown(threaded_writer.1);
+        converter.shutdown(&rt,threaded_writer.1);
 //        let hhh=threaded_writer.1;
 //        rt.spawn(async {
 //            hhh.await.unwrap();            

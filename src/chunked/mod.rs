@@ -40,6 +40,7 @@ use std::time::Duration;
 
 use self::residual_slicer::SLICER_IN_CHUNK_SIZE;
 use parquet::errors::{ParquetError, Result};
+use tokio::runtime;
 use crate::schema::FixedSchema;
 
 pub(crate) mod arrow_converter;
@@ -163,8 +164,8 @@ pub(crate) trait Converter<'a> {
 
     //    fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
     fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize, Duration, Duration);
-    fn setup(&mut self, rt: Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>);
-    fn shutdown(&mut self,jh:JoinHandle<Result<Stats>>);
+    fn setup(&mut self, rt: &Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>);
+    fn shutdown(&mut self,rt: &Runtime,jh:JoinHandle<Result<Stats>>);
 }
 
 pub trait ColumnBuilder {
@@ -179,6 +180,6 @@ pub trait RecordBatchOutput {
         schema: SchemaRef,
         fixed_schema: FixedSchema,
         outfile: PathBuf,
-        rt: tokio::runtime::Runtime
+        rt: &Runtime
     ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>);
 }

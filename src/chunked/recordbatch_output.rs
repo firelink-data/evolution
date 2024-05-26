@@ -91,7 +91,7 @@ pub(crate) fn output_factory(
     fixed_schema: FixedSchema,
     schema: SchemaRef,
     _outfile: PathBuf,
-    rt:tokio::runtime::Runtime
+    rt:& tokio::runtime::Runtime
 ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
     let mut pfo: Box<dyn RecordBatchOutput> =match target {
         Targets::Parquet => {
@@ -173,7 +173,7 @@ impl DeltaOut {
 
 impl RecordBatchOutput for DeltaOut {
 
-    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf,rt:tokio::runtime::Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf,rt:&Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
 
         let j:JoinHandle<Result<Stats>>=rt.spawn(Self::myDelta(schema,fixed_schema,outfile));
         
@@ -188,7 +188,7 @@ pub(crate) struct IcebergOut {
     pub(crate) sender: Option<Sender<RecordBatch>>,
 }
 impl RecordBatchOutput for IcebergOut {
-    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf,rt: tokio::runtime::Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf,rt: &Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         todo!()
     }
 }
@@ -197,7 +197,7 @@ pub(crate) struct FlightOut {
 }
 
 impl RecordBatchOutput for FlightOut {
-    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf,rt: tokio::runtime::Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf,rt: &Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         todo!()
     }
 }
@@ -207,7 +207,7 @@ pub(crate) struct ParquetFileOut {
     pub(crate) sender: Option<Sender<RecordBatch>>,
 }
 impl ParquetFileOut {
-    pub(crate) async fn myParquet(sender:Sender<RecordBatch>,mut receiver:  Receiver<RecordBatch>, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf)->(Result<Stats>) {
+    pub(crate) async fn myParquet(mut receiver:  Receiver<RecordBatch>, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf)->(Result<Stats>) {
 //        Self::deltasetup(fixed_schema).await.unwrap();
         let _out_file = fs::OpenOptions::new()
             .create(true)
@@ -219,7 +219,7 @@ impl ParquetFileOut {
 
         let mut writer: ArrowWriter<File> =
             ArrowWriter::try_new(_out_file, schema, Some(props.clone())).unwrap();
-        
+
             'outer: loop {
                 let mut message = receiver.recv();
 
@@ -251,14 +251,12 @@ impl ParquetFileOut {
     }
 }
 impl RecordBatchOutput for ParquetFileOut {
-    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf,rt: tokio::runtime::Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf,rt: &Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         let (sender, mut receiver) = bounded::<RecordBatch>(100);
 
         self.sender = Some(sender.clone());
 
-        let j:JoinHandle<Result<Stats>>=rt.spawn(Self::myParquet(sender,receiver,schema,fixed_schema,outfile));
-
-//        let j:JoinHandle<Result<Stats>>=rt.spawn(Self::myDelta(schema,fixed_schema,outfile));
+        let j:JoinHandle<Result<Stats>>=rt.spawn(Self::myParquet(receiver,schema,fixed_schema,outfile));
 
         (self.sender.as_mut().cloned().unwrap(), j)
 
@@ -271,7 +269,7 @@ pub struct IpcFileOut {
 
 
 impl RecordBatchOutput for IpcFileOut {
-    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf,rt: tokio::runtime::Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf,rt: &Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         todo!()
     }
 }
