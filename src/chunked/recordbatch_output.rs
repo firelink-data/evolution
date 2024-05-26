@@ -29,7 +29,7 @@ use arrow::array::{ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringB
 use ordered_channel::bounded;
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
-use parquet::file::properties::WriterProperties;
+use parquet::file::properties::{WriterProperties, WriterVersion};
 use parquet::format;
 use rayon::iter::IndexedParallelIterator;
 use rayon::prelude::*;
@@ -78,6 +78,7 @@ use std::time::{Duration, Instant};
 use thread::spawn;
 use tokio::task::JoinHandle;
 use Compression::SNAPPY;
+use deltalake_core::writer::WriteMode;
 //use deltalake::writer::test_utils::create_initialized_table;
 use tokio::runtime::Builder;
 use tokio::time::sleep;
@@ -122,12 +123,13 @@ impl DeltaOut {
         let mut table = match maybe_table {
             Ok(table) => table,
             Err(DeltaTableError::NotATable(_)) => {
-                info!("It doesn't look like our delta table has been created");
+                let fxschema_to_delta =schema.into_delta_columns();
+                info!("It doesn't look like our delta table has been created\n {:?}",fxschema_to_delta);
                 DeltaOps::try_from_uri(table_path)
                     .await
                     .unwrap()
                     .create()
-                    .with_columns(schema.into_delta_columns())
+                    .with_columns(fxschema_to_delta)
                     .await
                     .unwrap()
             }
@@ -144,13 +146,16 @@ impl DeltaOut {
     ) -> (Result<Stats>) {
         let mut table = Self::deltasetup(fixed_schema, outfile).await.unwrap();
 
-        let writer_properties = WriterProperties::builder()
+        let writer_properties = WriterProperties::builder().set_writer_version(WriterVersion::PARQUET_2_0)
             .set_compression(Compression::ZSTD(ZstdLevel::try_new(3).unwrap()))
             .build();
+
 
         let mut writer = RecordBatchWriter::for_table(&table)
             .expect("Failed to make RecordBatchWriter")
             .with_writer_properties(writer_properties);
+
+        
 
         let metadata = table
             .metadata()
@@ -159,17 +164,20 @@ impl DeltaOut {
             &metadata.schema().expect("failed to get schema"),
         )
         .expect("Failed to convert to arrow schema");
-        let arrow_schema_ref = Arc::new(arrow_schema);
 
         'outer: loop {
             let mut message = receiver.recv();
 
             match message {
                 Ok(rb) => {
-                    if (rb.num_rows() == 1) {
+                    if (rb.num_rows() == 0) {
                         break 'outer;
                     }
-                    writer.write(rb).await.expect("Error Writing batch");
+                    let nrb=rb.with_schema(Arc::new(arrow_schema.clone())).unwrap();
+                    info!("nrb rows={} ",nrb.num_rows());
+//                    writer.write(nrb).await.expect("Error Writing batch");
+                    writer.write_with_mode(nrb,WriteMode::MergeSchema);
+
                 }
                 Err(e) => {
                     info!("got RecvError in channel , break to outer");

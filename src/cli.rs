@@ -295,7 +295,6 @@ impl Cli {
                             schema.to_path_buf(),
                             n_threads as i16,
                         );
-                        let sc = master_builders.schema_factory();
 
                         let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow {
                             fn_line_break: find_last_nl,

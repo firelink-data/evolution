@@ -35,6 +35,7 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;
+use log::info;
 
 use crate::builder::{
     BooleanColumnBuilder, ColumnBuilder, Float16ColumnBuilder, Float32ColumnBuilder,
@@ -311,7 +312,7 @@ impl FixedSchema {
                 )
             })
             .collect();
-
+    info!("as_arrow_schema= {:?}",fields);
         Schema::new(fields)
     }
 
