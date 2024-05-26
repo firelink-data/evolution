@@ -5,6 +5,7 @@ members = [
     "crates/evolution-schema",
     "crates/evolution-mocker",
     "crates/evolution-target",
+    "crates/evolution-writer",
     # "crates/*",
 ]
 resolver = "2"

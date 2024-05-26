@@ -1,0 +1,13 @@
+[package]
+name = "evolution-writer"
+version = "1.0.0"
+description = "Output writers for evolution."
+edition = { workspace = true }
+authors = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[dependencies]
+evolution-common = { path = "../evolution-common" }

@@ -21,51 +21,26 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-// File created: 2024-02-05
+// File created: 2024-05-07
 // Last updated: 2024-05-26
 //
 
-use std::error;
-use std::fmt;
-use std::result;
+use log::warn;
 
-///
-pub type Result<T> = result::Result<T, Box<dyn error::Error>>;
+pub fn get_available_threads(n_wanted_threads: usize) -> usize {
+    let n_available_threads: usize = num_cpus::get();
 
-///
-#[derive(Debug)]
-pub struct SetupError {
-    details: String,
-}
-
-impl SetupError {
-    pub fn new(msg: &str) -> Self {
-        Self { details: msg.to_string() }
-    }
-}
-
-impl fmt::Display for SetupError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.details)
-    }
-}
-
-impl error::Error for SetupError {
-    fn description(&self) -> &str {
-        &self.details
-    }
-}
-
-#[cfg(test)]
-mod tests_error {
-    use super::*;
-
-    #[test]
-    fn test_setup_error() {
-        assert_eq!(
-            "uh oh stinky something went wrong!",
-            SetupError::new("uh oh stinky something went wrong!").to_string().as_str(),
+    if n_wanted_threads > n_available_threads {
+        warn!(
+            "You requested to use {} threads, but your CPU only has {} logical cores.",
+            n_wanted_threads,
+            n_available_threads,
         );
+        warn!(
+            "Will instead use all of the systems available logical cores ({} threads).",
+            n_available_threads,
+        );
+        return n_available_threads;
     }
+    n_wanted_threads
 }
-

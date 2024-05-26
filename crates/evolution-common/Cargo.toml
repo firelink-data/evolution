@@ -10,4 +10,6 @@ license = { workspace = true }
 readme = { workspace = true }
 
 [dependencies]
+log = "0.4.21"
+num_cpus = "1.16.0"
 serde = { version = "1.0.202", features = ["derive"] }

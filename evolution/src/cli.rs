@@ -22,11 +22,13 @@
 // SOFTWARE.
 //
 // File created: 2024-02-05
-// Last updated: 2024-05-25
+// Last updated: 2024-05-26
 //
 
 use clap::{value_parser, ArgAction, Parser, Subcommand};
 use evolution_common::error::Result;
+use evolution_common::thread::get_available_threads;
+use evolution_mocker::mocker::FixedLengthFileMocker;
 use evolution_target::target::Target;
 
 use std::path::PathBuf;
@@ -128,17 +130,36 @@ enum Commands {
             required = false,
         )]
         n_rows: usize,
+
+        /// Writer option to return an error if the file already exists.
+        #[arg(
+            long = "force-create-new",
+            action = ArgAction::SetTrue,
+            required = false,
+        )]
+        force_create_new: bool,
+
+        /// Writer option to truncate the output file if it already exists.
+        #[arg(
+            long = "truncate-existing",
+            action = ArgAction::SetTrue,
+            required = false,
+        )]
+        truncate_existing: bool,
     },
 }
 
 impl Cli {
     pub fn run(&self) -> Result<()> {
+
+        let n_threads: usize = get_available_threads(self.n_threads);
+
         match &self.command {
             Commands::Convert {
-                in_file,
-                schema,
-                out_file,
-                target,
+                in_file: _,
+                schema: _,
+                out_file: _,
+                target: _,
             } => {
                 todo!()
             },
@@ -146,10 +167,22 @@ impl Cli {
                 schema,
                 out_file,
                 n_rows,
+                force_create_new,
+                truncate_existing,
             } => {
-                todo!()
+                FixedLengthFileMocker::builder()
+                    .with_schema(schema.to_path_buf())
+                    .with_out_file(out_file.to_path_buf())
+                    .with_num_rows(*n_rows)
+                    .with_num_threads(n_threads)
+                    .with_force_create_new(*force_create_new)
+                    .with_truncate_existing(*truncate_existing)
+                    .try_build()?
+                    .mock()?;
             }
-        }
+        };
+
+        Ok(())
     }
 }
 
