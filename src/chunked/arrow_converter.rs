@@ -252,7 +252,6 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
     }
     
     fn shutdown(&mut self,rt: &runtime::Runtime,jh:JoinHandle<Result<Stats>>) {
-        //        converter.shutdown();
         let schema = Schema::new(vec![Field::new(
             "id",
             arrow::datatypes::DataType::Int32,
@@ -262,12 +261,8 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         let emptyrb = arrow::record_batch::RecordBatch::new_empty(Arc::new(schema));
         let c = self.consistent_counter.get();
         let _ = &self.masterbuilders.sender.clone().unwrap().send(c, emptyrb);
-        rt.spawn_blocking(|| async { });
+        rt.spawn_blocking(|| async {jh.await.unwrap() });
         
-        //     jh.spawn_blocking(async move {threaded_writer.1.await;});
-//        threaded_writer.1.await.expect("The task being joined has panicked");;
-
-
     }
 }
 
