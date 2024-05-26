@@ -40,7 +40,9 @@ pub struct SetupError {
 
 impl SetupError {
     pub fn new(msg: &str) -> Self {
-        Self { details: msg.to_string() }
+        Self {
+            details: msg.to_string(),
+        }
     }
 }
 
@@ -64,8 +66,9 @@ mod tests_error {
     fn test_setup_error() {
         assert_eq!(
             "uh oh stinky something went wrong!",
-            SetupError::new("uh oh stinky something went wrong!").to_string().as_str(),
+            SetupError::new("uh oh stinky something went wrong!")
+                .to_string()
+                .as_str(),
         );
     }
 }
-

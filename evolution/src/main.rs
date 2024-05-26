@@ -39,7 +39,7 @@ fn main() {
         Ok(_) => {
             #[cfg(debug_assertions)]
             debug!("Env logger setup ok!")
-        },
+        }
         Err(e) => error!("Could not set up env logger: {}", e),
     }
 

@@ -33,8 +33,7 @@ pub fn get_available_threads(n_wanted_threads: usize) -> usize {
     if n_wanted_threads > n_available_threads {
         warn!(
             "You requested to use {} threads, but your CPU only has {} logical cores.",
-            n_wanted_threads,
-            n_available_threads,
+            n_wanted_threads, n_available_threads,
         );
         warn!(
             "Will instead use all of the systems available logical cores ({} threads).",

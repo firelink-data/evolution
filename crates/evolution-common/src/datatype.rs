@@ -28,7 +28,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Enum of datatypes as a subset of the [`arrow::datatypes::DataType`].
-/// 
+///
 /// # Note
 /// This is needed so we can derive [`Deserialize`] and [`Serialize`] because
 /// the arrow datatypes do not implement these traits.
@@ -44,4 +44,3 @@ pub enum DataType {
     Utf8,
     LargeUtf8,
 }
-

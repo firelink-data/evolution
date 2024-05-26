@@ -77,13 +77,17 @@ impl FixedLengthFileWriterBuilder {
     /// the properties contained an invalid combination of settings. See [`OpenOptions`]
     /// documentation for details on all errors it can return.
     pub fn try_build(self) -> Result<FixedLengthFileWriter> {
-        let out_path: PathBuf = self.out_path.ok_or_else(|| Box::new(
-            SetupError::new("Required field 'out_path' was not provided, exiting..."),
-        ))?;
+        let out_path: PathBuf = self.out_path.ok_or_else(|| {
+            Box::new(SetupError::new(
+                "Required field 'out_path' was not provided, exiting...",
+            ))
+        })?;
 
-        let properties: FixedLengthFileWriterProperties = self.properties.ok_or_else(|| Box::new(
-            SetupError::new("Required field 'properties' was not provided, exiting..."),
-        ))?;
+        let properties: FixedLengthFileWriterProperties = self.properties.ok_or_else(|| {
+            Box::new(SetupError::new(
+                "Required field 'properties' was not provided, exiting...",
+            ))
+        })?;
 
         let inner: File = OpenOptions::new()
             .write(true)
@@ -93,10 +97,7 @@ impl FixedLengthFileWriterBuilder {
             .truncate(properties.truncate_existing && !properties.force_create_new)
             .open(out_path)?;
 
-        Ok(FixedLengthFileWriter {
-            inner,
-            properties,
-        })
+        Ok(FixedLengthFileWriter { inner, properties })
     }
 
     /// Creates a new [`FixedLengthFileWriter`] from the previously set values.
@@ -149,17 +150,23 @@ impl FixedLengthFileWriterPropertiesBuilder {
     /// # Errors
     /// Iff any of the required fields have not been set and thus are `None`.
     pub fn try_build(self) -> Result<FixedLengthFileWriterProperties> {
-        let force_create_new: bool = self.force_create_new.ok_or_else(|| Box::new(
-            SetupError::new("Required field 'force_create_new' was not provided, exiting..."),
-        ))?;
+        let force_create_new: bool = self.force_create_new.ok_or_else(|| {
+            Box::new(SetupError::new(
+                "Required field 'force_create_new' was not provided, exiting...",
+            ))
+        })?;
 
-        let create_or_open: bool = self.create_or_open.ok_or_else(|| Box::new(
-            SetupError::new("Required field 'create_or_open' was not provided, exiting..."),
-        ))?;
+        let create_or_open: bool = self.create_or_open.ok_or_else(|| {
+            Box::new(SetupError::new(
+                "Required field 'create_or_open' was not provided, exiting...",
+            ))
+        })?;
 
-        let truncate_existing: bool = self.truncate_existing.ok_or_else(|| Box::new(
-            SetupError::new("Required field 'truncate_existing' was not provided, exiting..."),
-        ))?;
+        let truncate_existing: bool = self.truncate_existing.ok_or_else(|| {
+            Box::new(SetupError::new(
+                "Required field 'truncate_existing' was not provided, exiting...",
+            ))
+        })?;
 
         Ok(FixedLengthFileWriterProperties {
             force_create_new,

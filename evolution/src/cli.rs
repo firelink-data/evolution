@@ -151,7 +151,6 @@ enum Commands {
 
 impl Cli {
     pub fn run(&self) -> Result<()> {
-
         let n_threads: usize = get_available_threads(self.n_threads);
 
         match &self.command {
@@ -162,7 +161,7 @@ impl Cli {
                 target: _,
             } => {
                 todo!()
-            },
+            }
             Commands::Mock {
                 schema,
                 out_file,
@@ -185,4 +184,3 @@ impl Cli {
         Ok(())
     }
 }
-

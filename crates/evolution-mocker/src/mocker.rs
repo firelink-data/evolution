@@ -89,7 +89,7 @@ pub struct FixedLengthFileMockerBuilder {
 }
 
 impl FixedLengthFileMockerBuilder {
-    /// Set the relative or absolute path to the json schema file to use. 
+    /// Set the relative or absolute path to the json schema file to use.
     pub fn with_schema(mut self, schema_path: PathBuf) -> Self {
         self.schema_path = Some(schema_path);
         self
@@ -132,52 +132,70 @@ impl FixedLengthFileMockerBuilder {
     pub fn try_build(self) -> Result<FixedLengthFileMocker> {
         let schema: SchemaRef = match self.schema_path {
             Some(p) => Box::new(FixedSchema::from_path(p)?),
-            None => return Err(Box::new(
-                SetupError::new("Required field 'schema_path' was not provided, exiting..."),
-            )),
+            None => {
+                return Err(Box::new(SetupError::new(
+                    "Required field 'schema_path' was not provided, exiting...",
+                )))
+            }
         };
 
         let out_path: PathBuf = match self.out_path {
             Some(p) => p,
-            None => return Err(Box::new(
-                SetupError::new("Required field 'out_path' was not provided, exiting..."),
-            )),
+            None => {
+                return Err(Box::new(SetupError::new(
+                    "Required field 'out_path' was not provided, exiting...",
+                )))
+            }
         };
 
-        let n_rows: usize = self.n_rows.ok_or_else(|| Box::new(
-            SetupError::new("Required field 'n_rows' was not provided, exiting..."),
-        ))?;
+        let n_rows: usize = self.n_rows.ok_or_else(|| {
+            Box::new(SetupError::new(
+                "Required field 'n_rows' was not provided, exiting...",
+            ))
+        })?;
 
-        let mut n_threads: usize = self.n_threads.ok_or_else(|| Box::new(
-            SetupError::new("Required field 'n_threads' was not provided, exiting..."),
-        ))?;
+        let mut n_threads: usize = self.n_threads.ok_or_else(|| {
+            Box::new(SetupError::new(
+                "Required field 'n_threads' was not provided, exiting...",
+            ))
+        })?;
 
-        let force_create_new: bool = self.force_create_new.ok_or_else(|| Box::new(
-            SetupError::new("Required field 'force_create_new' was not provided, exiting..."),
-        ))?;
+        let force_create_new: bool = self.force_create_new.ok_or_else(|| {
+            Box::new(SetupError::new(
+                "Required field 'force_create_new' was not provided, exiting...",
+            ))
+        })?;
 
-        let truncate_existing: bool = self.truncate_existing.ok_or_else(|| Box::new(
-            SetupError::new("Required field 'truncate_existing' was not provided, exiting..."),
-        ))?;
+        let truncate_existing: bool = self.truncate_existing.ok_or_else(|| {
+            Box::new(SetupError::new(
+                "Required field 'truncate_existing' was not provided, exiting...",
+            ))
+        })?;
 
-        let writer_properties: FixedLengthFileWriterProperties
-            = FixedLengthFileWriterProperties::builder()
-            .with_force_create_new(force_create_new)
-            .with_create_or_open(true)
-            .with_truncate_existing(truncate_existing)
-            .try_build()?;
+        let writer_properties: FixedLengthFileWriterProperties =
+            FixedLengthFileWriterProperties::builder()
+                .with_force_create_new(force_create_new)
+                .with_create_or_open(true)
+                .with_truncate_existing(truncate_existing)
+                .try_build()?;
 
-        let writer: WriterRef = Box::new(FixedLengthFileWriter::builder()
-            .with_out_path(out_path)
-            .with_properties(writer_properties)
-            .try_build()?);
+        let writer: WriterRef = Box::new(
+            FixedLengthFileWriter::builder()
+                .with_out_path(out_path)
+                .with_properties(writer_properties)
+                .try_build()?,
+        );
 
-        let multithreading: bool =
-            (n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING) && (n_threads > 1);
+        let multithreading: bool = (n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING) && (n_threads > 1);
 
         if !multithreading && n_threads > 1 {
-            warn!("You specified to use {} threads but only want to mock {} rows.", n_threads, n_rows);
-            warn!("This is done much more efficiently single-threaded, ignoring any multithreading!");
+            warn!(
+                "You specified to use {} threads but only want to mock {} rows.",
+                n_threads, n_rows
+            );
+            warn!(
+                "This is done much more efficiently single-threaded, ignoring any multithreading!"
+            );
             n_threads = 1;
         }
 
@@ -203,4 +221,3 @@ impl FixedLengthFileMockerBuilder {
         self.try_build().unwrap()
     }
 }
-

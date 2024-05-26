@@ -148,4 +148,3 @@ pub(crate) fn try_init_logging() -> Result<(), SetLoggerError> {
     log::set_boxed_logger(Box::new(logger))
         .map(|()| log::set_max_level(log_level.to_level_filter()))
 }
-
