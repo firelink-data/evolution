@@ -29,14 +29,15 @@ use std::env::VarError;
 use crate::chunked::trimmer::{trimmer_factory, ColumnTrimmer};
 use arrow::array::{ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
 use ordered_channel::bounded;
-use parquet::arrow::{ArrowWriter, AsyncArrowWriter};
+use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
 use parquet::format;
 use rayon::iter::IndexedParallelIterator;
 use rayon::prelude::*;
 
-use tokio::fs::File;
+use std::fs;
+use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::str::from_utf8_unchecked;
 use std::sync::Arc;
@@ -207,21 +208,23 @@ pub(crate) struct ParquetFileOut {
 }
 impl ParquetFileOut {
     pub(crate) async fn myParquet(mut receiver:  Receiver<RecordBatch>, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf)->(Result<Stats>) {
-        let _out_file = File::options()
+        let _out_file = fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .open(outfile).await.unwrap();
-        
+            .open(outfile)
+            .expect("aaa");
+
         let props = WriterProperties::builder().set_compression(SNAPPY).build();
-        let mut writer: AsyncArrowWriter<File> =
-            AsyncArrowWriter::try_new(_out_file, schema, Some(props.clone())).unwrap();
+
+        let mut writer: ArrowWriter<File> =
+            ArrowWriter::try_new(_out_file, schema, Some(props.clone())).unwrap();
 
             'outer: loop {
                 let mut message = receiver.recv();
 
                 match message {
                     Ok(rb) => {
-                        writer.write(&rb).await.expect("Error Writing batch");
+                        writer.write(&rb).expect("Error Writing batch");
                         if (rb.num_rows() == 0) {
                             break 'outer;
                         }
@@ -233,7 +236,7 @@ impl ParquetFileOut {
                 }
             }
             info!("closing the writer for parquet");
-            writer.close();
+            writer.finish();
             Ok(Stats {
                 bytes_in: 0,
                 bytes_out: 0,
