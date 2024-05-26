@@ -287,8 +287,7 @@ impl FixedSchema {
 
     /// Create a new vec containing a [`StructField`] for each [`FixedColumn`] in the schema.
     pub fn into_delta_columns(&self) -> Vec<StructField> {
-        self
-            .columns
+        self.columns
             .iter()
             .map(|c| StructField::new(c.name(), c.as_delta_dtype(), c.is_nullable()))
             .collect::<Vec<StructField>>()

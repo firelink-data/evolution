@@ -141,14 +141,7 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
         }
         info!("about to shudown converter...");
 
-        converter.shutdown(&rt,threaded_writer.1);
-//        let hhh=threaded_writer.1;
-//        rt.spawn(async {
-//            hhh.await.unwrap();            
-//        });
-        
-        //        rt.spawn_blocking(async move {threaded_writer.1.await;});
-//        threaded_writer.1.await.expect("The task being joined has panicked");;
+        converter.shutdown(&rt, threaded_writer.1);
         info!("converter has been shutdown");
 
         info!(
@@ -160,6 +153,7 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
             bytes_in,
             bytes_out: bytes_out,
             num_rows: 0,
+            adds: 0,
             read_duration: read_duration_tot,
             parse_duration: parse_duration_tot,
             builder_write_duration: builder_write_duration_tot,

@@ -24,8 +24,6 @@
 // File created: 2024-05-07
 // Last updated: 2024-05-25
 //
-use tokio::runtime::Runtime;
-use std::env::VarError;
 use crate::chunked::trimmer::{trimmer_factory, ColumnTrimmer};
 use arrow::array::{ArrayRef, BooleanBuilder, Int32Builder, Int64Builder, StringBuilder};
 use ordered_channel::bounded;
@@ -35,6 +33,8 @@ use parquet::file::properties::WriterProperties;
 use parquet::format;
 use rayon::iter::IndexedParallelIterator;
 use rayon::prelude::*;
+use std::env::VarError;
+use tokio::runtime::Runtime;
 
 use std::fs;
 use std::fs::File;
@@ -43,22 +43,22 @@ use std::str::from_utf8_unchecked;
 use std::sync::Arc;
 
 use super::{
-    RecordBatchOutput, trimmer, ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen,
+    trimmer, ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen, RecordBatchOutput,
     Stats,
 };
-use crate::schema::FixedSchema;
 use crate::chunked;
 use crate::cli::Targets;
 use crate::datatype::DataType;
 use crate::schema;
+use crate::schema::FixedSchema;
 use arrow::datatypes::{Field, Schema, SchemaRef};
 use arrow_ipc::writer::IpcWriteOptions;
 use arrow_ipc::CompressionType;
 use atomic_counter::{AtomicCounter, ConsistentCounter};
 use crossbeam::atomic::AtomicConsume;
 use libc::{bsearch, send};
-use ordered_channel::Sender;
 use ordered_channel::Receiver;
+use ordered_channel::Sender;
 
 use parquet::errors::{ParquetError, Result};
 use parquet::file::metadata::FileMetaData;
@@ -66,60 +66,45 @@ use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 //use std::sync::mpsc::{sync_channel, Receiver, RecvError, SyncSender};
 use std::thread;
 //use std::thread::JoinHandle;
-use tokio::task::JoinHandle;
-use std::time::{Duration, Instant};
-use thread::spawn;
-use Compression::SNAPPY;
 use chrono::prelude::*;
 use deltalake::arrow::array::*;
 use deltalake::arrow::record_batch::RecordBatch;
 use deltalake::errors::DeltaTableError;
-use deltalake::kernel::{ PrimitiveType, StructField, StructType};
-use deltalake::parquet::{
-    basic::{ZstdLevel},
-    
-};
+use deltalake::kernel::{PrimitiveType, StructField, StructType};
+use deltalake::parquet::basic::ZstdLevel;
 use deltalake::writer::{DeltaWriter, RecordBatchWriter};
 use deltalake::*;
+use std::time::{Duration, Instant};
+use thread::spawn;
+use tokio::task::JoinHandle;
+use Compression::SNAPPY;
 //use deltalake::writer::test_utils::create_initialized_table;
-use tracing::*;
 use tokio::runtime::Builder;
-use tokio::time::{sleep};
+use tokio::time::sleep;
+use tracing::*;
 
 pub(crate) fn output_factory(
     target: Targets,
     fixed_schema: FixedSchema,
     schema: SchemaRef,
     _outfile: PathBuf,
-    rt:& tokio::runtime::Runtime
+    rt: &tokio::runtime::Runtime,
 ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
-    let mut pfo: Box<dyn RecordBatchOutput> =match target {
-        Targets::Parquet => {
-             Box::new(ParquetFileOut { sender: None })
-        }
-        Targets::IPC => {
-             Box::new(IpcFileOut { sender: None })
-        }
-        Targets::Iceberg => {
-            Box::new(IcebergOut { sender: None })
-        }
-        Targets::Delta => {
-            Box::new(DeltaOut { sender: None })
-        }
-        Targets::Flight => {
-            Box::new(FlightOut { sender: None })
-        }
+    let mut pfo: Box<dyn RecordBatchOutput> = match target {
+        Targets::Parquet => Box::new(ParquetFileOut { sender: None }),
+        Targets::IPC => Box::new(IpcFileOut { sender: None }),
+        Targets::Iceberg => Box::new(IcebergOut { sender: None }),
+        Targets::Delta => Box::new(DeltaOut { sender: None }),
+        Targets::Flight => Box::new(FlightOut { sender: None }),
         Targets::Orc => {
             todo!()
         }
         Targets::None => {
             todo!()
         }
-
     };
 
-    pfo.setup(schema,fixed_schema, _outfile,rt)
-
+    pfo.setup(schema, fixed_schema, _outfile, rt)
 }
 
 pub(crate) struct DeltaOut {
@@ -127,10 +112,11 @@ pub(crate) struct DeltaOut {
 }
 
 impl DeltaOut {
-    async fn deltasetup(schema: FixedSchema) -> Result<(), DeltaTableError> {
+    async fn deltasetup(schema: FixedSchema) -> Result<DeltaTable, DeltaTableError> {
         let table_uri = std::env::var("TABLE_URI").map_err(|e| DeltaTableError::GenericError {
             source: Box::new(e),
         })?;
+
         info!("Using the location of: {:?}", table_uri);
 
         let table_path = deltalake::Path::parse(&table_uri).unwrap();
@@ -147,10 +133,19 @@ impl DeltaOut {
                     .with_columns(schema.into_delta_columns())
                     .await
                     .unwrap()
-
             }
             Err(err) => panic!("{:?}", err),
         };
+
+        Ok(table)
+    }
+    async fn myDelta(
+        mut receiver: Receiver<RecordBatch>,
+        schema: SchemaRef,
+        fixed_schema: FixedSchema,
+        outfile: PathBuf,
+    ) -> (Result<Stats>) {
+        let mut table = Self::deltasetup(fixed_schema).await.unwrap();
 
         let writer_properties = WriterProperties::builder()
             .set_compression(Compression::ZSTD(ZstdLevel::try_new(3).unwrap()))
@@ -160,35 +155,80 @@ impl DeltaOut {
             .expect("Failed to make RecordBatchWriter")
             .with_writer_properties(writer_properties);
 
-    todo!()
-    }
-    async fn myDelta(schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf)->(Result<Stats>) {
-        Self::deltasetup(fixed_schema).await.unwrap();
-        todo!()
-        
-    }
+        let metadata = table
+            .metadata()
+            .expect("Failed to get metadata for the table");
+        let arrow_schema = <deltalake::arrow::datatypes::Schema as TryFrom<&StructType>>::try_from(
+            &metadata.schema().expect("failed to get schema"),
+        )
+        .expect("Failed to convert to arrow schema");
+        let arrow_schema_ref = Arc::new(arrow_schema);
 
+        'outer: loop {
+            let mut message = receiver.recv();
+
+            match message {
+                Ok(rb) => {
+                    if (rb.num_rows() == 1) {
+                        break 'outer;
+                    }
+                    writer.write(rb).await.expect("Error Writing batch");
+                }
+                Err(e) => {
+                    info!("got RecvError in channel , break to outer");
+                    break 'outer;
+                }
+            }
+        }
+        info!("closing the writer for parquet");
+
+        let adds = writer
+            .flush_and_commit(&mut table)
+            .await
+            .expect("Failed to flush write");
+        info!("{} adds written", adds);
+
+        Ok(Stats {
+            bytes_in: 0,
+            bytes_out: 0,
+            num_rows: 0,
+            adds: adds,
+            read_duration: Default::default(),
+            parse_duration: Default::default(),
+            builder_write_duration: Default::default(),
+        })
+    }
 }
 
-
 impl RecordBatchOutput for DeltaOut {
+    fn setup(
+        &mut self,
+        schema: SchemaRef,
+        fixed_schema: FixedSchema,
+        outfile: PathBuf,
+        rt: &Runtime,
+    ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+        let (sender, mut receiver) = bounded::<RecordBatch>(100);
 
-    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf,rt:&Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+        self.sender = Some(sender.clone());
 
-        let j:JoinHandle<Result<Stats>>=rt.spawn(Self::myDelta(schema,fixed_schema,outfile));
-        
-        
-        
-//        let dout = Self::deltasetup(fixed_schema);
-        
-        todo!()
+        let j: JoinHandle<Result<Stats>> =
+            rt.spawn(Self::myDelta(receiver, schema, fixed_schema, outfile));
+
+        (self.sender.as_mut().cloned().unwrap(), j)
     }
 }
 pub(crate) struct IcebergOut {
     pub(crate) sender: Option<Sender<RecordBatch>>,
 }
 impl RecordBatchOutput for IcebergOut {
-    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf,rt: &Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+    fn setup(
+        &mut self,
+        schema: SchemaRef,
+        fixed_schema: FixedSchema,
+        outfile: PathBuf,
+        rt: &Runtime,
+    ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         todo!()
     }
 }
@@ -197,17 +237,27 @@ pub(crate) struct FlightOut {
 }
 
 impl RecordBatchOutput for FlightOut {
-    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf,rt: &Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+    fn setup(
+        &mut self,
+        schema: SchemaRef,
+        fixed_schema: FixedSchema,
+        outfile: PathBuf,
+        rt: &Runtime,
+    ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         todo!()
     }
 }
-
 
 pub(crate) struct ParquetFileOut {
     pub(crate) sender: Option<Sender<RecordBatch>>,
 }
 impl ParquetFileOut {
-    pub(crate) async fn myParquet(mut receiver:  Receiver<RecordBatch>, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf)->(Result<Stats>) {
+    pub(crate) async fn myParquet(
+        mut receiver: Receiver<RecordBatch>,
+        schema: SchemaRef,
+        fixed_schema: FixedSchema,
+        outfile: PathBuf,
+    ) -> (Result<Stats>) {
         let _out_file = fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -219,46 +269,51 @@ impl ParquetFileOut {
         let mut writer: ArrowWriter<File> =
             ArrowWriter::try_new(_out_file, schema, Some(props.clone())).unwrap();
 
-            'outer: loop {
-                let mut message = receiver.recv();
+        'outer: loop {
+            let mut message = receiver.recv();
 
-                match message {
-                    Ok(rb) => {
-                        writer.write(&rb).expect("Error Writing batch");
-                        if (rb.num_rows() == 0) {
-                            break 'outer;
-                        }
-                    }
-                    Err(e) => {
-                        info!("got RecvError in channel , break to outer");
+            match message {
+                Ok(rb) => {
+                    if (rb.num_rows() == 0) {
                         break 'outer;
                     }
+                    writer.write(&rb).expect("Error Writing batch");
+                }
+                Err(e) => {
+                    info!("got RecvError in channel , break to outer");
+                    break 'outer;
                 }
             }
-            info!("closing the writer for parquet");
-            writer.finish();
-            Ok(Stats {
-                bytes_in: 0,
-                bytes_out: 0,
-                num_rows: 0,
-                read_duration: Default::default(),
-                parse_duration: Default::default(),
-                builder_write_duration: Default::default(),
-            })
-
-
+        }
+        info!("closing the writer for parquet");
+        writer.finish();
+        Ok(Stats {
+            bytes_in: 0,
+            bytes_out: 0,
+            num_rows: 0,
+            adds: 0,
+            read_duration: Default::default(),
+            parse_duration: Default::default(),
+            builder_write_duration: Default::default(),
+        })
     }
 }
 impl RecordBatchOutput for ParquetFileOut {
-    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf,rt: &Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+    fn setup(
+        &mut self,
+        schema: SchemaRef,
+        fixed_schema: FixedSchema,
+        outfile: PathBuf,
+        rt: &Runtime,
+    ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         let (sender, mut receiver) = bounded::<RecordBatch>(100);
 
         self.sender = Some(sender.clone());
 
-        let j:JoinHandle<Result<Stats>>=rt.spawn(Self::myParquet(receiver,schema,fixed_schema,outfile));
+        let j: JoinHandle<Result<Stats>> =
+            rt.spawn(Self::myParquet(receiver, schema, fixed_schema, outfile));
 
         (self.sender.as_mut().cloned().unwrap(), j)
-
     }
 }
 
@@ -266,9 +321,14 @@ pub struct IpcFileOut {
     pub(crate) sender: Option<Sender<RecordBatch>>,
 }
 
-
 impl RecordBatchOutput for IpcFileOut {
-    fn setup(&mut self, schema: SchemaRef,fixed_schema: FixedSchema, outfile: PathBuf,rt: &Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+    fn setup(
+        &mut self,
+        schema: SchemaRef,
+        fixed_schema: FixedSchema,
+        outfile: PathBuf,
+        rt: &Runtime,
+    ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         todo!()
     }
 }
