@@ -28,6 +28,7 @@
 use clap::{value_parser, ArgAction, Parser, Subcommand};
 use evolution_common::error::Result;
 use evolution_common::thread::get_available_threads;
+#[cfg(feature = "mock")]
 use evolution_mocker::mocker::FixedLengthFileMocker;
 use evolution_target::target::Target;
 
@@ -69,6 +70,7 @@ pub(crate) struct Cli {
     read_buffer_size: usize,
 
     /// The size of the write buffer used when mocking (in rows).
+    #[cfg(feature = "mock")]
     #[arg(
         short = 'W',
         long = "write-buffer-size",
@@ -125,6 +127,7 @@ enum Commands {
     },
 
     /// Generate mocked fixed-length files.
+    #[cfg(feature = "mock")]
     Mock {
         /// The json schema to generate data based on.
         #[arg(
@@ -177,6 +180,7 @@ impl Cli {
     pub fn run(&self) -> Result<()> {
         let n_threads: usize = get_available_threads(self.n_threads);
         let read_buffer_size: usize = self.read_buffer_size;
+        #[cfg(feature = "mock")]
         let write_buffer_size: usize = self.write_buffer_size;
 
         match &self.command {
@@ -187,7 +191,8 @@ impl Cli {
                 target: _,
             } => {
                 todo!()
-            }
+            },
+            #[cfg(feature = "mock")]
             Commands::Mock {
                 schema,
                 out_file,
