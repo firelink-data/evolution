@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-02-05
-// Last updated: 2024-05-26
+// Last updated: 2024-05-27
 //
 
 use clap::{value_parser, ArgAction, Parser, Subcommand};
@@ -55,6 +55,30 @@ pub(crate) struct Cli {
         required = false,
     )]
     n_threads: usize,
+
+    /// The size of the read buffer used when converting (in bytes).
+    #[arg(
+        short = 'R',
+        long = "read-buffer-size",
+        action = ArgAction::Set,
+        // This is exactly 5GB = 5 * 1024 * 1024 * 1024 bytes.
+        default_value = "5368709120",
+        value_parser = value_parser!(usize),
+        required = false,
+    )]
+    read_buffer_size: usize,
+
+    /// The size of the write buffer used when mocking (in rows).
+    #[arg(
+        short = 'W',
+        long = "write-buffer-size",
+        action = ArgAction::Set,
+        // Buffering one million rows, when possible, then writing to file.
+        default_value = "1000000",
+        value_parser = value_parser!(usize),
+        required = false,
+    )]
+    write_buffer_size: usize,
 }
 
 #[derive(Subcommand)]
@@ -152,6 +176,8 @@ enum Commands {
 impl Cli {
     pub fn run(&self) -> Result<()> {
         let n_threads: usize = get_available_threads(self.n_threads);
+        let read_buffer_size: usize = self.read_buffer_size;
+        let write_buffer_size: usize = self.write_buffer_size;
 
         match &self.command {
             Commands::Convert {
@@ -174,10 +200,11 @@ impl Cli {
                     .with_out_file(out_file.to_path_buf())
                     .with_num_rows(*n_rows)
                     .with_num_threads(n_threads)
+                    .with_write_buffer_size(write_buffer_size)
                     .with_force_create_new(*force_create_new)
                     .with_truncate_existing(*truncate_existing)
                     .try_build()?
-                    .mock()?;
+                    .try_mock()?;
             }
         };
 
