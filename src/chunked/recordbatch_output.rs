@@ -154,7 +154,7 @@ impl DeltaOut {
 
         let mut writer = RecordBatchWriter::for_table(&table).expect("Failed to make RecordBatchWriter")
             .with_writer_properties(writer_properties);
-        
+
         let metadata = table
             .metadata()
             .expect("Failed to get metadata for the table");
@@ -175,7 +175,12 @@ impl DeltaOut {
 //                    let nrb=rb;
                     info!("nrb rows={} nrb col len {} batchcount={} usize={}",nrb.num_rows(),nrb.columns().len(),writer.buffered_record_batch_count(),writer.buffer_len());
                     writer.write(nrb).await.expect("writing");
-                    
+                    if (writer.buffered_record_batch_count()>200) {
+                     writer
+                        .flush()
+                        .await
+                        .expect("Failed to flush write");
+                    }
 //                    writer.write_with_mode(nrb,WriteMode::MergeSchema);
 
                 }
