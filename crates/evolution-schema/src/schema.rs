@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2023-11-25
-// Last updated: 2024-05-25
+// Last updated: 2024-05-27
 //
 
 use crate::column::FixedColumn;
@@ -165,9 +165,40 @@ impl FixedSchema {
             .map(|c| c.dtype())
             .collect::<Vec<DataType>>()
     }
+
+    /// Borrow the vector of [`FixedColumn`]s and create a new iterator with it.
+    pub fn iter(&self) -> FixedSchemaIterator {
+        FixedSchemaIterator {
+            columns: &self.columns,
+            index: 0,
+        }
+    }
 }
 
 impl Schema for FixedSchema {}
+
+/// Intermediary struct representing an iterable [`FixedSchema`]. It contains a reference
+/// to the schema's vector of [`FixedColumn`]s and the current iteration index.
+pub struct FixedSchemaIterator<'a> {
+    columns: &'a Vec<FixedColumn>,
+    index: usize,
+}
+
+impl<'a> Iterator for FixedSchemaIterator<'a> {
+    type Item = &'a FixedColumn;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.columns.len() {
+            Some(
+                &self.columns[{
+                    self.index += 1;
+                    self.index - 1
+                }],
+            )
+        } else {
+            None
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests_schema {
@@ -242,5 +273,41 @@ mod tests_schema {
         path.push("res/test_invalid_schema.json");
 
         let _: FixedSchema = FixedSchema::from_path(path).unwrap();
+    }
+
+    #[test]
+    fn test_iterate_schema_columns() {
+        let columns: Vec<FixedColumn> = vec![
+            FixedColumn::new(
+                String::from("id"),
+                0 as usize,
+                9 as usize,
+                DataType::Int32,
+                Alignment::Right,
+                Symbol::Whitespace,
+                false,
+            ),
+            FixedColumn::new(
+                String::from("NotCoolColumn"),
+                9 as usize,
+                149 as usize,
+                DataType::LargeUtf8,
+                Alignment::Left,
+                Symbol::Five,
+                false,
+            ),
+        ];
+        let a: FixedSchema = FixedSchema::new(String::from("ValidTestSchema"), 8914781578, columns);
+
+        let mut iterator: FixedSchemaIterator = a.iter();
+
+        let c1: &FixedColumn = iterator.next().unwrap();
+        assert_eq!("id", c1.name());
+        assert_eq!(9, c1.length());
+
+        let c2: &FixedColumn = iterator.next().unwrap();
+        assert_eq!("NotCoolColumn", c2.name());
+        assert_ne!(DataType::Boolean, c2.dtype());
+        assert_eq!(None, iterator.next());
     }
 }

@@ -22,15 +22,20 @@
 // SOFTWARE.
 //
 // File created: 2024-02-05
-// Last updated: 2024-05-26
+// Last updated: 2024-05-27
 //
 
+use evolution_common::{newline, NUM_BYTES_FOR_NEWLINE};
 use evolution_common::error::{Result, SetupError};
-use evolution_schema::schema::{FixedSchema, SchemaRef};
-use evolution_writer::writer::{FixedLengthFileWriter, FixedLengthFileWriterProperties, WriterRef};
-use log::warn;
+use evolution_schema::schema::FixedSchema;
+use evolution_writer::writer::{FixedLengthFileWriter, FixedLengthFileWriterProperties};
+use log::{info, warn};
+use padder::pad_and_push_to_buffer;
+use rand::rngs::ThreadRng;
 
 use std::path::PathBuf;
+
+use crate::mock_column;
 
 /// If the user only wants to generate a small amount of mocked .flf rows then multithreading
 /// is not a stuiable choice and probably only introduces extra overhead. This variable
@@ -45,14 +50,16 @@ pub type MockerRef = Box<dyn Mocker>;
 
 /// The mocker struct for fixed-length files (.flf).
 pub struct FixedLengthFileMocker {
-    /// The [`FixedSchema`] to mock data based on.
-    schema: SchemaRef,
-    /// The [`FixedLengthFileWriter`] to use when writing the mocked data.
-    writer: WriterRef,
+    /// The schema to mock data based on.
+    schema: FixedSchema,
+    /// The writer to use when writing the mocked data to file.
+    writer: FixedLengthFileWriter,
     /// The number of mocked rows to generate.
     n_rows: usize,
     /// The number of threads (logical cores) to use.
     n_threads: usize,
+    /// The size of the writer buffer (in number of rows).
+    write_buffer_size: usize,
 }
 
 impl FixedLengthFileMocker {
@@ -63,12 +70,58 @@ impl FixedLengthFileMocker {
         }
     }
 
-    pub fn mock(&mut self) -> Result<()> {
+    /// Generate mocked data based on the provided [`FixedSchema`]. This function will
+    /// either run in single-threaded mode or in multithreaded mode depending on:
+    /// * the number of available threads (logical cores) on the host system,
+    /// * and the number of mocked rows to generate.
+    pub fn try_mock(&mut self) -> Result<()> {
         if self.n_threads > 1 {
-            todo!()
+            self.try_mock_multithreaded()?;
         } else {
-            todo!()
+            self.try_mock_single_threaded()?;
         }
+        Ok(())
+    }
+
+    ///
+    fn try_mock_multithreaded(&mut self) -> Result<()> {
+        todo!()
+    }
+
+    ///
+    fn try_mock_single_threaded(&mut self) -> Result<()> {
+        let n_runes_in_row = self.schema.row_length();
+        // Here we multiply by 4 because a valid UTF-8 encoded character can at most be
+        // exactly 4 bytes. Thus, we will always allocate enough memory for the writer buffer.
+        // https://en.wikipedia.org/wiki/UTF-8
+        let writer_buffer_size: usize =
+            4 * self.write_buffer_size * NUM_BYTES_FOR_NEWLINE + self.write_buffer_size * n_runes_in_row;
+
+        let mut buffer: Vec<u8> = Vec::with_capacity(writer_buffer_size);
+        let mut rng: ThreadRng = rand::thread_rng();
+
+        for ridx in 0..self.n_rows {
+            if (ridx % self.write_buffer_size == 0) && (ridx != 0) {
+                self.writer.try_write(&buffer)?;
+                buffer.clear();
+            }
+
+            for column in self.schema.iter() {
+                pad_and_push_to_buffer(
+                    mock_column(column, &mut rng).as_bytes(),
+                    column.length(),
+                    column.alignment(),
+                    column.pad_symbol(),
+                    &mut buffer,
+                );
+            }
+
+            buffer.extend_from_slice(newline().as_bytes());
+        }
+
+        self.writer.try_write(&buffer)?;
+        self.writer.try_finish()?;
+
         Ok(())
     }
 }
@@ -82,6 +135,7 @@ pub struct FixedLengthFileMockerBuilder {
     out_path: Option<PathBuf>,
     n_rows: Option<usize>,
     n_threads: Option<usize>,
+    write_buffer_size: Option<usize>,
 
     // File descriptor properties.
     force_create_new: Option<bool>,
@@ -113,6 +167,12 @@ impl FixedLengthFileMockerBuilder {
         self
     }
 
+    /// Set the buffer size for writing to file (in number of rows).
+    pub fn with_write_buffer_size(mut self, buffer_size: usize) -> Self {
+        self.write_buffer_size = Some(buffer_size);
+        self
+    }
+
     /// Set the writer option to return an error if the file already exists.
     pub fn with_force_create_new(mut self, force_create_new: bool) -> Self {
         self.force_create_new = Some(force_create_new);
@@ -130,8 +190,8 @@ impl FixedLengthFileMockerBuilder {
     /// # Errors
     /// If any of the required fields are `None`, or if the schema deserialization failed.
     pub fn try_build(self) -> Result<FixedLengthFileMocker> {
-        let schema: SchemaRef = match self.schema_path {
-            Some(p) => Box::new(FixedSchema::from_path(p)?),
+        let schema: FixedSchema = match self.schema_path {
+            Some(p) => FixedSchema::from_path(p)?,
             None => {
                 return Err(Box::new(SetupError::new(
                     "Required field 'schema_path' was not provided, exiting...",
@@ -160,6 +220,12 @@ impl FixedLengthFileMockerBuilder {
             ))
         })?;
 
+        let write_buffer_size: usize = self.write_buffer_size.ok_or_else(|| {
+            Box::new(SetupError::new(
+                "Required field 'write_buffer_size' was not provided, exiting...",
+            ))
+        })?;
+
         let force_create_new: bool = self.force_create_new.ok_or_else(|| {
             Box::new(SetupError::new(
                 "Required field 'force_create_new' was not provided, exiting...",
@@ -179,12 +245,11 @@ impl FixedLengthFileMockerBuilder {
                 .with_truncate_existing(truncate_existing)
                 .try_build()?;
 
-        let writer: WriterRef = Box::new(
-            FixedLengthFileWriter::builder()
+        let writer: FixedLengthFileWriter
+            = FixedLengthFileWriter::builder()
                 .with_out_path(out_path)
                 .with_properties(writer_properties)
-                .try_build()?,
-        );
+                .try_build()?;
 
         let multithreading: bool = (n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING) && (n_threads > 1);
 
@@ -204,6 +269,7 @@ impl FixedLengthFileMockerBuilder {
             writer,
             n_rows,
             n_threads,
+            write_buffer_size,
         })
     }
 

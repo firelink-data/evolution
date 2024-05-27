@@ -1,6 +1,34 @@
+//
+// MIT License
+//
+// Copyright (c) 2024 Firelink Data
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+// File created: 2024-05-05
+// Last updated: 2024-05-27
+//
+
 use evolution_common::error::{Result, SetupError};
 
 use std::fs::{File, OpenOptions};
+use std::io::Write;
 use std::path::PathBuf;
 
 ///
@@ -23,6 +51,45 @@ impl FixedLengthFileWriter {
             ..Default::default()
         }
     }
+
+    /// Try and flush any remaining bytes in the output stream, ensuring that all bytes are written.
+    ///
+    /// # Errors
+    /// If not all bytes could be written due to any I/O errors or by reaching EOF.
+    pub fn try_finish(&mut self) -> Result<()> {
+        self.inner.flush()?;
+        Ok(())
+    }
+
+    /// Flush any remaining bytes in the output stream, ensuring that all bytes are written.
+    ///
+    /// # Panics
+    /// If not all bytes could be written due to any I/O errors or by reaching EOF.
+    pub fn finish(&mut self) {
+        self.try_finish().unwrap();
+    }
+
+    /// Try to write the entire buffer to the file by continuously calling [`write`].
+    ///
+    /// # Errors
+    /// Each call to [`write`] inside this function might generate an I/O error indicating
+    /// that the operation could not be completed. If an error is returned, then this is 
+    /// guaranteed to happen before any bytes are actually written from the buffer.
+    ///
+    /// [`write`]: std::io::Write::write
+    pub fn try_write(&mut self, buffer: &[u8]) -> Result<()> {
+        self.inner.write_all(buffer)?;
+        Ok(())
+    }
+
+    /// Write the entire buffer to the file by continuously calling [`write`].
+    ///
+    /// # Panics
+    /// Iff any I/O error was generated and then unwrapped.
+    pub fn write(&mut self, buffer: &[u8]) {
+        self.try_write(buffer).unwrap();
+    }
+
 }
 
 impl Writer for FixedLengthFileWriter {}

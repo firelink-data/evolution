@@ -22,8 +22,28 @@
 // SOFTWARE.
 //
 // File created: 2024-05-24
-// Last updated: 2024-05-26
+// Last updated: 2024-05-27
 //
+
+/// Get the number of bytes representing a newline character on a Windows system.
+#[cfg(target_os = "windows")]
+pub static NUM_BYTES_FOR_NEWLINE: usize = 2;
+/// Get the number of bytes representing a newline character on a Unix system.
+#[cfg(not(target_os = "windows"))]
+pub static NUM_BYTES_FOR_NEWLINE: usize = 1;
+
+/// Get the character representing a newline on a Windows system. This is called the
+/// Carriage-Return Line-Feed (CR-LF) and is represented as the `\r\n` characters.
+#[cfg(target_os = "windows")]
+pub fn newline<'a>() -> &'a str {
+    "\r\n"
+}
+/// Get the character representing a newline on a Unix system. This is called the line-feed (LF)
+/// and is represented as the `\n` character.
+#[cfg(not(target_os = "windows"))]
+pub fn newline<'a>() -> &'a str {
+    "\n"
+}
 
 pub mod datatype;
 pub mod error;
