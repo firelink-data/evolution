@@ -34,6 +34,7 @@ use parquet::format;
 use rayon::iter::IndexedParallelIterator;
 use rayon::prelude::*;
 use std::env::VarError;
+use std::fmt::Pointer;
 use tokio::runtime::Runtime;
 
 use std::fs;
@@ -151,12 +152,9 @@ impl DeltaOut {
             .build();
 
 
-        let mut writer = RecordBatchWriter::for_table(&table)
-            .expect("Failed to make RecordBatchWriter")
+        let mut writer = RecordBatchWriter::for_table(&table).expect("Failed to make RecordBatchWriter")
             .with_writer_properties(writer_properties);
-
         
-
         let metadata = table
             .metadata()
             .expect("Failed to get metadata for the table");
@@ -174,9 +172,11 @@ impl DeltaOut {
                         break 'outer;
                     }
                     let nrb=rb.with_schema(Arc::new(arrow_schema.clone())).unwrap();
-                    info!("nrb rows={} ",nrb.num_rows());
-//                    writer.write(nrb).await.expect("Error Writing batch");
-                    writer.write_with_mode(nrb,WriteMode::MergeSchema);
+//                    let nrb=rb;
+                    info!("nrb rows={} nrb col len {} batchcount={} usize={}",nrb.num_rows(),nrb.columns().len(),writer.buffered_record_batch_count(),writer.buffer_len());
+                    writer.write(nrb).await.expect("writing");
+                    
+//                    writer.write_with_mode(nrb,WriteMode::MergeSchema);
 
                 }
                 Err(e) => {
@@ -185,7 +185,7 @@ impl DeltaOut {
                 }
             }
         }
-        info!("closing the writer for parquet");
+        info!("closing the writer for parquet {}",writer.buffered_record_batch_count());
 
         let adds = writer
             .flush_and_commit(&mut table)
