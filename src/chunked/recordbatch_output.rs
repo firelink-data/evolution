@@ -64,6 +64,7 @@ use ordered_channel::Sender;
 use parquet::errors::{ParquetError, Result};
 use parquet::file::metadata::FileMetaData;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use std::sync::mpsc::RecvError;
 //use std::sync::mpsc::{sync_channel, Receiver, RecvError, SyncSender};
 use std::thread;
 //use std::thread::JoinHandle;
@@ -121,15 +122,17 @@ impl DeltaOut {
         let table_path =out.to_str().unwrap();
 
         let maybe_table = deltalake::open_table(&table_path).await;
+//        let hardoded_partition_cols = vec!["id".to_owned()];
         let mut table = match maybe_table {
             Ok(table) => table,
             Err(DeltaTableError::NotATable(_)) => {
                 let fxschema_to_delta =schema.into_delta_columns();
                 info!("It doesn't look like our delta table has been created\n {:?}",fxschema_to_delta);
-                DeltaOps::try_from_uri(table_path)
+                DeltaOps:: try_from_uri(table_path)
                     .await
                     .unwrap()
                     .create()
+//                    with_partition_columns(hardoded_partition_cols)
                     .with_columns(fxschema_to_delta)
                     .await
                     .unwrap()
@@ -146,12 +149,11 @@ impl DeltaOut {
         outfile: PathBuf,
     ) -> (Result<Stats>) {
         let mut table = Self::deltasetup(fixed_schema, outfile).await.unwrap();
-
-        let writer_properties = WriterProperties::builder().set_writer_version(WriterVersion::PARQUET_2_0)
+// TODO @TEDDY AND @WILLE THESE MAX SETTINGS DO NOTHING ?
+        let writer_properties = WriterProperties::builder().set_max_row_group_size(300).set_write_batch_size(300).set_writer_version(WriterVersion::PARQUET_2_0)
             .set_compression(Compression::ZSTD(ZstdLevel::try_new(3).unwrap()))
             .build();
-
-
+//        table.metadata().unwrap().partition_columns
         let mut writer = RecordBatchWriter::for_table(&table).expect("Failed to make RecordBatchWriter")
             .with_writer_properties(writer_properties);
 
@@ -162,6 +164,7 @@ impl DeltaOut {
             &metadata.schema().expect("failed to get schema"),
         )
         .expect("Failed to convert to arrow schema");
+        let mut adds_tot:usize=0;
 
         'outer: loop {
             let mut message = receiver.recv();
@@ -172,14 +175,14 @@ impl DeltaOut {
                         break 'outer;
                     }
                     let nrb=rb.with_schema(Arc::new(arrow_schema.clone())).unwrap();
-//                    let nrb=rb;
+                    //                    let nrb=rb;
                     info!("nrb rows={} nrb col len {} batchcount={} usize={}",nrb.num_rows(),nrb.columns().len(),writer.buffered_record_batch_count(),writer.buffer_len());
                     writer.write(nrb).await.expect("writing");
                     if (writer.buffered_record_batch_count()>200) {
-                     writer
-                        .flush()
-                        .await
-                        .expect("Failed to flush write");
+                        writer
+                            .flush()
+                            .await
+                            .expect("Failed to flush write");
                     }
 //                    writer.write_with_mode(nrb,WriteMode::MergeSchema);
 
@@ -196,8 +199,10 @@ impl DeltaOut {
             .flush_and_commit(&mut table)
             .await
             .expect("Failed to flush write");
-        info!("{} adds written", adds);
+        adds_tot+=adds as usize;
 
+        info!("{} adds written", adds_tot);
+        
         Ok(Stats {
             bytes_in: 0,
             bytes_out: 0,
