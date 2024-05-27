@@ -191,7 +191,7 @@ impl Cli {
                 target: _,
             } => {
                 todo!()
-            },
+            }
             #[cfg(feature = "mock")]
             Commands::Mock {
                 schema,

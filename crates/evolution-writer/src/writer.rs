@@ -73,7 +73,7 @@ impl FixedLengthFileWriter {
     ///
     /// # Errors
     /// Each call to [`write`] inside this function might generate an I/O error indicating
-    /// that the operation could not be completed. If an error is returned, then this is 
+    /// that the operation could not be completed. If an error is returned, then this is
     /// guaranteed to happen before any bytes are actually written from the buffer.
     ///
     /// [`write`]: std::io::Write::write
@@ -89,7 +89,6 @@ impl FixedLengthFileWriter {
     pub fn write(&mut self, buffer: &[u8]) {
         self.try_write(buffer).unwrap();
     }
-
 }
 
 impl Writer for FixedLengthFileWriter {}

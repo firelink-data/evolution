@@ -28,8 +28,8 @@
 use evolution_common::datatype::DataType;
 use evolution_schema::column::FixedColumn;
 use faker_rand::en_us::names::FirstName;
-use rand::Rng;
 use rand::rngs::ThreadRng;
+use rand::Rng;
 
 pub static MOCKED_F16_MAX: f32 = 256.0;
 pub static MOCKED_F32_MAX: f32 = 1_000_000.0;

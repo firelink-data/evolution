@@ -25,8 +25,8 @@
 // Last updated: 2024-05-27
 //
 
-use evolution_common::{newline, NUM_BYTES_FOR_NEWLINE};
 use evolution_common::error::{Result, SetupError};
+use evolution_common::{newline, NUM_BYTES_FOR_NEWLINE};
 use evolution_schema::schema::FixedSchema;
 use evolution_writer::writer::{FixedLengthFileWriter, FixedLengthFileWriterProperties};
 use log::{info, warn};
@@ -94,8 +94,8 @@ impl FixedLengthFileMocker {
         // Here we multiply by 4 because a valid UTF-8 encoded character can at most be
         // exactly 4 bytes. Thus, we will always allocate enough memory for the writer buffer.
         // https://en.wikipedia.org/wiki/UTF-8
-        let writer_buffer_size: usize =
-            4 * self.write_buffer_size * NUM_BYTES_FOR_NEWLINE + self.write_buffer_size * n_runes_in_row;
+        let writer_buffer_size: usize = 4 * self.write_buffer_size * NUM_BYTES_FOR_NEWLINE
+            + self.write_buffer_size * n_runes_in_row;
 
         let mut buffer: Vec<u8> = Vec::with_capacity(writer_buffer_size);
         let mut rng: ThreadRng = rand::thread_rng();
@@ -245,11 +245,10 @@ impl FixedLengthFileMockerBuilder {
                 .with_truncate_existing(truncate_existing)
                 .try_build()?;
 
-        let writer: FixedLengthFileWriter
-            = FixedLengthFileWriter::builder()
-                .with_out_path(out_path)
-                .with_properties(writer_properties)
-                .try_build()?;
+        let writer: FixedLengthFileWriter = FixedLengthFileWriter::builder()
+            .with_out_path(out_path)
+            .with_properties(writer_properties)
+            .try_build()?;
 
         let multithreading: bool = (n_rows >= MIN_NUM_ROWS_FOR_MULTITHREADING) && (n_threads > 1);
 
