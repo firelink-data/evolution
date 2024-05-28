@@ -5,6 +5,7 @@ members = [
     "crates/evolution-converter",
     "crates/evolution-mocker",
     "crates/evolution-schema",
+    "crates/evolution-slicer",
     "crates/evolution-target",
     "crates/evolution-writer",
 ]

@@ -12,4 +12,9 @@ readme = { workspace = true }
 [dependencies]
 arrow = "51.0.0"
 evolution-common = { path = "../evolution-common" }
+evolution-schema = { path = "../evolution-schema" }
+evolution-slicer = { path = "../evolution-slicer" }
 evolution-writer = { path = "../evolution-writer" }
+libc = "0.2.155"
+log = "0.4.21"
+parquet = "51.0.0"

@@ -22,17 +22,18 @@
 // SOFTWARE.
 //
 // File created: 2023-11-25
-// Last updated: 2024-05-27
+// Last updated: 2024-05-28
 //
 
-use crate::column::FixedColumn;
-
+use arrow::datatypes::{Field as ArrowField, Schema as ArrowSchema};
 use evolution_common::datatype::DataType;
 use evolution_common::error::Result;
 use serde::{Deserialize, Serialize};
 
 use std::fs;
 use std::path::PathBuf;
+
+use crate::column::FixedColumn;
 
 /// A blank trait to allow developers to create their own schema implementations.
 pub trait Schema {}
@@ -172,6 +173,17 @@ impl FixedSchema {
             columns: &self.columns,
             index: 0,
         }
+    }
+
+    /// Consume the [`FixedSchema`] and produce an [`ArrowSchema`] from it.
+    pub fn into_arrow_schema(self) -> ArrowSchema {
+        let fields = self
+            .columns
+            .iter()
+            .map(|c| ArrowField::new(c.name(), c.as_arrow_dtype(), c.is_nullable()))
+            .collect::<Vec<ArrowField>>();
+
+        ArrowSchema::new(fields)
     }
 }
 

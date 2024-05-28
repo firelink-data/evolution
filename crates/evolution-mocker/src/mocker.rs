@@ -121,7 +121,6 @@ impl FixedLengthFileMocker {
             buffer.extend_from_slice(newline().as_bytes());
         }
 
-
         info!("Done mocking, flushing any remaining buffers.");
         self.writer.try_write(&buffer)?;
         self.writer.try_finish()?;

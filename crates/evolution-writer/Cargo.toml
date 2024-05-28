@@ -10,4 +10,6 @@ license = { workspace = true }
 readme = { workspace = true }
 
 [dependencies]
+arrow = "51.0.0"
 evolution-common = { path = "../evolution-common" }
+parquet = "51.0.0"

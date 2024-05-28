@@ -189,14 +189,12 @@ impl Cli {
                 schema,
                 out_file,
                 target,
-            } => {
-                match target {
-                    Target::Delta => todo!(),
-                    Target::Iceberg => todo!(),
-                    Target::Ipc => todo!(),
-                    Target::Parquet => todo!(),
-                }
-            }
+            } => match target {
+                Target::Delta => todo!(),
+                Target::Iceberg => todo!(),
+                Target::Ipc => todo!(),
+                Target::Parquet => todo!(),
+            },
             #[cfg(feature = "mock")]
             Commands::Mock {
                 schema,

@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-02-05
-// Last updated: 2024-05-26
+// Last updated: 2024-05-28
 //
 
 use std::error;
@@ -32,13 +32,15 @@ use std::result;
 ///
 pub type Result<T> = result::Result<T, Box<dyn error::Error>>;
 
-///
+/// An error representing that something went wrong when setting up all resources.
+/// Most likely caused by some I/O error due to incorrect paths or write/read modes.
 #[derive(Debug)]
 pub struct SetupError {
     details: String,
 }
 
 impl SetupError {
+    /// Create a new [`SetupError`] which will display the provided message.
     pub fn new(msg: &str) -> Self {
         Self {
             details: msg.to_string(),
@@ -58,6 +60,33 @@ impl error::Error for SetupError {
     }
 }
 
+/// An error representing that something went wrong during execution.
+#[derive(Debug)]
+pub struct ExecutionError {
+    details: String,
+}
+
+impl ExecutionError {
+    /// Create a new [`ExecutionError`] which will display the provided message.
+    pub fn new(msg: &str) -> Self {
+        Self {
+            details: msg.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for ExecutionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.details)
+    }
+}
+
+impl error::Error for ExecutionError {
+    fn description(&self) -> &str {
+        &self.details
+    }
+}
+
 #[cfg(test)]
 mod tests_error {
     use super::*;
@@ -67,6 +96,16 @@ mod tests_error {
         assert_eq!(
             "uh oh stinky something went wrong!",
             SetupError::new("uh oh stinky something went wrong!")
+                .to_string()
+                .as_str(),
+        );
+    }
+
+    #[test]
+    fn test_execution_error() {
+        assert_eq!(
+            "uh oh stinky something went wrong!",
+            ExecutionError::new("uh oh stinky something went wrong!")
                 .to_string()
                 .as_str(),
         );

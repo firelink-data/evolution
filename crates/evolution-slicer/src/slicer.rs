@@ -22,7 +22,182 @@
 // SOFTWARE.
 //
 // File created: 2023-12-11
-// Last updated: 2024-05-15
+// Last updated: 2024-05-28
 //
 
-pub trait Slicer {}
+use evolution_common::error::{ExecutionError, Result};
+
+use std::fs::{File, OpenOptions};
+use std::io::{BufReader, Read};
+use std::path::PathBuf;
+
+/// A slicer reads something and produces a slice.
+pub trait Slicer {
+    fn is_done(&self) -> bool;
+}
+
+///
+pub type SlicerRef = Box<dyn Slicer>;
+
+///
+pub struct FixedLengthFileSlicer {
+    inner: BufReader<File>,
+    bytes_to_read: usize,
+    remaining_bytes: usize,
+    bytes_processed: usize,
+    bytes_overlapped: usize,
+}
+
+impl FixedLengthFileSlicer {
+    /// Try creating a new [`FixedLengthFileSlicer`] from a relative or absolute path
+    /// to the fixed-length file that is to be sliced.
+    ///
+    /// # Errors
+    /// This function can return an error for the following reasons:
+    /// * Any I/O error was returned when trying to open the path as a file.
+    /// * Could not read the metadata of the file at the path.
+    pub fn try_from_path(in_path: PathBuf) -> Result<Self> {
+        let file: File = OpenOptions::new().read(true).open(in_path)?;
+
+        let bytes_to_read: usize = file.metadata()?.len() as usize;
+        let remaining_bytes: usize = bytes_to_read;
+        let bytes_processed: usize = 0;
+        let bytes_overlapped: usize = 0;
+
+        let inner: BufReader<File> = BufReader::new(file);
+
+        Ok(FixedLengthFileSlicer {
+            inner,
+            bytes_to_read,
+            remaining_bytes,
+            bytes_processed,
+            bytes_overlapped,
+        })
+    }
+
+    /// Create a new [`FixedLengthFileSlicer`] from a relative or absolute path to
+    /// the fixed-length file that is to be sliced.
+    ///
+    /// # Panics
+    /// This function can panic for the following reasons:
+    /// * Any I/O error was returned when trying to open the path as a file.
+    /// * Could not read the metadata of the file at the path.
+    pub fn from_path(in_path: PathBuf) -> Self {
+        FixedLengthFileSlicer::try_from_path(in_path).unwrap()
+    }
+
+    /// Get the total number of bytes to read.
+    pub fn bytes_to_read(&self) -> usize {
+        self.bytes_to_read
+    }
+
+    /// Get the number of remaining bytes to read.
+    pub fn remaining_bytes(&self) -> usize {
+        self.remaining_bytes
+    }
+
+    /// Set the number of remaining bytes to read.
+    pub fn set_remaining_bytes(&mut self, remaining_bytes: usize) {
+        self.remaining_bytes = remaining_bytes;
+    }
+
+    /// Get the total number of processed bytes.
+    pub fn bytes_processed(&self) -> usize {
+        self.bytes_processed
+    }
+
+    /// Set the total number of processed bytes.
+    pub fn set_bytes_processed(&mut self, bytes_processed: usize) {
+        self.bytes_processed = bytes_processed;
+    }
+
+    /// Get the total number of overlapped bytes (due to sliding window).
+    pub fn bytes_overlapped(&self) -> usize {
+        self.bytes_overlapped
+    }
+
+    /// Set the total number of overlapped bytes.
+    pub fn set_bytes_overlapped(&mut self, bytes_overlapped: usize) {
+        self.bytes_overlapped = bytes_overlapped;
+    }
+
+    /// Try and read from the buffered reader into the provided buffer. This function
+    /// reads enough bytes to fill the buffer, hence, it is up to the caller to
+    /// ensure that the buffer has the correct and/or wanted capacity.
+    ///
+    /// # Errors
+    /// If the buffered reader encounters an EOF before completely filling the buffer.
+    pub fn try_read_to_buffer(&mut self, buffer: &mut [u8]) -> Result<()> {
+        self.inner.read_exact(buffer)?;
+        Ok(())
+    }
+
+    /// Try and find all occurances of linebreak characters in a byte slice and push
+    /// the index of the byte to a provided buffer. The function looks specifically
+    /// for two characters, the carriage-return (CR) and line-feed (LF) characters,
+    /// represented as the character sequence '\r\n' on Windows systems.
+    ///
+    /// # Errors
+    /// If the byte slice to search through was empty.
+    #[cfg(target_os = "windows")]
+    pub fn try_find_line_breaks(&self, bytes: &[u8], buffer: &mut Vec<usize>) -> Result<()> {
+        if bytes.is_empty() {
+            return Err(Box::new(ExecutionError::new(
+                "Byte slice to find newlines in was empty, exiting...",
+            )));
+        };
+
+        (1..bytes.len()).for_each(|idx| {
+            if (bytes[idx - 1] == 0x0d) && (bytes[idx] == 0x0a) {
+                buffer.push(idx - 1);
+            };
+        });
+
+        Ok(())
+    }
+    /// Try and find all occurances of linebreak characters in a byte slice and push
+    /// the index of the byte to a provided buffer. The function looks specifically
+    /// for a line-feed (LF) character, represented as '\n' on Unix systems.
+    ///
+    /// # Errors
+    /// If the byte slice to search through was empty.
+    #[cfg(not(target_os = "windows"))]
+    pub fn try_find_line_breaks(&self, bytes: &[u8], buffer: &mut Vec<usize>) -> Result<()> {
+        if bytes.is_empty() {
+            return Err(Box::new(ExecutionError::new(
+                "Byte slice to find newlines in was empty, exiting...",
+            )));
+        };
+
+        (0..bytes.len()).for_each(|idx| {
+            if bytes[idx] == 0x0a {
+                buffer.push(idx);
+            };
+        });
+
+        Ok(())
+    }
+
+    /// Try and seek relative to the current position in the buffered reader.
+    ///
+    /// # Errors
+    /// Seeking to a negative offset will return an error.
+    pub fn try_seek_relative(&mut self, bytes_to_seek: i64) -> Result<()> {
+        self.inner.seek_relative(bytes_to_seek)?;
+        Ok(())
+    }
+
+    /// Seek relative to the current position in the buffered reader.
+    ///
+    /// # Panics
+    /// Seeking to a negative offset will cause the program to panic.
+    pub fn seek_relative(&mut self, bytes_to_seek: i64) {
+        self.try_seek_relative(bytes_to_seek).unwrap()
+    }
+}
+
+impl Slicer for FixedLengthFileSlicer {
+    fn is_done(&self) -> bool {
+        self.bytes_processed >= self.bytes_to_read
+    }
+}
