@@ -34,16 +34,19 @@ use ordered_channel::Sender;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::mpsc::SyncSender;
-use std::thread::JoinHandle;
 use std::time::Duration;
+use tokio::runtime::Runtime;
+use tokio::task::JoinHandle;
 
 use self::residual_slicer::SLICER_IN_CHUNK_SIZE;
+use crate::schema::FixedSchema;
 use parquet::errors::{ParquetError, Result};
+use tokio::runtime;
 
 pub(crate) mod arrow_converter;
+pub(crate) mod recordbatch_output;
 pub(crate) mod residual_slicer;
 pub(crate) mod self_converter;
-pub(crate) mod threaded_file_output;
 mod trimmer;
 
 pub(crate) struct ChunkAndResidue {
@@ -61,7 +64,7 @@ pub(crate) struct Stats {
     pub(crate) bytes_in: usize,
     pub(crate) bytes_out: usize,
     pub(crate) num_rows: i64,
-
+    pub(crate) adds: i64,
     pub(crate) read_duration: Duration,
     pub(crate) parse_duration: Duration,
     pub(crate) builder_write_duration: Duration,
@@ -161,8 +164,8 @@ pub(crate) trait Converter<'a> {
 
     //    fn process(& mut self, slices: Vec< &'a[u8]>) -> usize;
     fn process(&mut self, slices: Vec<&'a [u8]>) -> (usize, usize, Duration, Duration);
-    fn setup(&mut self) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>);
-    fn shutdown(&mut self);
+    fn setup(&mut self, rt: &Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>);
+    fn shutdown(&mut self, rt: &Runtime, jh: JoinHandle<Result<Stats>>);
 }
 
 pub trait ColumnBuilder {
@@ -171,10 +174,12 @@ pub trait ColumnBuilder {
     //    fn name(&  self) -> &String;
 }
 
-pub trait arrow_file_output {
+pub trait RecordBatchOutput {
     fn setup(
         &mut self,
         schema: SchemaRef,
+        fixed_schema: FixedSchema,
         outfile: PathBuf,
+        rt: &Runtime,
     ) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>);
 }

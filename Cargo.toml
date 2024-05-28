@@ -1,6 +1,6 @@
 [package]
 name = "evolution"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 description = "🦖 Evolve your fixed-length data files into Apache Parquet, fully parallelized!"
 authors = [
@@ -44,11 +44,18 @@ libc = "0.2.154"
 arrow = "51.0.0"
 parquet = "51.0.0"
 arrow-ipc = "51.0.0"
+deltalake =  { version="0.17.3", features = ["datafusion"]}
+datafusion = "38.0.0"
+
+deltalake-core = "0.17.3"
 
 padder = { version = "1.2.0", features = ["serde"] }
 ordered-channel="1.1.0"
 atomic-counter = "1.0.1"
-crossbeam-channel = "0.5.12"
+crossbeam-channel = "0.5.13"
+tracing = "0.1.40"
+tokio = "1.37.0"
+futures = "0.3.30"
 [dev-dependencies]
 glob = "0.3.1"
 

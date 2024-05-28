@@ -22,14 +22,16 @@
 // SOFTWARE.
 //
 // File created: 2023-11-25
-// Last updated: 2024-05-15
+// Last updated: 2024-05-25
 //
 
 use arrow::datatypes::{DataType as ArrowDataType, Field, Schema, SchemaRef as ArrowSchemaRef};
+use deltalake::kernel::{DataType as DeltaDataType, StructField};
 use padder::{Alignment, Symbol};
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
 
+use log::info;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
@@ -95,6 +97,11 @@ impl FixedColumn {
         self.pad_symbol
     }
 
+    /// Get whether or not the column is nullable.
+    pub fn is_nullable(&self) -> bool {
+        self.is_nullable
+    }
+
     /// Find the matching [`ArrowDataType`] for the [`FixedColumn`]s dtype.
     pub fn as_arrow_dtype(&self) -> ArrowDataType {
         match self.dtype {
@@ -107,6 +114,26 @@ impl FixedColumn {
             DataType::Int64 => ArrowDataType::Int64,
             DataType::Utf8 => ArrowDataType::Utf8,
             DataType::LargeUtf8 => ArrowDataType::LargeUtf8,
+        }
+    }
+
+    /// Get the datatype of the column as a [`DeltaDataType`] variant.
+    ///
+    /// # Note
+    /// Currently this method will map the Float16 datatype to the Float32 variant. This
+    /// is because [`deltalake`] does not define a Float16 variant in its [`DeltaDataType`].
+    pub fn as_delta_dtype(&self) -> DeltaDataType {
+        match self.dtype {
+            DataType::Boolean => DeltaDataType::BOOLEAN,
+            // Note that this might have unwanted side-effects due to datatype changing!
+            DataType::Float16 => DeltaDataType::FLOAT,
+            DataType::Float32 => DeltaDataType::FLOAT,
+            DataType::Float64 => DeltaDataType::DOUBLE,
+            DataType::Int16 => DeltaDataType::SHORT,
+            DataType::Int32 => DeltaDataType::INTEGER,
+            DataType::Int64 => DeltaDataType::LONG,
+            DataType::Utf8 => DeltaDataType::STRING,
+            DataType::LargeUtf8 => DeltaDataType::STRING,
         }
     }
 
@@ -259,6 +286,14 @@ impl FixedSchema {
         Schema::new(fields)
     }
 
+    /// Create a new vec containing a [`StructField`] for each [`FixedColumn`] in the schema.
+    pub fn into_delta_columns(&self) -> Vec<StructField> {
+        self.columns
+            .iter()
+            .map(|c| StructField::new(c.name(), c.as_delta_dtype(), c.is_nullable()))
+            .collect::<Vec<StructField>>()
+    }
+
     ///
     /// # Performance
     /// This function will clone each [`FixedColumn`] name attribute which might
@@ -277,7 +312,7 @@ impl FixedSchema {
                 )
             })
             .collect();
-
+        info!("as_arrow_schema= {:?}", fields);
         Schema::new(fields)
     }
 

@@ -45,14 +45,15 @@ use std::str::from_utf8_unchecked;
 use std::sync::Arc;
 
 use super::{
-    arrow_file_output, trimmer, ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen,
+    trimmer, ColumnBuilder, Converter, FnFindLastLineBreak, FnLineBreakLen, RecordBatchOutput,
     Stats,
 };
 use crate::chunked;
-use crate::chunked::threaded_file_output::{ipc_file_out, output_factory, parquet_file_out};
+use crate::chunked::recordbatch_output::{output_factory, IpcFileOut, ParquetFileOut};
 pub use crate::cli::Targets;
 use crate::datatype::DataType;
 use crate::schema;
+use crate::schema::FixedSchema;
 use arrow::datatypes::{Field, Schema, SchemaRef};
 use atomic_counter::{AtomicCounter, ConsistentCounter};
 use crossbeam::atomic::AtomicConsume;
@@ -64,9 +65,11 @@ use rayon::join;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::sync::mpsc::{sync_channel, Receiver, RecvError, SyncSender};
 use std::thread;
-use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 use thread::spawn;
+use tokio::runtime;
+use tokio::runtime::Runtime;
+use tokio::task::JoinHandle;
 //use ordered_channel::Sender;
 //use crossbeam::channel::{Receiver, Sender};
 
@@ -79,6 +82,7 @@ pub(crate) struct Slice2Arrow<'a> {
     pub(crate) masterbuilders: MasterBuilders,
     pub(crate) consistent_counter: ConsistentCounter,
     pub(crate) target: Targets,
+    pub(crate) fixed_schema: FixedSchema,
 }
 
 pub(crate) struct MasterBuilders {
@@ -190,7 +194,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 
         let start_parse = Instant::now();
         let offset: usize = self.consistent_counter.get();
-
+        let mut local_consistent_counter: ConsistentCounter = ConsistentCounter::new(0);
         let arc_slices = Arc::new(&slices);
         self.masterbuilders
             .builders
@@ -213,13 +217,13 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
                             br.push(bb.finish());
                         }
                         let record_batch = RecordBatch::try_from_iter(br).unwrap();
-
                         let _ = self
                             .masterbuilders
                             .sender
                             .clone()
                             .unwrap()
                             .send(offset + i, record_batch);
+                        let offset: usize = local_consistent_counter.add(1);
                     }
                 }
             });
@@ -227,26 +231,25 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         for ii in slices.iter() {
             bytes_in += ii.len();
         }
-        let offset: usize = self
-            .consistent_counter
-            .add(self.masterbuilders.builders.len());
+        let offset: usize = self.consistent_counter.add(local_consistent_counter.get());
 
         parse_duration = start_parse.elapsed();
         (bytes_in, bytes_out, parse_duration, builder_write_duration)
     }
 
-    fn setup(&mut self) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
+    fn setup(&mut self, rt: &runtime::Runtime) -> (Sender<RecordBatch>, JoinHandle<Result<Stats>>) {
         let o = output_factory(
             self.target.clone(),
+            self.fixed_schema.clone(),
             self.masterbuilders.schema_factory(),
             self.masterbuilders.outfile.clone(),
+            rt,
         );
         self.masterbuilders.sender = Some(o.0.clone());
         o
     }
 
-    fn shutdown(&mut self) {
-        //        converter.shutdown();
+    fn shutdown(&mut self, rt: &runtime::Runtime, jh: JoinHandle<Result<Stats>>) {
         let schema = Schema::new(vec![Field::new(
             "id",
             arrow::datatypes::DataType::Int32,
@@ -256,6 +259,10 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         let emptyrb = arrow::record_batch::RecordBatch::new_empty(Arc::new(schema));
         let c = self.consistent_counter.get();
         let _ = &self.masterbuilders.sender.clone().unwrap().send(c, emptyrb);
+        rt.spawn_blocking(|| async {
+            info!("...spawned blockiiiiing");
+            jh.await.unwrap()
+        });
     }
 }
 

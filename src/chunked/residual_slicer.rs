@@ -37,6 +37,7 @@ use std::io::{BufReader, Read};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::runtime::Runtime;
 
 use super::{ChunkAndResidue, Converter, FnFindLastLineBreak, IterRevolver, Slicer, Stats};
 
@@ -88,8 +89,8 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
             .stack_size(((SLICER_IN_CHUNK_SIZE as f32) * 2f32) as usize)
             .build_global()
             .unwrap();
-
-        let threaded_writer = converter.setup();
+        let rt = Runtime::new().unwrap();
+        let threaded_writer = converter.setup(&rt);
 
         loop {
             let cr = ir.next().unwrap();
@@ -138,10 +139,9 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
             parse_duration_tot += parse_duration;
             builder_write_duration_tot += builder_write_duration;
         }
-        info!("about to shudown converter...");
+        info!("about to shutdown converter...");
 
-        converter.shutdown();
-        threaded_writer.1.join();
+        converter.shutdown(&rt, threaded_writer.1);
         info!("converter has been shutdown");
 
         info!(
@@ -153,6 +153,7 @@ impl<'a> Slicer<'a> for ResidualSlicer<'a> {
             bytes_in,
             bytes_out: bytes_out,
             num_rows: 0,
+            adds: 0,
             read_duration: read_duration_tot,
             parse_duration: parse_duration_tot,
             builder_write_duration: builder_write_duration_tot,

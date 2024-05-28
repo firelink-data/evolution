@@ -19,14 +19,14 @@
 [![CD](https://github.com/firelink-data/evolution/actions/workflows/cd.yml/badge.svg)](https://github.com/firelink-data/evolution/actions/workflows/cd.yml)
 [![Tests](https://github.com/firelink-data/evolution/actions/workflows/tests.yml/badge.svg)](https://github.com/firelink-data/evolution/actions/workflows/tests.yml)
 
-🦖 *Evolve your fixed-length data files into Apache Parquet, fully parallelized!*
+🦖 *Evolve your fixed-length data files using Apache Arrow , fully parallelized!*
 
 </div>
 
 
 ## 🔎 Overview
 
-This repository hosts the **evolution** program which both allows you to convert existing fixed-length files into other data formats, but also allows you to create large amounts of mocked data blazingly fast. The program supports full parallelism and utilizes SIMD techniques, when possible, for highly efficient parsing of data. 
+This repository hosts the **evolution** program which both allows you to convert existing fixed-length files into dataformats like parquet or lake targets like Delta , but also allows you to create large amounts of mocked data blazingly fast. The program supports full parallelism and utilizes SIMD techniques, when possible, for highly efficient parsing of data. 
 
 To get started, follow the installation, schema setup, and example usage sections below in this README. Happy hacking! 👋🥳
 

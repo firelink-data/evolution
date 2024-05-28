@@ -51,6 +51,7 @@ use crate::chunked::{find_last_nl, line_break_len_cr, Converter as ChunkedConver
 use crate::converter::Converter;
 use crate::error::Result;
 use crate::mocker::Mocker;
+use crate::schema::FixedSchema;
 use crate::threads::get_available_threads;
 
 #[cfg(feature = "rayon")]
@@ -64,6 +65,10 @@ enum Converters {
 pub enum Targets {
     Parquet,
     IPC,
+    Iceberg,
+    Delta,
+    Flight,
+    Orc,
     None,
 }
 
@@ -290,7 +295,6 @@ impl Cli {
                             schema.to_path_buf(),
                             n_threads as i16,
                         );
-                        let sc = master_builders.schema_factory();
 
                         let s2a: Box<Slice2Arrow> = Box::new(Slice2Arrow {
                             fn_line_break: find_last_nl,
@@ -298,6 +302,7 @@ impl Cli {
                             masterbuilders: master_builders,
                             consistent_counter: ConsistentCounter::new(0),
                             target: self.target.clone(),
+                            fixed_schema: FixedSchema::from_path(schema.to_path_buf()).unwrap(),
                         });
                         s2a
                     }
