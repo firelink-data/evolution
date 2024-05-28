@@ -194,7 +194,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
 
         let start_parse = Instant::now();
         let offset: usize = self.consistent_counter.get();
-
+        let mut local_consistent_counter: ConsistentCounter = ConsistentCounter::new(0);
         let arc_slices = Arc::new(&slices);
         self.masterbuilders
             .builders
@@ -217,13 +217,13 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
                             br.push(bb.finish());
                         }
                         let record_batch = RecordBatch::try_from_iter(br).unwrap();
-
                         let _ = self
                             .masterbuilders
                             .sender
                             .clone()
                             .unwrap()
                             .send(offset + i, record_batch);
+                        let offset: usize = local_consistent_counter.add(1);
                     }
                 }
             });
@@ -231,9 +231,7 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         for ii in slices.iter() {
             bytes_in += ii.len();
         }
-        let offset: usize = self
-            .consistent_counter
-            .add(self.masterbuilders.builders.len());
+        let offset: usize = self.consistent_counter.add(local_consistent_counter.get());
 
         parse_duration = start_parse.elapsed();
         (bytes_in, bytes_out, parse_duration, builder_write_duration)
@@ -261,7 +259,10 @@ impl<'a> Converter<'a> for Slice2Arrow<'a> {
         let emptyrb = arrow::record_batch::RecordBatch::new_empty(Arc::new(schema));
         let c = self.consistent_counter.get();
         let _ = &self.masterbuilders.sender.clone().unwrap().send(c, emptyrb);
-        rt.spawn_blocking(|| async { jh.await.unwrap() });
+        rt.spawn_blocking(|| async {
+            info!("...spawned blockiiiiing");
+            jh.await.unwrap()
+        });
     }
 }
 

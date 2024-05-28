@@ -297,7 +297,6 @@ impl ParquetFileOut {
 
         'outer: loop {
             let mut message = receiver.recv();
-
             match message {
                 Ok(rb) => {
                     if (rb.num_rows() == 0) {
@@ -306,7 +305,6 @@ impl ParquetFileOut {
                     writer.write(&rb).expect("Error Writing batch");
                 }
                 Err(e) => {
-                    info!("got RecvError in channel , break to outer");
                     break 'outer;
                 }
             }
