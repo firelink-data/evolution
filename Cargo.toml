@@ -2,11 +2,11 @@
 members = [
     "evolution",
     "crates/evolution-common",
-    "crates/evolution-schema",
+    "crates/evolution-converter",
     "crates/evolution-mocker",
+    "crates/evolution-schema",
     "crates/evolution-target",
     "crates/evolution-writer",
-    # "crates/*",
 ]
 resolver = "2"
 

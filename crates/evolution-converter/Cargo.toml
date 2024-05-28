@@ -1,0 +1,15 @@
+[package]
+name = "evolution-converter"
+version = "1.0.0"
+description = "Converters for evolution."
+edition = { workspace = true }
+authors = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[dependencies]
+arrow = "51.0.0"
+evolution-common = { path = "../evolution-common" }
+evolution-writer = { path = "../evolution-writer" }

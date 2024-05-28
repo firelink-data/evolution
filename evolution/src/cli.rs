@@ -185,12 +185,17 @@ impl Cli {
 
         match &self.command {
             Commands::Convert {
-                in_file: _,
-                schema: _,
-                out_file: _,
-                target: _,
+                in_file,
+                schema,
+                out_file,
+                target,
             } => {
-                todo!()
+                match target {
+                    Target::Delta => todo!(),
+                    Target::Iceberg => todo!(),
+                    Target::Ipc => todo!(),
+                    Target::Parquet => todo!(),
+                }
             }
             #[cfg(feature = "mock")]
             Commands::Mock {

@@ -22,13 +22,13 @@
 // SOFTWARE.
 //
 // File created: 2024-02-05
-// Last updated: 2024-05-27
+// Last updated: 2024-05-28
 //
 
 use evolution_common::error::{Result, SetupError};
 use evolution_common::{newline, NUM_BYTES_FOR_NEWLINE};
 use evolution_schema::schema::FixedSchema;
-use evolution_writer::writer::{FixedLengthFileWriter, FixedLengthFileWriterProperties};
+use evolution_writer::writer::{FixedLengthFileWriter, FixedLengthFileWriterProperties, Writer};
 use log::{info, warn};
 use padder::pad_and_push_to_buffer;
 use rand::rngs::ThreadRng;
@@ -100,6 +100,8 @@ impl FixedLengthFileMocker {
         let mut buffer: Vec<u8> = Vec::with_capacity(writer_buffer_size);
         let mut rng: ThreadRng = rand::thread_rng();
 
+        info!("Mocking {} rows in single-threaded mode.", self.n_rows);
+
         for ridx in 0..self.n_rows {
             if (ridx % self.write_buffer_size == 0) && (ridx != 0) {
                 self.writer.try_write(&buffer)?;
@@ -119,6 +121,8 @@ impl FixedLengthFileMocker {
             buffer.extend_from_slice(newline().as_bytes());
         }
 
+
+        info!("Done mocking, flushing any remaining buffers.");
         self.writer.try_write(&buffer)?;
         self.writer.try_finish()?;
 

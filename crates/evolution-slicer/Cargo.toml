@@ -1,0 +1,11 @@
+[package]
+name = "evolution-slicer"
+version = "1.0.0"
+description = "Data slicer implemented for evolution."
+edition = { workspace = true }
+authors = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+

@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-05-05
-// Last updated: 2024-05-27
+// Last updated: 2024-05-28
 //
 
 use evolution_common::error::{Result, SetupError};
@@ -31,10 +31,18 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 
-///
-pub trait Writer {}
-///
-pub type WriterRef = Box<dyn Writer>;
+/// A trait providing functions to write buffered data to some target.
+pub trait Writer<'a> {
+    type Buffer: 'a;
+
+    fn finish(&mut self);
+    fn write(&mut self, buffer: Self::Buffer);
+    fn try_finish(&mut self) -> Result<()>;
+    fn try_write(&mut self, buffer: Self::Buffer) -> Result<()>;
+}
+
+/// A short-hand notation for a generic writer implementation.
+pub type WriterRef<'a, T> = dyn Writer<'a, Buffer = T>;
 
 /// The writer struct for fixed-length files (.flf).
 pub struct FixedLengthFileWriter {
@@ -52,21 +60,38 @@ impl FixedLengthFileWriter {
         }
     }
 
-    /// Try and flush any remaining bytes in the output stream, ensuring that all bytes are written.
-    ///
-    /// # Errors
-    /// If not all bytes could be written due to any I/O errors or by reaching EOF.
-    pub fn try_finish(&mut self) -> Result<()> {
-        self.inner.flush()?;
-        Ok(())
+    /// Get the properties of the opened file descriptor.
+    pub fn properties(&self) -> &FixedLengthFileWriterProperties {
+        &self.properties
     }
+}
+
+impl<'a> Writer<'a> for FixedLengthFileWriter {
+    type Buffer = &'a [u8];
 
     /// Flush any remaining bytes in the output stream, ensuring that all bytes are written.
     ///
     /// # Panics
     /// If not all bytes could be written due to any I/O errors or by reaching EOF.
-    pub fn finish(&mut self) {
+    fn finish(&mut self) {
         self.try_finish().unwrap();
+    }
+
+    /// Write the entire buffer to the file by continuously calling [`write`].
+    ///
+    /// # Panics
+    /// Iff any I/O error was generated and then unwrapped.
+    fn write(&mut self, buffer: &[u8]) {
+        self.try_write(buffer).unwrap();
+    }
+
+    /// Try and flush any remaining bytes in the output stream, ensuring that all bytes are written.
+    ///
+    /// # Errors
+    /// If not all bytes could be written due to any I/O errors or by reaching EOF.
+    fn try_finish(&mut self) -> Result<()> {
+        self.inner.flush()?;
+        Ok(())
     }
 
     /// Try to write the entire buffer to the file by continuously calling [`write`].
@@ -77,21 +102,11 @@ impl FixedLengthFileWriter {
     /// guaranteed to happen before any bytes are actually written from the buffer.
     ///
     /// [`write`]: std::io::Write::write
-    pub fn try_write(&mut self, buffer: &[u8]) -> Result<()> {
+    fn try_write(&mut self, buffer: Self::Buffer) -> Result<()> {
         self.inner.write_all(buffer)?;
         Ok(())
     }
-
-    /// Write the entire buffer to the file by continuously calling [`write`].
-    ///
-    /// # Panics
-    /// Iff any I/O error was generated and then unwrapped.
-    pub fn write(&mut self, buffer: &[u8]) {
-        self.try_write(buffer).unwrap();
-    }
 }
-
-impl Writer for FixedLengthFileWriter {}
 
 /// A collection of various file properties for the [`FixedLengthFileWriter`].
 pub struct FixedLengthFileWriterProperties {
