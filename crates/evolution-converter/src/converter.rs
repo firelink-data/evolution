@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-02-17
-// Last updated: 2024-05-28
+// Last updated: 2024-05-29
 //
 
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
@@ -45,6 +45,7 @@ pub trait Converter {}
 pub struct ParquetConverter {
     slicer: FixedLengthFileSlicer,
     writer: ParquetWriter,
+    builder: ArrowBuilder,
     n_threads: usize,
     read_buffer_size: usize,
 }
@@ -141,6 +142,8 @@ impl ParquetConverter {
         todo!()
     }
 }
+
+impl Converter for ParquetConverter {}
 
 /// A helper struct for building an instance of a [`ParquetConverter`] struct.
 #[derive(Default)]

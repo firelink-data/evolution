@@ -1,0 +1,15 @@
+[package]
+name = "evolution-builder"
+version = "1.0.0"
+description = "Builder implementations for evolution."
+edition = { workspace = true }
+authors = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[dependencies]
+evolution-common = { path = "../evolution-common" }
+evolution-parser = { path = "../evolution-parser" }
+arrow = { version = "51.0.0", default-features = false }

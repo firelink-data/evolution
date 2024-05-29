@@ -22,23 +22,28 @@
 // SOFTWARE.
 //
 // File created: 2023-11-25
-// Last updated: 2024-05-25
+// Last updated: 2024-05-29
 //
 
 use arrow::datatypes::DataType as ArrowDataType;
 use deltalake::kernel::DataType as DeltaDataType;
+use evolution_builder::builder::ColumnBuilderRef;
 use evolution_common::datatype::DataType;
 use padder::{Alignment, Symbol};
 use serde::{Deserialize, Serialize};
 
+use std::sync::Arc;
+
 /// A blank trait to allow developers to create their own column implementations.
 pub trait Column {}
-pub type ColumnRef = Box<dyn Column>;
+
+/// 
+pub type ColumnRef = Arc<dyn Column>;
 
 /// Representation of a column in a fixed-length file (.flf), containing the only allowed fields.
 ///
 /// # Note
-/// This struct is meant to be created when deserialzied a .json schema file representing a [`crate::schema::FixedSchema`],
+/// This struct is meant to be created when deserializing a .json schema file representing a [`crate::schema::FixedSchema`],
 /// and as such, capitalization of the field values is extremely important. For example, the dtype field has to be exactly
 /// one of the [`DataType`] enum variants, spelled exactly the same. Otherwise, serde can't deserialize the values.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -156,6 +161,11 @@ impl FixedColumn {
             DataType::Utf8 => DeltaDataType::STRING,
             DataType::LargeUtf8 => DeltaDataType::STRING,
         }
+    }
+
+    ///
+    pub fn as_column_builder(&self) -> ColumnBuilderRef {
+        todo!()
     }
 }
 
