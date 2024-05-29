@@ -11,6 +11,7 @@ readme = { workspace = true }
 
 [dependencies]
 arrow = "51.0.0"
+evolution-builder = { path = "../evolution-builder" }
 evolution-common = { path = "../evolution-common" }
 evolution-schema = { path = "../evolution-schema" }
 evolution-slicer = { path = "../evolution-slicer" }

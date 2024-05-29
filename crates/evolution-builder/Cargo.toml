@@ -13,3 +13,4 @@ readme = { workspace = true }
 evolution-common = { path = "../evolution-common" }
 evolution-parser = { path = "../evolution-parser" }
 arrow = { version = "51.0.0", default-features = false }
+log = "0.4.21"

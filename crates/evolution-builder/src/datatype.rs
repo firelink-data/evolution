@@ -22,18 +22,61 @@
 // SOFTWARE.
 //
 // File created: 2024-05-07
-// Last updated: 2024-05-29
+// Last updated: 2024-05-30
 //
 
-use arrow::array::{BooleanBuilder as BooleanArray};
+use arrow::array::BooleanBuilder as BooleanArray;
+use evolution_common::error::Result;
 use evolution_parser::parser::BooleanParser;
+use log::warn;
 
 use crate::builder::ColumnBuilder;
 
 ///
-pub struct BooleanBuilder {
+pub struct BooleanColumnBuilder {
     inner: BooleanArray,
-    name: String,
     parser: BooleanParser,
-    num_runes: usize,
+    name: String,
+    n_runes: usize,
+    is_nullable: bool,
+}
+
+impl BooleanColumnBuilder {
+    ///
+    pub fn new(
+        name: String,
+        n_runes: usize,
+        is_nullable: bool,
+        parser: BooleanParser,
+    ) -> Self {
+        Self {
+            inner: BooleanArray::new(),
+            parser,
+            name,
+            n_runes,
+            is_nullable,
+        }
+    }
+}
+
+impl ColumnBuilder for BooleanColumnBuilder {
+    fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
+        let n_bytes_in_col: usize = match self.parser.try_parse(&bytes) {
+            Ok((n, v)) => {
+                self.inner.append_value(v);
+                n
+            },
+            Err(e) => {
+                if self.is_nullable {
+                    warn!("");
+                    self.inner.append_null();
+                    n
+                } else {
+                    return Err(e);
+                }
+            },
+        };
+
+        Ok(n_bytes_in_col)
+    }
 }

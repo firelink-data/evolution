@@ -22,14 +22,15 @@
 // SOFTWARE.
 //
 // File created: 2024-02-17
-// Last updated: 2024-05-29
+// Last updated: 2024-05-30
 //
 
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
+use evolution_builder::builder::ParquetBuilder;
 use evolution_common::error::{ExecutionError, Result, SetupError};
 use evolution_common::NUM_BYTES_FOR_NEWLINE;
 use evolution_schema::schema::FixedSchema;
-use evolution_slicer::slicer::{FixedLengthFileSlicer, Slicer};
+use evolution_slicer::slicer::{FileSlicer, Slicer};
 use evolution_writer::parquet::ParquetWriter;
 use log::info;
 use parquet::file::properties::WriterProperties as ArrowWriterProperties;
@@ -42,10 +43,13 @@ use std::sync::Arc;
 pub trait Converter {}
 
 ///
+pub type ConverterRef = Box<dyn Converter>;
+
+///
 pub struct ParquetConverter {
-    slicer: FixedLengthFileSlicer,
+    slicer: FileSlicer,
     writer: ParquetWriter,
-    builder: ArrowBuilder,
+    builder: ParquetBuilder,
     n_threads: usize,
     read_buffer_size: usize,
 }
@@ -78,12 +82,8 @@ impl ParquetConverter {
         let mut buffer_capacity: usize = self.read_buffer_size;
         let mut buffer: Vec<u8> = vec![0u8; buffer_capacity];
 
-        // One million newlines should not happen in one slice, so this capacity
-        // should be large enough so that we don't have to perform any new allocations.
-        let mut line_break_indices: Vec<usize> = Vec::with_capacity(1024 * 1024);
-
         info!(
-            "File to convert is {} bytes in total.",
+            "The file to convert is {} bytes in total.",
             self.slicer.bytes_to_read(),
         );
 
@@ -111,17 +111,13 @@ impl ParquetConverter {
             }
 
             self.slicer.try_read_to_buffer(&mut buffer)?;
-            self.slicer
-                .try_find_line_breaks(&buffer, &mut line_break_indices)?;
-
-            let byte_idx_last_line_break: usize = *line_break_indices.last().ok_or_else(|| {
-                Box::new(ExecutionError::new(
-                    "No line breaks found in the read buffer, exiting!",
-                ))
-            })?;
+            let byte_idx_last_line_break: usize = self.slicer
+                .try_find_last_line_break(&buffer)?;
 
             let n_bytes_left_after_last_line_break: usize =
                 buffer_capacity - byte_idx_last_line_break - NUM_BYTES_FOR_NEWLINE;
+
+            self.builder.try_parse_slice(&buffer)?;
 
             self.slicer
                 .try_seek_relative(-(n_bytes_left_after_last_line_break as i64))?;
@@ -136,10 +132,6 @@ impl ParquetConverter {
         }
 
         Ok(())
-    }
-
-    fn parse_slice(&mut self, buffer: &[u8]) {
-        todo!()
     }
 }
 
@@ -241,10 +233,17 @@ impl ParquetConverterBuilder {
             ))
         })?;
 
-        let slicer: FixedLengthFileSlicer = FixedLengthFileSlicer::try_from_path(in_file)?;
+        let slicer: FileSlicer = FileSlicer::try_from_path(in_file)?;
+
+        let fixed_schema: FixedSchema = FixedSchema::from_path(schema_path)?;
+
+        // Here it is okay to clone the entire struct, since this is not executed
+        // during any heavy workload, and should only happen during setup.
+        let builder: ParquetBuilder = fixed_schema.clone()
+            .into_builder::<ParquetBuilder>();
 
         let arrow_schema: ArrowSchemaRef =
-            Arc::new(FixedSchema::from_path(schema_path)?.into_arrow_schema());
+            Arc::new(fixed_schema.into_arrow_schema());
 
         let writer: ParquetWriter = ParquetWriter::builder()
             .with_out_path(out_path)
@@ -255,6 +254,7 @@ impl ParquetConverterBuilder {
         Ok(ParquetConverter {
             slicer,
             writer,
+            builder,
             n_threads,
             read_buffer_size,
         })

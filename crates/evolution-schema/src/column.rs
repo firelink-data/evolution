@@ -28,17 +28,18 @@
 use arrow::datatypes::DataType as ArrowDataType;
 use deltalake::kernel::DataType as DeltaDataType;
 use evolution_builder::builder::ColumnBuilderRef;
+use evolution_builder::datatype::BooleanColumnBuilder;
 use evolution_common::datatype::DataType;
+use evolution_parser::parser::BooleanParser;
+use log::warn;
 use padder::{Alignment, Symbol};
 use serde::{Deserialize, Serialize};
-
-use std::sync::Arc;
 
 /// A blank trait to allow developers to create their own column implementations.
 pub trait Column {}
 
 /// 
-pub type ColumnRef = Arc<dyn Column>;
+pub type ColumnRef = Box<dyn Column>;
 
 /// Representation of a column in a fixed-length file (.flf), containing the only allowed fields.
 ///
@@ -151,8 +152,10 @@ impl FixedColumn {
     pub fn as_delta_dtype(&self) -> DeltaDataType {
         match self.dtype {
             DataType::Boolean => DeltaDataType::BOOLEAN,
-            // Note that this might have unwanted side-effects due to datatype changing!
-            DataType::Float16 => DeltaDataType::FLOAT,
+            DataType::Float16 => {
+                warn!("Casting Float16 to Float32 for deltalake compatibility.");
+                DeltaDataType::FLOAT
+            },
             DataType::Float32 => DeltaDataType::FLOAT,
             DataType::Float64 => DeltaDataType::DOUBLE,
             DataType::Int16 => DeltaDataType::SHORT,
@@ -163,9 +166,28 @@ impl FixedColumn {
         }
     }
 
-    ///
+    /// Create a new [`ColumnBuilderRef`] based on the datatype of the column.
+    /// 
+    /// # Performance
+    /// This method will clone the String which contains the name of the column.
+    /// You should only use this during setup of the program, and not during any
+    /// performance critical parts of the program.
     pub fn as_column_builder(&self) -> ColumnBuilderRef {
-        todo!()
+        match self.dtype {
+            DataType::Boolean => Box::new(BooleanColumnBuilder::new(
+                self.name.clone(),
+                self.length,
+                BooleanParser::new(self.alignment, self.pad_symbol),
+            )),
+            DataType::Float16 => todo!(),
+            DataType::Float32 => todo!(),
+            DataType::Float64 => todo!(),
+            DataType::Int16 => todo!(),
+            DataType::Int32 => todo!(),
+            DataType::Int64 => todo!(),
+            DataType::Utf8 => todo!(),
+            DataType::LargeUtf8 => todo!(),
+        }
     }
 }
 

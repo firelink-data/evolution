@@ -22,29 +22,50 @@
 // SOFTWARE.
 //
 // File created: 2024-05-07
-// Last updated: 2024-05-29
+// Last updated: 2024-05-30
 //
 
-use arrow::array::ArrayRef as ArrowArrayRef;
-
-use std::fmt::Debug;
-use std::sync::Arc;
+use evolution_common::error::Result;
+use evolution_common::NUM_BYTES_FOR_NEWLINE;
 
 ///
-pub trait Builder {}
+pub trait Builder: From<Vec<ColumnBuilderRef>> {}
 
 ///
-pub type BuilderRef = Arc<dyn Builder>;
+pub type BuilderRef = Box<dyn Builder>;
 
 ///
-pub trait ColumnBuilder: Debug + Send + Sync {}
+pub trait ColumnBuilder {
+    fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize>;
+}
 
 ///
-pub type ColumnBuilderRef = Arc<dyn ColumnBuilder>;
+pub type ColumnBuilderRef = Box<dyn ColumnBuilder>;
 
 ///
 pub struct ParquetBuilder {
     columns: Vec<ColumnBuilderRef>,
 }
 
-impl ParquetBuilder {}
+impl ParquetBuilder {
+    ///
+    pub fn try_parse_slice(&mut self, buffer: &[u8]) -> Result<()> {
+        let mut idx: usize = 0;
+        while idx < buffer.len() {
+            for column in self.columns.iter_mut() {
+                idx += column.try_build_column(&buffer[idx..])?;
+            }
+            idx += NUM_BYTES_FOR_NEWLINE;
+        }
+
+        Ok(())
+    }
+}
+
+impl From<Vec<ColumnBuilderRef>> for ParquetBuilder {
+    fn from(columns: Vec<ColumnBuilderRef>) -> Self {
+        Self { columns }
+    }
+}
+
+impl Builder for ParquetBuilder {}

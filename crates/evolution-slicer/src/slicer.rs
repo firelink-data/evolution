@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2023-12-11
-// Last updated: 2024-05-28
+// Last updated: 2024-05-29
 //
 
 use evolution_common::error::{ExecutionError, Result};
@@ -30,17 +30,18 @@ use evolution_common::error::{ExecutionError, Result};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
+use std::sync::Arc;
 
-/// A slicer reads something and produces a slice.
+///
 pub trait Slicer {
     fn is_done(&self) -> bool;
 }
 
 ///
-pub type SlicerRef = Box<dyn Slicer>;
+pub type SlicerRef = Arc<dyn Slicer>;
 
 ///
-pub struct FixedLengthFileSlicer {
+pub struct FileSlicer {
     inner: BufReader<File>,
     bytes_to_read: usize,
     remaining_bytes: usize,
@@ -48,8 +49,8 @@ pub struct FixedLengthFileSlicer {
     bytes_overlapped: usize,
 }
 
-impl FixedLengthFileSlicer {
-    /// Try creating a new [`FixedLengthFileSlicer`] from a relative or absolute path
+impl FileSlicer {
+    /// Try creating a new [`FileSlicer`] from a relative or absolute path
     /// to the fixed-length file that is to be sliced.
     ///
     /// # Errors
@@ -66,7 +67,7 @@ impl FixedLengthFileSlicer {
 
         let inner: BufReader<File> = BufReader::new(file);
 
-        Ok(FixedLengthFileSlicer {
+        Ok(FileSlicer {
             inner,
             bytes_to_read,
             remaining_bytes,
@@ -83,7 +84,7 @@ impl FixedLengthFileSlicer {
     /// * Any I/O error was returned when trying to open the path as a file.
     /// * Could not read the metadata of the file at the path.
     pub fn from_path(in_path: PathBuf) -> Self {
-        FixedLengthFileSlicer::try_from_path(in_path).unwrap()
+        FileSlicer::try_from_path(in_path).unwrap()
     }
 
     /// Get the total number of bytes to read.
@@ -130,6 +131,40 @@ impl FixedLengthFileSlicer {
     pub fn try_read_to_buffer(&mut self, buffer: &mut [u8]) -> Result<()> {
         self.inner.read_exact(buffer)?;
         Ok(())
+    }
+
+    /// Read from the buffered reader into the provided buffer. This function reads
+    /// enough bytes to fill the buffer, hence, it is up to the caller to ensure that
+    /// that buffer has the correct and/or wanted capacity.
+    ///
+    /// # Panics
+    /// If the buffered reader encounters an EOF before completely filling the buffer.
+    pub fn read_to_buffer(&mut self, buffer: &mut [u8]) {
+        self.inner.read_exact(buffer).unwrap();
+    }
+
+    ///
+    #[cfg(not(target_os = "windows"))]
+    pub fn try_find_last_line_break(&self, bytes: &[u8]) -> Result<usize> {
+        if bytes.is_empty() {
+            return Err(Box::new(ExecutionError::new(
+                "Byte slice to find newlines in was empty, exiting...",
+            )));
+        };
+
+        let mut idx: usize = bytes.len() - 1;
+
+        while idx > 0 {
+            if bytes[idx] == 0x0a {
+                return Ok(idx);
+            };
+
+            idx -= 1;
+        }
+
+        Err(Box::new(ExecutionError::new(
+            "Could not find any newlines in byte slice, exiting...",
+        )))
     }
 
     /// Try and find all occurances of linebreak characters in a byte slice and push
@@ -196,7 +231,8 @@ impl FixedLengthFileSlicer {
     }
 }
 
-impl Slicer for FixedLengthFileSlicer {
+impl Slicer for FileSlicer {
+    /// Get whether or not this [`Slicer`] is done reading the input file.
     fn is_done(&self) -> bool {
         self.bytes_processed >= self.bytes_to_read
     }

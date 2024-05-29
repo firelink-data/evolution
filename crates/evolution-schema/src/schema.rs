@@ -22,10 +22,11 @@
 // SOFTWARE.
 //
 // File created: 2023-11-25
-// Last updated: 2024-05-28
+// Last updated: 2024-05-30
 //
 
 use arrow::datatypes::{Field as ArrowField, Schema as ArrowSchema};
+use evolution_builder::builder::{Builder, ColumnBuilderRef};
 use evolution_common::datatype::DataType;
 use evolution_common::error::Result;
 use serde::{Deserialize, Serialize};
@@ -184,6 +185,19 @@ impl FixedSchema {
             .collect::<Vec<ArrowField>>();
 
         ArrowSchema::new(fields)
+    }
+
+    /// Consume the [`FixedSchema`] and produce an instance of a [`Builder`] from it.
+    pub fn into_builder<T>(self) -> T
+    where
+        T: Builder
+    {
+        let column_builders = self.columns
+            .iter()
+            .map(|c| c.as_column_builder())
+            .collect::<Vec<ColumnBuilderRef>>();
+
+        T::from(column_builders)
     }
 }
 
