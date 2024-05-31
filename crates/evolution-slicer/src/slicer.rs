@@ -22,13 +22,14 @@
 // SOFTWARE.
 //
 // File created: 2023-12-11
-// Last updated: 2024-05-29
+// Last updated: 2024-05-31
 //
 
 use evolution_common::error::{ExecutionError, Result};
+use log::warn;
 
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, Read};
+use std::io::{BufReader, ErrorKind, Read};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -129,8 +130,16 @@ impl FileSlicer {
     /// # Errors
     /// If the buffered reader encounters an EOF before completely filling the buffer.
     pub fn try_read_to_buffer(&mut self, buffer: &mut [u8]) -> Result<()> {
-        self.inner.read_exact(buffer)?;
-        Ok(())
+        match self.inner.read_exact(buffer) {
+            Ok(()) => Ok(()),
+            Err(e) => match e.kind() {
+                ErrorKind::UnexpectedEof => {
+                    warn!("EOF reached, this should be the last time reading from the file.");
+                    Ok(())
+                },
+                _ => Err(Box::new(e))
+            }
+        }
     }
 
     /// Read from the buffered reader into the provided buffer. This function reads

@@ -1,0 +1,24 @@
+{
+    "name": "EvolutionExampleSchema",
+    "version": 1337,
+    "columns": [
+        {
+            "name": "cool",
+            "offset": 0,
+            "length": 9,
+            "dtype": "Boolean",
+            "alignment": "Right",
+            "pad_symbol": "Underscore",
+            "is_nullable": false
+        },
+        {
+            "name": "employed",
+            "offset": 9,
+            "length": 5,
+            "dtype": "Boolean",
+            "alignment": "Center",
+            "pad_symbol": "Asterisk",
+            "is_nullable": true
+        }
+    ]
+}

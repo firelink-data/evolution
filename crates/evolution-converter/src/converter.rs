@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-02-17
-// Last updated: 2024-05-30
+// Last updated: 2024-05-31
 //
 
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
@@ -32,7 +32,9 @@ use evolution_common::NUM_BYTES_FOR_NEWLINE;
 use evolution_schema::schema::FixedSchema;
 use evolution_slicer::slicer::{FileSlicer, Slicer};
 use evolution_writer::parquet::ParquetWriter;
-use log::info;
+#[cfg(debug_assertions)]
+use log::debug;
+use log::{info, warn};
 use parquet::file::properties::WriterProperties as ArrowWriterProperties;
 
 use std::mem;
@@ -80,7 +82,6 @@ impl ParquetConverter {
     ///
     pub fn try_convert_single_threaded(&mut self) -> Result<()> {
         let mut buffer_capacity: usize = self.read_buffer_size;
-        let mut buffer: Vec<u8> = vec![0u8; buffer_capacity];
 
         info!(
             "The file to convert is {} bytes in total.",
@@ -100,24 +101,21 @@ impl ParquetConverter {
                 buffer_capacity = remaining_bytes;
             }
 
-            // This is to not have to perform a syscall and realloc the buffer.
-            // We save precious CPU cycles here, but unsafe... scary!
-            unsafe {
-                libc::memset(
-                    buffer.as_mut_ptr() as _,
-                    0,
-                    buffer.capacity() * mem::size_of::<u8>(),
-                );
-            }
-
+            // This is really ugly, I dont want to have to perform these syscalls
+            // for heap allocations in the main loop... But the buffered reader
+            // requires that the buffer contains some values, it can't be empty
+            // but with large enough capacity, really dumb. Look into smarter
+            // way to do this, because it really bothers me!!!!!
+            let mut buffer: Vec<u8> = vec![0u8; buffer_capacity];
             self.slicer.try_read_to_buffer(&mut buffer)?;
+
             let byte_idx_last_line_break: usize = self.slicer
                 .try_find_last_line_break(&buffer)?;
 
             let n_bytes_left_after_last_line_break: usize =
                 buffer_capacity - byte_idx_last_line_break - NUM_BYTES_FOR_NEWLINE;
 
-            self.builder.try_parse_slice(&buffer)?;
+            self.builder.try_build_from_slice(&buffer)?;
 
             self.slicer
                 .try_seek_relative(-(n_bytes_left_after_last_line_break as i64))?;
@@ -227,12 +225,6 @@ impl ParquetConverterBuilder {
             ))
         })?;
 
-        let write_properties: ArrowWriterProperties = self.write_properties.ok_or_else(|| {
-            Box::new(SetupError::new(
-                "Required field 'write_properties' was not provided, exiting...",
-            ))
-        })?;
-
         let slicer: FileSlicer = FileSlicer::try_from_path(in_file)?;
 
         let fixed_schema: FixedSchema = FixedSchema::from_path(schema_path)?;
@@ -248,7 +240,7 @@ impl ParquetConverterBuilder {
         let writer: ParquetWriter = ParquetWriter::builder()
             .with_out_path(out_path)
             .with_arrow_schema(arrow_schema)
-            .with_properties(write_properties)
+            .with_properties(self.write_properties)
             .try_build()?;
 
         Ok(ParquetConverter {

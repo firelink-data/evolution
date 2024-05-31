@@ -22,12 +22,13 @@
 // SOFTWARE.
 //
 // File created: 2024-02-05
-// Last updated: 2024-05-27
+// Last updated: 2024-05-31
 //
 
 use clap::{value_parser, ArgAction, Parser, Subcommand};
 use evolution_common::error::Result;
 use evolution_common::thread::get_available_threads;
+use evolution_converter::converter::ParquetConverter;
 #[cfg(feature = "mock")]
 use evolution_mocker::mocker::FixedLengthFileMocker;
 use evolution_target::target::Target;
@@ -193,7 +194,16 @@ impl Cli {
                 Target::Delta => todo!(),
                 Target::Iceberg => todo!(),
                 Target::Ipc => todo!(),
-                Target::Parquet => todo!(),
+                Target::Parquet => {
+                    ParquetConverter::builder()
+                        .with_in_file(in_file.to_path_buf())
+                        .with_schema(schema.to_path_buf())
+                        .with_out_file(out_file.to_path_buf())
+                        .with_num_threads(1)
+                        .with_read_buffer_size(read_buffer_size)
+                        .try_build()?
+                        .try_convert()?;
+                },
             },
             #[cfg(feature = "mock")]
             Commands::Mock {

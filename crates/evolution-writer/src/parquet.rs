@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-05-05
-// Last updated: 2024-05-28
+// Last updated: 2024-05-31
 //
 
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
@@ -68,8 +68,8 @@ impl ParquetWriterBuilder {
     }
 
     /// Set the [`ArrowWriterProperties`] to use for the [`ArrowWriter`].
-    pub fn with_properties(mut self, properties: ArrowWriterProperties) -> Self {
-        self.properties = Some(properties);
+    pub fn with_properties(mut self, properties: Option<ArrowWriterProperties>) -> Self {
+        self.properties = properties;
         self
     }
 

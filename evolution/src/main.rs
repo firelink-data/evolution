@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2023-11-21
-// Last updated: 2024-05-24
+// Last updated: 2024-05-31
 //
 
 use clap::Parser;
@@ -44,7 +44,7 @@ fn main() {
     }
 
     match Cli::parse().run() {
-        Ok(_) => info!("All done, bye! 👋🥳"),
+        Ok(_) => info!("All done, bye! 🦖"),
         Err(e) => error!("{}", e),
     }
 }

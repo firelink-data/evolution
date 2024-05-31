@@ -22,12 +22,14 @@
 // SOFTWARE.
 //
 // File created: 2024-05-07
-// Last updated: 2024-05-30
+// Last updated: 2024-05-31
 //
 
 use arrow::array::BooleanBuilder as BooleanArray;
-use evolution_common::error::Result;
-use evolution_parser::parser::BooleanParser;
+#[cfg(debug_assertions)]
+use log::debug;
+use evolution_common::error::{ExecutionError, Result};
+use evolution_parser::datatype::BooleanParser;
 use log::warn;
 
 use crate::builder::ColumnBuilder;
@@ -61,22 +63,24 @@ impl BooleanColumnBuilder {
 
 impl ColumnBuilder for BooleanColumnBuilder {
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
-        let n_bytes_in_col: usize = match self.parser.try_parse(&bytes) {
-            Ok((n, v)) => {
+        let n_bytes_in_column: usize = match self.parser.try_parse(&bytes, self.n_runes) {
+            (n, Some(v)) => {
                 self.inner.append_value(v);
                 n
             },
-            Err(e) => {
+            (n, None) => {
                 if self.is_nullable {
-                    warn!("");
+                    warn!("Could not parse byte slice to 'Boolean' datatype, appending null.");
                     self.inner.append_null();
                     n
                 } else {
-                    return Err(e);
+                    return Err(Box::new(ExecutionError::new(
+                        "Could not parse byte slice to 'Boolean' datatype, column is not nullable, exiting...",
+                    )));
                 }
             },
         };
 
-        Ok(n_bytes_in_col)
+        Ok(n_bytes_in_column)
     }
 }

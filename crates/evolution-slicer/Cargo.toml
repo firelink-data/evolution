@@ -11,3 +11,4 @@ readme = { workspace = true }
 
 [dependencies]
 evolution-common = { path = "../evolution-common" }
+log = "0.4.21"

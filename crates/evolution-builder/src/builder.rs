@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-05-07
-// Last updated: 2024-05-30
+// Last updated: 2024-05-31
 //
 
 use evolution_common::error::Result;
@@ -49,7 +49,7 @@ pub struct ParquetBuilder {
 
 impl ParquetBuilder {
     ///
-    pub fn try_parse_slice(&mut self, buffer: &[u8]) -> Result<()> {
+    pub fn try_build_from_slice(&mut self, buffer: &[u8]) -> Result<()> {
         let mut idx: usize = 0;
         while idx < buffer.len() {
             for column in self.columns.iter_mut() {

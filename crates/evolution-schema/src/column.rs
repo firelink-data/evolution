@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2023-11-25
-// Last updated: 2024-05-29
+// Last updated: 2024-05-31
 //
 
 use arrow::datatypes::DataType as ArrowDataType;
@@ -30,7 +30,7 @@ use deltalake::kernel::DataType as DeltaDataType;
 use evolution_builder::builder::ColumnBuilderRef;
 use evolution_builder::datatype::BooleanColumnBuilder;
 use evolution_common::datatype::DataType;
-use evolution_parser::parser::BooleanParser;
+use evolution_parser::datatype::BooleanParser;
 use log::warn;
 use padder::{Alignment, Symbol};
 use serde::{Deserialize, Serialize};
@@ -177,6 +177,7 @@ impl FixedColumn {
             DataType::Boolean => Box::new(BooleanColumnBuilder::new(
                 self.name.clone(),
                 self.length,
+                self.is_nullable,
                 BooleanParser::new(self.alignment, self.pad_symbol),
             )),
             DataType::Float16 => todo!(),

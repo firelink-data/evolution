@@ -22,7 +22,9 @@
 // SOFTWARE.
 //
 // File created: 2024-05-08
-// Last updated: 2024-05-29
+// Last updated: 2024-05-31
 //
 
+pub mod datatype;
 pub mod parser;
+pub mod trimmer;

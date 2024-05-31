@@ -22,11 +22,8 @@
 // SOFTWARE.
 //
 // File created: 2024-05-08
-// Last updated: 2024-05-30
+// Last updated: 2024-05-31
 //
-
-use evolution_common::error::Result;
-use padder::{Alignment, Symbol};
 
 ///
 pub trait Parser {}
@@ -34,23 +31,3 @@ pub trait Parser {}
 ///
 pub type ParserRef = Box<dyn Parser>;
 
-///
-pub struct BooleanParser {
-    alignment: Alignment,
-    trim_symbol: Symbol,
-}
-
-impl BooleanParser {
-    ///
-    pub fn new(alignment: Alignment, trim_symbol: Symbol) -> Self {
-        Self {
-            alignment,
-            trim_symbol,
-        }
-    }
-
-    ///
-    pub fn try_parse(&self, bytes: &[u8]) -> Result<(usize, bool)> {
-        todo!()
-    }
-}
