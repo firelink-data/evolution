@@ -1,17 +1,4 @@
-<div align="center">
-<br/>
-<br/>
-<div align="left">
-<br/>
-<p align="center">
-<a href="https://github.com/firelink-data/evolution">
-<img align="center" width=50% src="https://github.com/firelink-data/evolution/blob/e360e5773173d7745cdd609ec3c3abd0a0917ea2/resources/images/evolution-banner.png"></img>
-</a>
-</p>
-</div>
-<br/>
-<br/>
-
+# Evolution
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Crates.io (latest)](https://img.shields.io/crates/v/evolution)](https://crates.io/crates/evolution)
 [![codecov](https://codecov.io/gh/firelink-data/evolution/graph/badge.svg?token=B95DUS13B5)](https://codecov.io/gh/firelink-data/evolution)
@@ -19,16 +6,11 @@
 [![CD](https://github.com/firelink-data/evolution/actions/workflows/cd.yml/badge.svg)](https://github.com/firelink-data/evolution/actions/workflows/cd.yml)
 [![Tests](https://github.com/firelink-data/evolution/actions/workflows/tests.yml/badge.svg)](https://github.com/firelink-data/evolution/actions/workflows/tests.yml)
 
-🦖 *Evolve your fixed-length data files into Apache Parquet, fully parallelized!*
+> 🦖 A modern, platform agnostic, and highly efficient framework that makes it easy to convert and evolve<br/>fixed-length files into robust and future-proof targets, such as, but not limited to, **Parquet**, **Delta**, or **Iceberg**.
 
-</div>
+This repository hosts the **evolution** project which both allows you to convert existing fixed-length files into other data formats, but also allows you to create large amounts of mocked data blazingly fast. The program supports full parallelism and utilizes SIMD techniques, when possible, for highly efficient parsing of data. 
 
-
-## 🔎 Overview
-
-This repository hosts the **evolution** program which both allows you to convert existing fixed-length files into other data formats, but also allows you to create large amounts of mocked data blazingly fast. The program supports full parallelism and utilizes SIMD techniques, when possible, for highly efficient parsing of data. 
-
-To get started, follow the installation, schema setup, and example usage sections below in this README. Happy hacking! 👋🥳
+To get started, follow the installation, schema setup, and example usage sections below in this README.
 
 
 ## 📋 Table of contents
@@ -123,7 +105,7 @@ An example schema can be found [here](https://github.com/firelink-data/evolution
 `Alignment` and `Symbol`, with default implementations as `Alignment::Right` and `Symbol::Whitespace` respectively.
 
 
-## 🚀 Example usage
+## ⚡️ Quick start
 
 If you install the program as explained above then by simply running the binary you will see the following helpful usage print:
 ```
@@ -232,5 +214,5 @@ $ lscpu | grep -E '^Thread|^Core|^Socket|^CPU\('
 The number of logical cores is calculed as: **threads per core X cores per socket X sockets**.
 
 
-## 📜 License
+## ⚠️ License
 All code is to be held under a general MIT license, please see [LICENSE](https://github.com/firelink-data/evolution/blob/main/LICENSE) for specific information.
