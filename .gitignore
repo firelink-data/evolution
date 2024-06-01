@@ -24,3 +24,4 @@ Cargo.lock
 
 # Python virtualenv for testing parquet files etc.
 .python-venv/
+.venv/
