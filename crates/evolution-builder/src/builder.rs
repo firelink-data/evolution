@@ -1,7 +1,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2024 Firelink Data
+// Copyright (c) 2023-2024 Firelink Data
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,9 +22,10 @@
 // SOFTWARE.
 //
 // File created: 2024-05-07
-// Last updated: 2024-05-31
+// Last updated: 2024-06-01
 //
 
+use arrow::array::ArrayRef;
 use evolution_common::error::Result;
 use evolution_common::NUM_BYTES_FOR_NEWLINE;
 
@@ -37,6 +38,7 @@ pub type BuilderRef = Box<dyn Builder>;
 ///
 pub trait ColumnBuilder {
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize>;
+    fn finish(&mut self) -> (&str, ArrayRef);
 }
 
 ///
@@ -59,6 +61,11 @@ impl ParquetBuilder {
         }
 
         Ok(())
+    }
+
+    ///
+    pub fn columns(&mut self) -> &mut Vec<ColumnBuilderRef> {
+        &mut self.columns
     }
 }
 

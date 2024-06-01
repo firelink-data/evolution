@@ -1,7 +1,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2024 Firelink Data
+// Copyright (c) 2023-2024 Firelink Data
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -118,9 +118,9 @@ pub struct IntParser {
 
 impl IntParser {
     ///
-    pub fn new(alignment: Alignment, trim_symbol: Symbol) -> Self {
+    pub fn new() -> Self {
         Self {
-            trimmer: IntTrimmer::new(alignment, trim_symbol),
+            trimmer: IntTrimmer::new(),
         }
     }
 
@@ -130,11 +130,12 @@ impl IntParser {
     where
         T: atoi_simd::Parse + atoi_simd::ParseNeg,
     {
-        let end_byte_idx: usize = self.trimmer.find_byte_indices(bytes, n_runes);
+        let (start_byte_idx, end_byte_idx, n_bytes_in_column): (usize, usize, usize) =
+            self.trimmer.find_byte_indices(bytes, n_runes);
 
-        let value: Option<T> = atoi_simd::parse::<T>(&bytes[..end_byte_idx]).ok();
+        let value: Option<T> = atoi_simd::parse::<T>(&bytes[start_byte_idx..end_byte_idx]).ok();
 
-        (end_byte_idx, value)
+        (n_bytes_in_column, value)
     }
 }
 
@@ -170,7 +171,7 @@ impl Utf8Parser {
         let end_byte_idx: usize = self.trimmer.find_byte_indices(bytes, n_runes);
         let text: &'a str = unsafe { from_utf8_unchecked(&bytes[..end_byte_idx]) };
 
-        (end_byte_idx, Some(text))
+        (end_byte_idx, Some(self.trimmer.trim(text)))
     }
 }
 

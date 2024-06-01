@@ -1,7 +1,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2024 Firelink Data
+// Copyright (c) 2023-2024 Firelink Data
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,15 +22,18 @@
 // SOFTWARE.
 //
 // File created: 2023-11-25
-// Last updated: 2024-05-31
+// Last updated: 2024-06-01
 //
 
 use arrow::datatypes::DataType as ArrowDataType;
 use deltalake::kernel::DataType as DeltaDataType;
 use evolution_builder::builder::ColumnBuilderRef;
-use evolution_builder::datatype::BooleanColumnBuilder;
+use evolution_builder::datatype::{
+    BooleanColumnBuilder, Float16ColumnBuilder, Float32ColumnBuilder, Float64ColumnBuilder,
+    Int16ColumnBuilder, Int32ColumnBuilder, Int64ColumnBuilder, Utf8ColumnBuilder,
+};
 use evolution_common::datatype::DataType;
-use evolution_parser::datatype::BooleanParser;
+use evolution_parser::datatype::{BooleanParser, FloatParser, IntParser, Utf8Parser};
 use log::warn;
 use padder::{Alignment, Symbol};
 use serde::{Deserialize, Serialize};
@@ -180,14 +183,54 @@ impl FixedColumn {
                 self.is_nullable,
                 BooleanParser::new(self.alignment, self.pad_symbol),
             )),
-            DataType::Float16 => todo!(),
-            DataType::Float32 => todo!(),
-            DataType::Float64 => todo!(),
-            DataType::Int16 => todo!(),
-            DataType::Int32 => todo!(),
-            DataType::Int64 => todo!(),
-            DataType::Utf8 => todo!(),
-            DataType::LargeUtf8 => todo!(),
+            DataType::Float16 => Box::new(Float16ColumnBuilder::new(
+                self.name.clone(),
+                self.length,
+                self.is_nullable,
+                FloatParser::new(self.alignment, self.pad_symbol),
+            )),
+            DataType::Float32 => Box::new(Float32ColumnBuilder::new(
+                self.name.clone(),
+                self.length,
+                self.is_nullable,
+                FloatParser::new(self.alignment, self.pad_symbol),
+            )),
+            DataType::Float64 => Box::new(Float64ColumnBuilder::new(
+                self.name.clone(),
+                self.length,
+                self.is_nullable,
+                FloatParser::new(self.alignment, self.pad_symbol),
+            )),
+            DataType::Int16 => Box::new(Int16ColumnBuilder::new(
+                self.name.clone(),
+                self.length,
+                self.is_nullable,
+                IntParser::new(),
+            )),
+            DataType::Int32 => Box::new(Int32ColumnBuilder::new(
+                self.name.clone(),
+                self.length,
+                self.is_nullable,
+                IntParser::new(),
+            )),
+            DataType::Int64 => Box::new(Int64ColumnBuilder::new(
+                self.name.clone(),
+                self.length,
+                self.is_nullable,
+                IntParser::new(),
+            )),
+            DataType::Utf8 => Box::new(Utf8ColumnBuilder::new(
+                self.name.clone(),
+                self.length,
+                self.is_nullable,
+                Utf8Parser::new(self.alignment, self.pad_symbol),
+            )),
+            DataType::LargeUtf8 => Box::new(Utf8ColumnBuilder::new(
+                self.name.clone(),
+                self.length,
+                self.is_nullable,
+                Utf8Parser::new(self.alignment, self.pad_symbol),
+            )),
         }
     }
 }

@@ -1,7 +1,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2024 Firelink Data
+// Copyright (c) 2023-2024 Firelink Data
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -54,12 +54,12 @@ impl TextTrimmer {
     ///
     pub fn find_byte_indices(&self, bytes: &[u8], n_runes: usize) -> usize {
         let mut utf8_byte_unit: usize = 1;
-        let mut n_bytes: usize = 0;
-        let mut found_runes: usize = 0;
+        let mut n_bytes_read: usize = 0;
+        let mut n_found_runes: usize = 0;
 
         let mut iterator: Iter<u8> = bytes.iter();
 
-        while found_runes < n_runes {
+        while n_found_runes < n_runes {
             let byte: u8 = match iterator.nth(utf8_byte_unit - 1) {
                 Some(b) => *b,
                 None => break,
@@ -73,15 +73,15 @@ impl TextTrimmer {
                 _ => panic!("Couldn't parse byte slice, invalid UTF-8 sequence!"),
             };
 
-            found_runes += 1;
-            n_bytes += utf8_byte_unit;
+            n_found_runes += 1;
+            n_bytes_read += utf8_byte_unit;
         }
 
-        if found_runes != n_runes {
+        if n_found_runes != n_runes {
             warn!("Read the entire byte slice but did not find enough runes...");
         }
 
-        n_bytes
+        n_bytes_read
     }
 
     ///
@@ -97,35 +97,36 @@ impl TextTrimmer {
 impl Trimmer for TextTrimmer {}
 
 ///
-pub struct IntTrimmer {
-    alignment: Alignment,
-    symbol: char,
-}
+pub struct IntTrimmer {}
 
 impl IntTrimmer {
     ///
-    pub fn new(alignment: Alignment, symbol: Symbol) -> Self {
-        Self {
-            alignment,
-            symbol: symbol.into(),
-        }
+    pub fn new() -> Self {
+        Self {}
     }
 
-    /// TODO: this can be a specific int implementation, for now it is like any
-    /// other datatype.
-    pub fn find_byte_indices(&self, bytes: &[u8], n_runes: usize) -> usize {
+    /// This function assumes a lot of stuffs, ok. Assume: UTF-8, byte slice somewhere
+    /// contains ASCII numbers (in UTF-8 encoding), we look for these, when we have found
+    /// enough numbers as we want we
+    pub fn find_byte_indices(&self, bytes: &[u8], n_runes: usize) -> (usize, usize, usize) {
         let mut utf8_byte_unit: usize = 1;
-        let mut n_bytes: usize = 0;
-        let mut found_runes: usize = 0;
+        let mut n_bytes_read: usize = 0;
+        let mut n_found_runes: usize = 0;
 
         let mut iterator: Iter<u8> = bytes.iter();
 
-        while found_runes < n_runes {
+        let mut has_found_start_of_number: bool = false;
+        let mut has_found_all_number_bytes: bool = false;
+        let mut start_byte_idx: usize = 0;
+        let mut stop_byte_idx: usize = 0;
+
+        while n_found_runes < n_runes {
             let byte: u8 = match iterator.nth(utf8_byte_unit - 1) {
                 Some(b) => *b,
                 None => break,
             };
 
+            n_bytes_read += utf8_byte_unit;
             utf8_byte_unit = match byte {
                 byte if byte >> 7 == 0 => 1,
                 byte if byte >> 5 == 0b110 => 2,
@@ -134,24 +135,35 @@ impl IntTrimmer {
                 _ => panic!("Couldn't parse byte slice, invalid UTF-8 sequence!"),
             };
 
-            found_runes += 1;
-            n_bytes += utf8_byte_unit;
+            if !has_found_all_number_bytes {
+                if let 48..=57 = byte {
+                    if !has_found_start_of_number {
+                        start_byte_idx = n_bytes_read - utf8_byte_unit;
+                        has_found_start_of_number = true;
+                    }
+
+                    if n_found_runes + 1 == n_runes {
+                        stop_byte_idx = 1 + n_bytes_read - utf8_byte_unit;
+                        has_found_all_number_bytes = true;
+                    }
+                } else {
+                    if has_found_start_of_number {
+                        stop_byte_idx = n_bytes_read - utf8_byte_unit;
+                        has_found_all_number_bytes = true;
+                    }
+                }
+            }
+
+            // A negative number starts here!
+            if !has_found_start_of_number && (byte == 45) {
+                start_byte_idx = n_bytes_read - utf8_byte_unit;
+                has_found_start_of_number = true;
+            }
+
+            n_found_runes += 1;
         }
 
-        if found_runes != n_runes {
-            warn!("Read the entire byte slice but did not find enough runes...");
-        }
-
-        n_bytes
-    }
-
-    ///
-    pub fn trim<'a>(&self, text: &'a str) -> &'a str {
-        match self.alignment {
-            Alignment::Left => text.trim_end_matches::<char>(self.symbol),
-            Alignment::Right => text.trim_start_matches::<char>(self.symbol),
-            Alignment::Center => text.trim_matches::<char>(self.symbol),
-        }
+        (start_byte_idx, stop_byte_idx, n_bytes_read)
     }
 }
 

@@ -1,7 +1,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2024 Firelink Data
+// Copyright (c) 2023-2024 Firelink Data
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,10 +22,12 @@
 // SOFTWARE.
 //
 // File created: 2024-05-05
-// Last updated: 2024-05-31
+// Last updated: 2024-06-01
 //
 
+use arrow::array::{ArrayRef, RecordBatch};
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
+use evolution_builder::builder::ParquetBuilder;
 use evolution_common::error::{Result, SetupError};
 use parquet::arrow::ArrowWriter;
 use parquet::file::properties::WriterProperties as ArrowWriterProperties;
@@ -36,13 +38,34 @@ use std::path::PathBuf;
 ///
 pub struct ParquetWriter {
     inner: ArrowWriter<File>,
+    n_columns: usize,
 }
 
 impl ParquetWriter {
+    ///
     pub fn builder() -> ParquetWriterBuilder {
         ParquetWriterBuilder {
             ..Default::default()
         }
+    }
+
+    /// TODO: NOTE THIS ALLOCATES MEMORY ON THE HEAP!!!
+    pub fn try_write_from_builder(&mut self, builder: &mut ParquetBuilder) -> Result<()> {
+        let mut buffer: Vec<(&str, ArrayRef)> = Vec::with_capacity(self.n_columns);
+        for column_builder in builder.columns().iter_mut() {
+            buffer.push(column_builder.finish());
+        }
+
+        let record_batch: RecordBatch = RecordBatch::try_from_iter(buffer)?;
+        self.inner.write(&record_batch)?;
+
+        Ok(())
+    }
+
+    /// Close and finalize the underlying arrow writer.
+    pub fn finish(&mut self) -> Result<()> {
+        self.inner.finish()?;
+        Ok(())
     }
 }
 
@@ -90,10 +113,12 @@ impl ParquetWriterBuilder {
             ))
         })?;
 
+        let n_columns: usize = schema.all_fields().len();
+
         // Note, here it is OK for no properties to be set.
         let inner: ArrowWriter<File> = ArrowWriter::try_new(out_file, schema, self.properties)?;
 
-        Ok(ParquetWriter { inner })
+        Ok(ParquetWriter { inner, n_columns })
     }
 
     ///

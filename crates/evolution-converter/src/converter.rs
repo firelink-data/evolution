@@ -1,7 +1,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2024 Firelink Data
+// Copyright (c) 2023-2024 Firelink Data
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,22 +22,21 @@
 // SOFTWARE.
 //
 // File created: 2024-02-17
-// Last updated: 2024-05-31
+// Last updated: 2024-06-01
 //
 
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
 use evolution_builder::builder::ParquetBuilder;
-use evolution_common::error::{ExecutionError, Result, SetupError};
+use evolution_common::error::{Result, SetupError};
 use evolution_common::NUM_BYTES_FOR_NEWLINE;
 use evolution_schema::schema::FixedSchema;
 use evolution_slicer::slicer::{FileSlicer, Slicer};
 use evolution_writer::parquet::ParquetWriter;
 #[cfg(debug_assertions)]
 use log::debug;
-use log::{info, warn};
+use log::info;
 use parquet::file::properties::WriterProperties as ArrowWriterProperties;
 
-use std::mem;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -83,6 +82,7 @@ impl ParquetConverter {
     pub fn try_convert_single_threaded(&mut self) -> Result<()> {
         let mut buffer_capacity: usize = self.read_buffer_size;
 
+        info!("Converting flf to parquet in single-threaded mode.");
         info!(
             "The file to convert is {} bytes in total.",
             self.slicer.bytes_to_read(),
@@ -115,6 +115,7 @@ impl ParquetConverter {
                 buffer_capacity - byte_idx_last_line_break - NUM_BYTES_FOR_NEWLINE;
 
             self.builder.try_build_from_slice(&buffer)?;
+            self.writer.try_write_from_builder(&mut self.builder)?;
 
             self.slicer
                 .try_seek_relative(-(n_bytes_left_after_last_line_break as i64))?;
@@ -126,6 +127,17 @@ impl ParquetConverter {
             self.slicer.set_remaining_bytes(remaining_bytes);
             self.slicer.set_bytes_processed(bytes_processed);
             self.slicer.set_bytes_overlapped(bytes_overlapped);
+        }
+
+        self.writer.finish()?;
+
+        info!("Done converting flf to parquet in single-threaded mode!");
+
+        if self.slicer.bytes_overlapped() > 0 {
+            info!(
+                "We read {} bytes two times (due to sliding window overlap).",
+                self.slicer.bytes_overlapped(),
+            );
         }
 
         Ok(())

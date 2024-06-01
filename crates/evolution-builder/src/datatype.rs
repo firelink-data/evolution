@@ -1,7 +1,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2024 Firelink Data
+// Copyright (c) 2023-2024 Firelink Data
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,15 +22,22 @@
 // SOFTWARE.
 //
 // File created: 2024-05-07
-// Last updated: 2024-05-31
+// Last updated: 2024-06-01
 //
 
-use arrow::array::BooleanBuilder as BooleanArray;
+use arrow::array::{
+    ArrayRef, BooleanBuilder as BooleanArray, Float16Builder as Float16Array,
+    Float32Builder as Float32Array, Float64Builder as Float64Array, Int16Builder as Int16Array,
+    Int32Builder as Int32Array, Int64Builder as Int64Array, StringBuilder as Utf8Array,
+};
 use evolution_common::error::{ExecutionError, Result};
-use evolution_parser::datatype::BooleanParser;
+use evolution_parser::datatype::{BooleanParser, FloatParser, IntParser, Utf8Parser};
+use half::f16;
 #[cfg(debug_assertions)]
 use log::debug;
 use log::warn;
+
+use std::sync::Arc;
 
 use crate::builder::ColumnBuilder;
 
@@ -57,6 +64,7 @@ impl BooleanColumnBuilder {
 }
 
 impl ColumnBuilder for BooleanColumnBuilder {
+    ///
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
         let n_bytes_in_column: usize = match self.parser.try_parse(&bytes, self.n_runes) {
             (n, Some(v)) => {
@@ -77,5 +85,374 @@ impl ColumnBuilder for BooleanColumnBuilder {
         };
 
         Ok(n_bytes_in_column)
+    }
+
+    ///
+    fn finish(&mut self) -> (&str, ArrayRef) {
+        (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
+    }
+}
+
+///
+pub struct Float16ColumnBuilder {
+    inner: Float16Array,
+    parser: FloatParser,
+    name: String,
+    n_runes: usize,
+    is_nullable: bool,
+}
+
+impl Float16ColumnBuilder {
+    ///
+    pub fn new(name: String, n_runes: usize, is_nullable: bool, parser: FloatParser) -> Self {
+        Self {
+            inner: Float16Array::new(),
+            parser,
+            name,
+            n_runes,
+            is_nullable,
+        }
+    }
+}
+
+impl ColumnBuilder for Float16ColumnBuilder {
+    ///
+    fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
+        let n_bytes_in_column: usize = match self.parser.try_parse::<f16>(&bytes, self.n_runes) {
+            (n, Some(v)) => {
+                self.inner.append_value(v);
+                n
+            }
+            (n, None) => {
+                if self.is_nullable {
+                    warn!("Could not parse byte slice to 'Float16' datatype, appending null.");
+                    self.inner.append_null();
+                    n
+                } else {
+                    return Err(Box::new(ExecutionError::new(
+                        "Could not parse byte slice to 'Float16' datatype, column is not nullable, exiting...",
+                    )));
+                }
+            }
+        };
+
+        Ok(n_bytes_in_column)
+    }
+
+    ///
+    fn finish(&mut self) -> (&str, ArrayRef) {
+        (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
+    }
+}
+
+///
+pub struct Float32ColumnBuilder {
+    inner: Float32Array,
+    parser: FloatParser,
+    name: String,
+    n_runes: usize,
+    is_nullable: bool,
+}
+
+impl Float32ColumnBuilder {
+    ///
+    pub fn new(name: String, n_runes: usize, is_nullable: bool, parser: FloatParser) -> Self {
+        Self {
+            inner: Float32Array::new(),
+            parser,
+            name,
+            n_runes,
+            is_nullable,
+        }
+    }
+}
+
+impl ColumnBuilder for Float32ColumnBuilder {
+    ///
+    fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
+        let n_bytes_in_column: usize = match self.parser.try_parse::<f32>(&bytes, self.n_runes) {
+            (n, Some(v)) => {
+                self.inner.append_value(v);
+                n
+            }
+            (n, None) => {
+                if self.is_nullable {
+                    warn!("Could not parse byte slice to 'Float32' datatype, appending null.");
+                    self.inner.append_null();
+                    n
+                } else {
+                    return Err(Box::new(ExecutionError::new(
+                        "Could not parse byte slice to 'Float32' datatype, column is not nullable, exiting...",
+                    )));
+                }
+            }
+        };
+
+        Ok(n_bytes_in_column)
+    }
+
+    ///
+    fn finish(&mut self) -> (&str, ArrayRef) {
+        (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
+    }
+}
+
+///
+pub struct Float64ColumnBuilder {
+    inner: Float64Array,
+    parser: FloatParser,
+    name: String,
+    n_runes: usize,
+    is_nullable: bool,
+}
+
+impl Float64ColumnBuilder {
+    ///
+    pub fn new(name: String, n_runes: usize, is_nullable: bool, parser: FloatParser) -> Self {
+        Self {
+            inner: Float64Array::new(),
+            parser,
+            name,
+            n_runes,
+            is_nullable,
+        }
+    }
+}
+
+impl ColumnBuilder for Float64ColumnBuilder {
+    ///
+    fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
+        let n_bytes_in_column: usize = match self.parser.try_parse::<f64>(&bytes, self.n_runes) {
+            (n, Some(v)) => {
+                self.inner.append_value(v);
+                n
+            }
+            (n, None) => {
+                if self.is_nullable {
+                    warn!("Could not parse byte slice to 'Float64' datatype, appending null.");
+                    self.inner.append_null();
+                    n
+                } else {
+                    return Err(Box::new(ExecutionError::new(
+                        "Could not parse byte slice to 'Float64' datatype, column is not nullable, exiting...",
+                    )));
+                }
+            }
+        };
+
+        Ok(n_bytes_in_column)
+    }
+
+    ///
+    fn finish(&mut self) -> (&str, ArrayRef) {
+        (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
+    }
+}
+
+///
+pub struct Int16ColumnBuilder {
+    inner: Int16Array,
+    parser: IntParser,
+    name: String,
+    n_runes: usize,
+    is_nullable: bool,
+}
+
+impl Int16ColumnBuilder {
+    ///
+    pub fn new(name: String, n_runes: usize, is_nullable: bool, parser: IntParser) -> Self {
+        Self {
+            inner: Int16Array::new(),
+            parser,
+            name,
+            n_runes,
+            is_nullable,
+        }
+    }
+}
+
+impl ColumnBuilder for Int16ColumnBuilder {
+    ///
+    fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
+        let n_bytes_in_column: usize = match self.parser.try_parse::<i16>(&bytes, self.n_runes) {
+            (n, Some(v)) => {
+                self.inner.append_value(v);
+                n
+            }
+            (n, None) => {
+                if self.is_nullable {
+                    warn!("Could not parse byte slice to 'Int16' datatype, appending null.");
+                    self.inner.append_null();
+                    n
+                } else {
+                    return Err(Box::new(ExecutionError::new(
+                        "Could not parse byte slice to 'Int16' datatype, column is not nullable, exiting...",
+                    )));
+                }
+            }
+        };
+
+        Ok(n_bytes_in_column)
+    }
+
+    ///
+    fn finish(&mut self) -> (&str, ArrayRef) {
+        (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
+    }
+}
+
+///
+pub struct Int32ColumnBuilder {
+    inner: Int32Array,
+    parser: IntParser,
+    name: String,
+    n_runes: usize,
+    is_nullable: bool,
+}
+
+impl Int32ColumnBuilder {
+    ///
+    pub fn new(name: String, n_runes: usize, is_nullable: bool, parser: IntParser) -> Self {
+        Self {
+            inner: Int32Array::new(),
+            parser,
+            name,
+            n_runes,
+            is_nullable,
+        }
+    }
+}
+
+impl ColumnBuilder for Int32ColumnBuilder {
+    ///
+    fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
+        let n_bytes_in_column: usize = match self.parser.try_parse::<i32>(&bytes, self.n_runes) {
+            (n, Some(v)) => {
+                self.inner.append_value(v);
+                n
+            }
+            (n, None) => {
+                if self.is_nullable {
+                    warn!("Could not parse byte slice to 'Int32' datatype, appending null.");
+                    self.inner.append_null();
+                    n
+                } else {
+                    return Err(Box::new(ExecutionError::new(
+                        "Could not parse byte slice to 'Int32' datatype, column is not nullable, exiting...",
+                    )));
+                }
+            }
+        };
+
+        Ok(n_bytes_in_column)
+    }
+
+    ///
+    fn finish(&mut self) -> (&str, ArrayRef) {
+        (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
+    }
+}
+
+///
+pub struct Int64ColumnBuilder {
+    inner: Int64Array,
+    parser: IntParser,
+    name: String,
+    n_runes: usize,
+    is_nullable: bool,
+}
+
+impl Int64ColumnBuilder {
+    ///
+    pub fn new(name: String, n_runes: usize, is_nullable: bool, parser: IntParser) -> Self {
+        Self {
+            inner: Int64Array::new(),
+            parser,
+            name,
+            n_runes,
+            is_nullable,
+        }
+    }
+}
+
+impl ColumnBuilder for Int64ColumnBuilder {
+    ///
+    fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
+        let n_bytes_in_column: usize = match self.parser.try_parse::<i64>(&bytes, self.n_runes) {
+            (n, Some(v)) => {
+                self.inner.append_value(v);
+                n
+            }
+            (n, None) => {
+                if self.is_nullable {
+                    warn!("Could not parse byte slice to 'Int64' datatype, appending null.");
+                    self.inner.append_null();
+                    n
+                } else {
+                    return Err(Box::new(ExecutionError::new(
+                        "Could not parse byte slice to 'Int64' datatype, column is not nullable, exiting...",
+                    )));
+                }
+            }
+        };
+
+        Ok(n_bytes_in_column)
+    }
+
+    ///
+    fn finish(&mut self) -> (&str, ArrayRef) {
+        (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
+    }
+}
+
+///
+pub struct Utf8ColumnBuilder {
+    inner: Utf8Array,
+    parser: Utf8Parser,
+    name: String,
+    n_runes: usize,
+    is_nullable: bool,
+}
+
+impl Utf8ColumnBuilder {
+    ///
+    pub fn new(name: String, n_runes: usize, is_nullable: bool, parser: Utf8Parser) -> Self {
+        Self {
+            inner: Utf8Array::new(),
+            parser,
+            name,
+            n_runes,
+            is_nullable,
+        }
+    }
+}
+
+impl ColumnBuilder for Utf8ColumnBuilder {
+    ///
+    fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
+        let n_bytes_in_column: usize = match self.parser.try_parse(&bytes, self.n_runes) {
+            (n, Some(v)) => {
+                self.inner.append_value(v);
+                n
+            }
+            (n, None) => {
+                if self.is_nullable {
+                    warn!("Could not parse byte slice to 'Int64' datatype, appending null.");
+                    self.inner.append_null();
+                    n
+                } else {
+                    return Err(Box::new(ExecutionError::new(
+                        "Could not parse byte slice to 'Int64' datatype, column is not nullable, exiting...",
+                    )));
+                }
+            }
+        };
+
+        Ok(n_bytes_in_column)
+    }
+
+    ///
+    fn finish(&mut self) -> (&str, ArrayRef) {
+        (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
     }
 }
