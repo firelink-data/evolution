@@ -136,9 +136,9 @@ impl FileSlicer {
                 ErrorKind::UnexpectedEof => {
                     warn!("EOF reached, this should be the last time reading from the file.");
                     Ok(())
-                },
-                _ => Err(Box::new(e))
-            }
+                }
+                _ => Err(Box::new(e)),
+            },
         }
     }
 

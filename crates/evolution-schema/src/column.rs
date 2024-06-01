@@ -38,7 +38,7 @@ use serde::{Deserialize, Serialize};
 /// A blank trait to allow developers to create their own column implementations.
 pub trait Column {}
 
-/// 
+///
 pub type ColumnRef = Box<dyn Column>;
 
 /// Representation of a column in a fixed-length file (.flf), containing the only allowed fields.
@@ -155,7 +155,7 @@ impl FixedColumn {
             DataType::Float16 => {
                 warn!("Casting Float16 to Float32 for deltalake compatibility.");
                 DeltaDataType::FLOAT
-            },
+            }
             DataType::Float32 => DeltaDataType::FLOAT,
             DataType::Float64 => DeltaDataType::DOUBLE,
             DataType::Int16 => DeltaDataType::SHORT,
@@ -167,7 +167,7 @@ impl FixedColumn {
     }
 
     /// Create a new [`ColumnBuilderRef`] based on the datatype of the column.
-    /// 
+    ///
     /// # Performance
     /// This method will clone the String which contains the name of the column.
     /// You should only use this during setup of the program, and not during any

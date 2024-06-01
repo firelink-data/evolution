@@ -109,8 +109,7 @@ impl ParquetConverter {
             let mut buffer: Vec<u8> = vec![0u8; buffer_capacity];
             self.slicer.try_read_to_buffer(&mut buffer)?;
 
-            let byte_idx_last_line_break: usize = self.slicer
-                .try_find_last_line_break(&buffer)?;
+            let byte_idx_last_line_break: usize = self.slicer.try_find_last_line_break(&buffer)?;
 
             let n_bytes_left_after_last_line_break: usize =
                 buffer_capacity - byte_idx_last_line_break - NUM_BYTES_FOR_NEWLINE;
@@ -231,11 +230,9 @@ impl ParquetConverterBuilder {
 
         // Here it is okay to clone the entire struct, since this is not executed
         // during any heavy workload, and should only happen during setup.
-        let builder: ParquetBuilder = fixed_schema.clone()
-            .into_builder::<ParquetBuilder>();
+        let builder: ParquetBuilder = fixed_schema.clone().into_builder::<ParquetBuilder>();
 
-        let arrow_schema: ArrowSchemaRef =
-            Arc::new(fixed_schema.into_arrow_schema());
+        let arrow_schema: ArrowSchemaRef = Arc::new(fixed_schema.into_arrow_schema());
 
         let writer: ParquetWriter = ParquetWriter::builder()
             .with_out_path(out_path)

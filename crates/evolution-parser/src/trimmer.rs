@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-05-31
-// Last updated: 2024-05-31
+// Last updated: 2024-06-01
 //
 
 use log::warn;
@@ -57,7 +57,7 @@ impl TextTrimmer {
         let mut n_bytes: usize = 0;
         let mut found_runes: usize = 0;
 
-        let mut iterator: Iter<u8> = bytes.iter(); 
+        let mut iterator: Iter<u8> = bytes.iter();
 
         while found_runes < n_runes {
             let byte: u8 = match iterator.nth(utf8_byte_unit - 1) {
@@ -94,3 +94,126 @@ impl TextTrimmer {
     }
 }
 
+impl Trimmer for TextTrimmer {}
+
+///
+pub struct IntTrimmer {
+    alignment: Alignment,
+    symbol: char,
+}
+
+impl IntTrimmer {
+    ///
+    pub fn new(alignment: Alignment, symbol: Symbol) -> Self {
+        Self {
+            alignment,
+            symbol: symbol.into(),
+        }
+    }
+
+    /// TODO: this can be a specific int implementation, for now it is like any
+    /// other datatype.
+    pub fn find_byte_indices(&self, bytes: &[u8], n_runes: usize) -> usize {
+        let mut utf8_byte_unit: usize = 1;
+        let mut n_bytes: usize = 0;
+        let mut found_runes: usize = 0;
+
+        let mut iterator: Iter<u8> = bytes.iter();
+
+        while found_runes < n_runes {
+            let byte: u8 = match iterator.nth(utf8_byte_unit - 1) {
+                Some(b) => *b,
+                None => break,
+            };
+
+            utf8_byte_unit = match byte {
+                byte if byte >> 7 == 0 => 1,
+                byte if byte >> 5 == 0b110 => 2,
+                byte if byte >> 4 == 0b1110 => 3,
+                byte if byte >> 3 == 0b11110 => 4,
+                _ => panic!("Couldn't parse byte slice, invalid UTF-8 sequence!"),
+            };
+
+            found_runes += 1;
+            n_bytes += utf8_byte_unit;
+        }
+
+        if found_runes != n_runes {
+            warn!("Read the entire byte slice but did not find enough runes...");
+        }
+
+        n_bytes
+    }
+
+    ///
+    pub fn trim<'a>(&self, text: &'a str) -> &'a str {
+        match self.alignment {
+            Alignment::Left => text.trim_end_matches::<char>(self.symbol),
+            Alignment::Right => text.trim_start_matches::<char>(self.symbol),
+            Alignment::Center => text.trim_matches::<char>(self.symbol),
+        }
+    }
+}
+
+impl Trimmer for IntTrimmer {}
+
+///
+pub struct FloatTrimmer {
+    alignment: Alignment,
+    symbol: char,
+}
+
+impl FloatTrimmer {
+    ///
+    pub fn new(alignment: Alignment, symbol: Symbol) -> Self {
+        Self {
+            alignment,
+            symbol: symbol.into(),
+        }
+    }
+
+    /// TODO: this can be a specific int implementation, for now it is like any
+    /// other datatype.
+    pub fn find_byte_indices(&self, bytes: &[u8], n_runes: usize) -> usize {
+        let mut utf8_byte_unit: usize = 1;
+        let mut n_bytes: usize = 0;
+        let mut found_runes: usize = 0;
+
+        let mut iterator: Iter<u8> = bytes.iter();
+
+        while found_runes < n_runes {
+            let byte: u8 = match iterator.nth(utf8_byte_unit - 1) {
+                Some(b) => *b,
+                None => break,
+            };
+
+            utf8_byte_unit = match byte {
+                byte if byte >> 7 == 0 => 1,
+                byte if byte >> 5 == 0b110 => 2,
+                byte if byte >> 4 == 0b1110 => 3,
+                byte if byte >> 3 == 0b11110 => 4,
+                _ => panic!("Couldn't parse byte slice, invalid UTF-8 sequence!"),
+            };
+
+            found_runes += 1;
+            n_bytes += utf8_byte_unit;
+        }
+
+        if found_runes != n_runes {
+            warn!("Read the entire byte slice but did not find enough runes...");
+        }
+
+        n_bytes
+    }
+
+    ///
+    pub fn trim<'a>(&self, text: &'a str) -> &'a str {
+        match self.alignment {
+            Alignment::Left => text.trim_end_matches::<char>(self.symbol),
+            Alignment::Right => text.trim_start_matches::<char>(self.symbol),
+            Alignment::Center => text.trim_matches::<char>(self.symbol),
+        }
+    }
+}
+
+impl Trimmer for FloatTrimmer {}

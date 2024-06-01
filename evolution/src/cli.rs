@@ -203,7 +203,7 @@ impl Cli {
                         .with_read_buffer_size(read_buffer_size)
                         .try_build()?
                         .try_convert()?;
-                },
+                }
             },
             #[cfg(feature = "mock")]
             Commands::Mock {

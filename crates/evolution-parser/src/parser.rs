@@ -30,4 +30,3 @@ pub trait Parser {}
 
 ///
 pub type ParserRef = Box<dyn Parser>;
-

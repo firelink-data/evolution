@@ -26,10 +26,10 @@
 //
 
 use arrow::array::BooleanBuilder as BooleanArray;
-#[cfg(debug_assertions)]
-use log::debug;
 use evolution_common::error::{ExecutionError, Result};
 use evolution_parser::datatype::BooleanParser;
+#[cfg(debug_assertions)]
+use log::debug;
 use log::warn;
 
 use crate::builder::ColumnBuilder;
@@ -45,12 +45,7 @@ pub struct BooleanColumnBuilder {
 
 impl BooleanColumnBuilder {
     ///
-    pub fn new(
-        name: String,
-        n_runes: usize,
-        is_nullable: bool,
-        parser: BooleanParser,
-    ) -> Self {
+    pub fn new(name: String, n_runes: usize, is_nullable: bool, parser: BooleanParser) -> Self {
         Self {
             inner: BooleanArray::new(),
             parser,
@@ -67,7 +62,7 @@ impl ColumnBuilder for BooleanColumnBuilder {
             (n, Some(v)) => {
                 self.inner.append_value(v);
                 n
-            },
+            }
             (n, None) => {
                 if self.is_nullable {
                     warn!("Could not parse byte slice to 'Boolean' datatype, appending null.");
@@ -78,7 +73,7 @@ impl ColumnBuilder for BooleanColumnBuilder {
                         "Could not parse byte slice to 'Boolean' datatype, column is not nullable, exiting...",
                     )));
                 }
-            },
+            }
         };
 
         Ok(n_bytes_in_column)

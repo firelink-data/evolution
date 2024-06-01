@@ -10,6 +10,7 @@ license = { workspace = true }
 readme = { workspace = true }
 
 [dependencies]
+atoi_simd = "0.16.0"
 evolution-common = { path = "../evolution-common" }
 log = "0.4.21"
 padder = "1.2.0"

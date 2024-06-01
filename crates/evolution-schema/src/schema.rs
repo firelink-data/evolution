@@ -190,9 +190,10 @@ impl FixedSchema {
     /// Consume the [`FixedSchema`] and produce an instance of a [`Builder`] from it.
     pub fn into_builder<T>(self) -> T
     where
-        T: Builder
+        T: Builder,
     {
-        let column_builders = self.columns
+        let column_builders = self
+            .columns
             .iter()
             .map(|c| c.as_column_builder())
             .collect::<Vec<ColumnBuilderRef>>();
