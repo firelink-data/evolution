@@ -45,7 +45,7 @@ arrow = "51.0.0"
 parquet = "51.0.0"
 arrow-ipc = "51.0.0"
 deltalake =  { version="0.17.3", features = ["datafusion"]}
-datafusion = "38.0.0"
+datafusion = "41.0.0"
 
 deltalake-core = "0.17.3"
 
