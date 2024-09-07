@@ -152,7 +152,44 @@ impl FileSlicer {
         self.inner.read_exact(buffer).unwrap();
     }
 
+    /// Try and find the last linebreak character in a byte slice and return the index
+    /// of the character. The function looks specifically for two character, the
+    /// carriage-return (CR) and line-feed (LF) characters, represented as the character
+    /// sequence '\r\n' on Windows systems.
     ///
+    /// # Errors
+    /// If either the byte slice to search through was empty, or there existed no linebreak
+    /// character in the byte slice.
+    #[cfg(target_os = "windows")]
+    pub fn try_find_last_line_break(&self, bytes: &[u8]) -> Result<usize> {
+        if bytes.is_empty() {
+            return Err(Box::new(ExecutionError::new(
+                "Byte slice to find newlines in was empty, exiting...",
+            )));
+        };
+
+        let mut idx: usize = bytes.len() - 1;
+
+        while idx > 1 {
+            if (bytes[idx - 1] == 0x0d) && (bytes[idx] == 0x0a) {
+                return Ok(idx - 1);
+            };
+
+            idx -= 1;
+        }
+
+        Err(Box::new(ExecutionError::new(
+            "Could not find any newlines in byte slice, exiting...",
+        )))
+    }
+
+    /// Try and find the last linebreak character in a byte slice and return the index
+    /// of the character. The function looks specifically for a line-feed (LF) character,
+    /// represented as '\n' on Unix systems.
+    ///
+    /// # Errors
+    /// If either the byte slice to search through was empty, or there existed no linebreak
+    /// character in the byte slice.
     #[cfg(not(target_os = "windows"))]
     pub fn try_find_last_line_break(&self, bytes: &[u8]) -> Result<usize> {
         if bytes.is_empty() {
