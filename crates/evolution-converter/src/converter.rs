@@ -73,12 +73,31 @@ impl ParquetConverter {
         Ok(())
     }
 
+    /// Converts the target file in multithreaded mode.
     ///
+    /// # Panics ?
+    /// ...
+    ///
+    /// # Errors
+    /// ...
     pub fn try_convert_multithreaded(&mut self) -> Result<()> {
-        todo!()
+        info!("Converting flf to parquet in multithreaded mode.");
+        info!(
+            "The file to convert is {} bytes in total.",
+            self.slicer.bytes_to_read(),
+        );
+
+        todo!();
+
     }
 
+    /// Converts the target file in single-threaded mode.
     ///
+    /// # Panics ?
+    /// ...
+    ///
+    /// # Errors
+    /// ...
     pub fn try_convert_single_threaded(&mut self) -> Result<()> {
         let mut buffer_capacity: usize = self.read_buffer_size;
 
