@@ -58,6 +58,16 @@ pub(crate) struct Cli {
     )]
     n_threads: usize,
 
+    /// The maximum amount of messages that can be accumulated in the thread channels before holding.
+    #[arg(
+        short = 'C',
+        long = "thread-channel-capacity",
+        action = ArgAction::Set,
+        value_parser = value_parser!(usize),
+        required = false,
+    )]
+    thread_channel_capacity: Option<usize>,
+
     /// The size of the read buffer used when converting (in bytes).
     #[arg(
         short = 'R',
@@ -201,6 +211,7 @@ impl Cli {
                         .with_out_file(out_file.to_path_buf())
                         .with_num_threads(n_threads)
                         .with_read_buffer_size(read_buffer_size)
+                        .with_thread_channel_capacity(self.thread_channel_capacity)
                         .try_build()?
                         .try_convert()?;
                 }

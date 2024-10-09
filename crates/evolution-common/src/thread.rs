@@ -22,11 +22,12 @@
 // SOFTWARE.
 //
 // File created: 2024-05-07
-// Last updated: 2024-05-26
+// Last updated: 2024-10-09
 //
 
 use log::warn;
 
+///
 pub fn get_available_threads(n_wanted_threads: usize) -> usize {
     let n_available_threads: usize = num_cpus::get();
 
@@ -42,4 +43,12 @@ pub fn get_available_threads(n_wanted_threads: usize) -> usize {
         return n_available_threads;
     }
     n_wanted_threads
+}
+
+/// TODO: actually do an estimation based on the available system memory etc.
+/// This is just a heuristic, scale a large capacity with the number of threads linearly.
+pub fn estimate_best_thread_channel_capacity(
+    n_threads: usize,
+) -> usize {
+    256 / n_threads
 }

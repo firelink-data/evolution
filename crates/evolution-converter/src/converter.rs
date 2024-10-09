@@ -22,19 +22,26 @@
 // SOFTWARE.
 //
 // File created: 2024-02-17
-// Last updated: 2024-06-01
+// Last updated: 2024-10-09
 //
 
+use arrow::buffer;
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
+use arrow::record_batch::RecordBatch;
+use crossbeam::{channel, scope, thread};
+use crossbeam::thread::ScopedJoinHandle;
+
 use evolution_builder::builder::ParquetBuilder;
 use evolution_common::error::{Result, SetupError};
+use evolution_common::thread::estimate_best_thread_channel_capacity;
 use evolution_common::NUM_BYTES_FOR_NEWLINE;
 use evolution_schema::schema::FixedSchema;
 use evolution_slicer::slicer::{FileSlicer, Slicer};
 use evolution_writer::parquet::ParquetWriter;
+
 #[cfg(debug_assertions)]
 use log::debug;
-use log::info;
+use log::{info, Record};
 use parquet::file::properties::WriterProperties as ArrowWriterProperties;
 
 use std::path::PathBuf;
@@ -51,8 +58,11 @@ pub struct ParquetConverter {
     slicer: FileSlicer,
     writer: ParquetWriter,
     builder: ParquetBuilder,
-    n_threads: usize,
+    schema: FixedSchema,
     read_buffer_size: usize,
+
+    n_threads: usize,
+    thread_channel_capacity: usize,
 }
 
 impl ParquetConverter {
@@ -81,14 +91,67 @@ impl ParquetConverter {
     /// # Errors
     /// ...
     pub fn try_convert_multithreaded(&mut self) -> Result<()> {
+        let mut buffer_capacity = self.read_buffer_size;
+        let n_worker_threads: usize = self.n_threads - 1;
+
         info!("Converting flf to parquet in multithreaded mode.");
         info!(
             "The file to convert is {} bytes in total.",
             self.slicer.bytes_to_read(),
         );
 
-        todo!();
+        let mut line_break_indices: Vec<usize> =
+            Vec::with_capacity(buffer_capacity);
 
+        let mut worker_line_break_indices: Vec<(usize, usize)> =
+            Vec::with_capacity(n_worker_threads);
+
+        loop {
+            if self.slicer.is_done() {
+                break;
+            }
+
+            let mut remaining_bytes: usize = self.slicer.remaining_bytes();
+            let mut bytes_processed: usize = self.slicer.bytes_processed();
+            let mut bytes_overlapped: usize = self.slicer.bytes_overlapped();
+
+            if remaining_bytes < buffer_capacity {
+                buffer_capacity = remaining_bytes;
+            }
+
+            let mut buffer: Vec<u8> = vec![0u8; buffer_capacity];
+            self.slicer.try_read_to_buffer(&mut buffer)?;
+            self.slicer.try_find_line_breaks(&buffer, &mut line_break_indices)?;
+
+            let byte_idx_last_line_break: usize = self.slicer.try_find_last_line_break(&buffer)?;
+            let n_bytes_left_after_last_line_break: usize =
+                buffer_capacity - byte_idx_last_line_break - NUM_BYTES_FOR_NEWLINE;
+
+            self.distribute_worker_thread_workloads(
+                &line_break_indices,
+                &mut worker_line_break_indices,
+            );
+
+            self.spawn_threads(
+                &buffer,
+                &line_break_indices,
+                &worker_line_break_indices,
+            )?;
+
+            self.slicer
+                .try_seek_relative(-(n_bytes_left_after_last_line_break as i64))?;
+
+            bytes_processed += buffer_capacity - n_bytes_left_after_last_line_break;
+            bytes_overlapped += n_bytes_left_after_last_line_break;
+            remaining_bytes -= buffer_capacity - n_bytes_left_after_last_line_break;
+
+            self.slicer.set_remaining_bytes(remaining_bytes);
+            self.slicer.set_bytes_processed(bytes_processed);
+            self.slicer.set_bytes_overlapped(bytes_overlapped);
+
+        }
+
+        Ok(())
     }
 
     /// Converts the target file in single-threaded mode.
@@ -129,7 +192,6 @@ impl ParquetConverter {
             self.slicer.try_read_to_buffer(&mut buffer)?;
 
             let byte_idx_last_line_break: usize = self.slicer.try_find_last_line_break(&buffer)?;
-
             let n_bytes_left_after_last_line_break: usize =
                 buffer_capacity - byte_idx_last_line_break - NUM_BYTES_FOR_NEWLINE;
 
@@ -161,6 +223,65 @@ impl ParquetConverter {
 
         Ok(())
     }
+
+    /// Divide the current buffer into chunks for each worker thread based on the line breaks.
+    /// 
+    /// # Note
+    /// The workload will attempt to be uniform on each worker, however, the worker with the
+    /// last index might get some extra lines to process due to number of rows now being
+    /// divisible by the estimated number of rows per thread.
+    fn distribute_worker_thread_workloads(
+        &self,
+        line_break_indices: &[usize],
+        thread_workloads: &mut Vec<(usize, usize)>,
+    ) {
+        let n_line_break_indices: usize = line_break_indices.len();
+        let n_rows_per_thread: usize = n_line_break_indices / thread_workloads.capacity(); // usize division will floor the result
+
+        let mut prev_line_break_idx: usize = 0;
+        for worker_idx in 1..(thread_workloads.capacity()) {
+            let next_line_break_idx: usize = n_rows_per_thread * worker_idx;
+            thread_workloads.push((prev_line_break_idx, next_line_break_idx));
+            prev_line_break_idx = next_line_break_idx;
+        }
+
+        thread_workloads.push((prev_line_break_idx, n_line_break_indices))
+    }
+
+    ///
+    fn spawn_threads(
+        &mut self,
+        buffer: &Vec<u8>,
+        line_breaks: &[usize],
+        thread_workloads: &[(usize, usize)],
+    ) -> Result<()> {
+        let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
+        let arc_buffer: Arc<&Vec<u8>> = Arc::new(buffer);
+        let arc_slicer: Arc<&FileSlicer> = Arc::new(&self.slicer);
+
+        let _ = scope(|s| {
+            #[cfg(debug_assertions)]
+            debug!("Starting {} worker threads for convertion.", thread_workloads.len());
+
+            let threads = thread_workloads
+            .iter()
+            .map(|(from, to)| {
+                let t_sender: channel::Sender<RecordBatch> = sender.clone();
+                let t_line_breaks: &[usize] = &line_breaks[*from..*to];
+                let t_buffer: Arc<&Vec<u8>> = arc_buffer.clone();
+                let t_slicer: Arc<&FileSlicer> = arc_slicer.clone();
+
+                // Can we do this in another way? So we don't have to allocate a bunch of stuff in our loop...
+                let mut t_builders: ParquetBuilder = self.schema.clone().into_builder();
+                s.spawn(move |_| {
+                    todo!()
+                })
+            })
+            .collect::<Vec<ScopedJoinHandle<()>>>();
+        });
+
+        Ok(())
+    }
 }
 
 impl Converter for ParquetConverter {}
@@ -173,6 +294,7 @@ pub struct ParquetConverterBuilder {
     out_path: Option<PathBuf>,
     n_threads: Option<usize>,
     read_buffer_size: Option<usize>,
+    thread_channel_capacity: Option<usize>,
     write_properties: Option<ArrowWriterProperties>,
 }
 
@@ -210,6 +332,13 @@ impl ParquetConverterBuilder {
     /// Set the properties of the [`ArrowWriter`] which writes to parquet.
     pub fn with_write_properties(mut self, properties: ArrowWriterProperties) -> Self {
         self.write_properties = Some(properties);
+        self
+    }
+
+    /// Set the maximum message capacity on the multithreaded converter thread channels.
+    /// See https://docs.rs/crossbeam/latest/crossbeam/channel/fn.bounded.html for specifics.
+    pub fn with_thread_channel_capacity(mut self, thread_channel_capacity: Option<usize>) -> Self {
+        self.thread_channel_capacity = thread_channel_capacity;
         self
     }
 
@@ -255,15 +384,16 @@ impl ParquetConverterBuilder {
             ))
         })?;
 
-        let slicer: FileSlicer = FileSlicer::try_from_path(in_file)?;
+        let thread_channel_capacity: usize =
+            self.thread_channel_capacity.or(Some(estimate_best_thread_channel_capacity(n_threads))).unwrap();
 
-        let fixed_schema: FixedSchema = FixedSchema::from_path(schema_path)?;
+        let slicer: FileSlicer = FileSlicer::try_from_path(in_file)?;
+        let schema: FixedSchema = FixedSchema::from_path(schema_path)?;
 
         // Here it is okay to clone the entire struct, since this is not executed
         // during any heavy workload, and should only happen during setup.
-        let builder: ParquetBuilder = fixed_schema.clone().into_builder::<ParquetBuilder>();
-
-        let arrow_schema: ArrowSchemaRef = Arc::new(fixed_schema.into_arrow_schema());
+        let builder: ParquetBuilder = schema.clone().into_builder::<ParquetBuilder>();
+        let arrow_schema: ArrowSchemaRef = Arc::new(schema.clone().into_arrow_schema());
 
         let writer: ParquetWriter = ParquetWriter::builder()
             .with_out_path(out_path)
@@ -275,8 +405,10 @@ impl ParquetConverterBuilder {
             slicer,
             writer,
             builder,
-            n_threads,
+            schema,
             read_buffer_size,
+            n_threads,
+            thread_channel_capacity,
         })
     }
 }
