@@ -47,7 +47,7 @@ arrow-ipc = "51.0.0"
 deltalake =  { version="0.17.3", features = ["datafusion"]}
 datafusion = "38.0.0"
 
-deltalake-core = "0.17.3"
+deltalake-core = "0.20.1"
 
 padder = { version = "1.2.0", features = ["serde"] }
 ordered-channel="1.1.0"
