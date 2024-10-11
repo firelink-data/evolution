@@ -26,9 +26,10 @@
 //
 
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
-use crossbeam::thread::ScopedJoinHandle;
 use crossbeam::channel;
 use crossbeam::thread::scope;
+use crossbeam::thread::ScopedJoinHandle;
+use parquet::file::properties::WriterProperties as ArrowWriterProperties;
 
 use evolution_builder::builder::ParquetBuilder;
 use evolution_common::error::{ExecutionError, Result, SetupError};
@@ -41,7 +42,6 @@ use evolution_writer::parquet::ParquetWriter;
 #[cfg(debug_assertions)]
 use log::debug;
 use log::info;
-use parquet::file::properties::WriterProperties as ArrowWriterProperties;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -268,19 +268,19 @@ impl ParquetConverter {
     /// Spawn the threads which perform the conversion, specifically, n-1 threads will work on converting and 1
     /// thread will collect and buffer the converted results and write those to parquet file, where n was the
     /// specified number of threads for the program.
-    /// 
+    ///
     /// The threading is implemented using [`crossbeam`] and might perform differently depending on host system.
-    /// 
+    ///
     /// # Panics
     /// This function will panic and terminate execution for the following reasons:
     /// * If the [`ParquetBuilder`] was unable to parse a column to its expected format.
     /// * If a thread not being able to communicate through the channel due to it being disconnected.
     /// * If the [`ParquetWriter`] could not write the parsed columns as a [`RecordBatch`].
     /// * If any worker thread could not join the main thread from its handle.
-    /// 
+    ///
     /// # Errors
     /// If and only if the thread scope closure returned an error, which will propagate an [`ExecutionError`].
-    /// 
+    ///
     /// [`RecordBatch`]: arrow::array::RecordBatch
     fn spawn_converter_threads(
         &mut self,
@@ -341,7 +341,11 @@ impl ParquetConverter {
 
         if thread_result.is_err() {
             return Err(Box::new(ExecutionError::new(
-                format!("One of the scoped threads returned an error: {:?}", thread_result).as_str(),
+                format!(
+                    "One of the scoped threads returned an error: {:?}",
+                    thread_result
+                )
+                .as_str(),
             )));
         }
 
