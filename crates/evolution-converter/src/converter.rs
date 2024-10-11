@@ -73,8 +73,14 @@ impl ParquetConverter {
         }
     }
 
-    /// Try and convert the provided fixed-length file to parquet output format. Will propagate any
-    /// errors created in any of the conversion modes (single-threaded or multithreaded).
+    /// Try and convert the provided fixed-length file to parquet output format. 
+    /// 
+    /// # Errors
+    /// This function will propagate any errors created in any of the conversion modes, see any
+    /// of the functions [`try_convert_multithreaded`] or [`try_convert_single_threaded`] for specifics.
+    /// 
+    /// [`try_convert_multithreaded`]: ParquetConverter::try_convert_multithreaded
+    /// [`try_convert_single_threaded`]: ParquetConverter::try_convert_single_threaded
     pub fn try_convert(&mut self) -> Result<()> {
         if self.n_threads > 1 {
             self.try_convert_multithreaded()?;
