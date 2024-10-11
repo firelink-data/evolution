@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-05-05
-// Last updated: 2024-06-01
+// Last updated: 2024-10-11
 //
 
 use arrow::array::{ArrayRef, RecordBatch};
@@ -63,7 +63,7 @@ impl ParquetWriter {
     }
 
     /// Close and finalize the underlying arrow writer.
-    pub fn finish(&mut self) -> Result<()> {
+    pub fn try_finish(&mut self) -> Result<()> {
         self.inner.finish()?;
         Ok(())
     }

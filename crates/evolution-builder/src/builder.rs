@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-05-07
-// Last updated: 2024-06-01
+// Last updated: 2024-10-11
 //
 
 use arrow::array::ArrayRef;
@@ -36,7 +36,7 @@ pub trait Builder: From<Vec<ColumnBuilderRef>> {}
 pub type BuilderRef = Box<dyn Builder>;
 
 ///
-pub trait ColumnBuilder {
+pub trait ColumnBuilder: Send + Sync {
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize>;
     fn finish(&mut self) -> (&str, ArrayRef);
 }

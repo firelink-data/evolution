@@ -221,12 +221,23 @@ impl FileSlicer {
     /// # Errors
     /// If the byte slice to search through was empty.
     #[cfg(target_os = "windows")]
-    pub fn try_find_line_breaks(&self, bytes: &[u8], buffer: &mut Vec<usize>) -> Result<()> {
+    pub fn try_find_line_breaks(
+        &self,
+        bytes: &[u8],
+        buffer: &mut Vec<usize>,
+        add_starting_idx: bool,
+    ) -> Result<()> {
         if bytes.is_empty() {
             return Err(Box::new(ExecutionError::new(
                 "Byte slice to find newlines in was empty, exiting...",
             )));
         };
+
+        // We need to also set the starting position of the current buffer, which is on index 0.
+        // This is needed for multitthreading when threads need to know the byte indices of their slice.
+        if add_starting_idx {
+            buffer.push(0);
+        }
 
         (1..bytes.len()).for_each(|idx| {
             if (bytes[idx - 1] == 0x0d) && (bytes[idx] == 0x0a) {
@@ -243,12 +254,23 @@ impl FileSlicer {
     /// # Errors
     /// If the byte slice to search through was empty.
     #[cfg(not(target_os = "windows"))]
-    pub fn try_find_line_breaks(&self, bytes: &[u8], buffer: &mut Vec<usize>) -> Result<()> {
+    pub fn try_find_line_breaks(
+        &self,
+        bytes: &[u8],
+        buffer: &mut Vec<usize>,
+        add_starting_idx: bool,
+    ) -> Result<()> {
         if bytes.is_empty() {
             return Err(Box::new(ExecutionError::new(
                 "Byte slice to find newlines in was empty, exiting...",
             )));
         };
+
+        // We need to also set the starting position of the current buffer, which is on index 0.
+        // This is needed for multitthreading when threads need to know the byte indices of their slice.
+        if add_starting_idx {
+            buffer.push(0);
+        }
 
         (0..bytes.len()).for_each(|idx| {
             if bytes[idx] == 0x0a {

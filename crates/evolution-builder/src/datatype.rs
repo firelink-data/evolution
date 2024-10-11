@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-05-07
-// Last updated: 2024-06-01
+// Last updated: 2024-10-11
 //
 
 use arrow::array::{
@@ -33,8 +33,6 @@ use arrow::array::{
 use evolution_common::error::{ExecutionError, Result};
 use evolution_parser::datatype::{BooleanParser, FloatParser, IntParser, Utf8Parser};
 use half::f16;
-#[cfg(debug_assertions)]
-use log::debug;
 use log::warn;
 
 use std::sync::Arc;
@@ -66,7 +64,7 @@ impl BooleanColumnBuilder {
 impl ColumnBuilder for BooleanColumnBuilder {
     ///
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
-        let n_bytes_in_column: usize = match self.parser.try_parse(&bytes, self.n_runes) {
+        let n_bytes_in_column: usize = match self.parser.try_parse(bytes, self.n_runes) {
             (n, Some(v)) => {
                 self.inner.append_value(v);
                 n
@@ -118,7 +116,7 @@ impl Float16ColumnBuilder {
 impl ColumnBuilder for Float16ColumnBuilder {
     ///
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
-        let n_bytes_in_column: usize = match self.parser.try_parse::<f16>(&bytes, self.n_runes) {
+        let n_bytes_in_column: usize = match self.parser.try_parse::<f16>(bytes, self.n_runes) {
             (n, Some(v)) => {
                 self.inner.append_value(v);
                 n
@@ -170,7 +168,7 @@ impl Float32ColumnBuilder {
 impl ColumnBuilder for Float32ColumnBuilder {
     ///
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
-        let n_bytes_in_column: usize = match self.parser.try_parse::<f32>(&bytes, self.n_runes) {
+        let n_bytes_in_column: usize = match self.parser.try_parse::<f32>(bytes, self.n_runes) {
             (n, Some(v)) => {
                 self.inner.append_value(v);
                 n
@@ -222,7 +220,7 @@ impl Float64ColumnBuilder {
 impl ColumnBuilder for Float64ColumnBuilder {
     ///
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
-        let n_bytes_in_column: usize = match self.parser.try_parse::<f64>(&bytes, self.n_runes) {
+        let n_bytes_in_column: usize = match self.parser.try_parse::<f64>(bytes, self.n_runes) {
             (n, Some(v)) => {
                 self.inner.append_value(v);
                 n
@@ -274,7 +272,7 @@ impl Int16ColumnBuilder {
 impl ColumnBuilder for Int16ColumnBuilder {
     ///
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
-        let n_bytes_in_column: usize = match self.parser.try_parse::<i16>(&bytes, self.n_runes) {
+        let n_bytes_in_column: usize = match self.parser.try_parse::<i16>(bytes, self.n_runes) {
             (n, Some(v)) => {
                 self.inner.append_value(v);
                 n
@@ -326,7 +324,7 @@ impl Int32ColumnBuilder {
 impl ColumnBuilder for Int32ColumnBuilder {
     ///
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
-        let n_bytes_in_column: usize = match self.parser.try_parse::<i32>(&bytes, self.n_runes) {
+        let n_bytes_in_column: usize = match self.parser.try_parse::<i32>(bytes, self.n_runes) {
             (n, Some(v)) => {
                 self.inner.append_value(v);
                 n
@@ -378,7 +376,7 @@ impl Int64ColumnBuilder {
 impl ColumnBuilder for Int64ColumnBuilder {
     ///
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
-        let n_bytes_in_column: usize = match self.parser.try_parse::<i64>(&bytes, self.n_runes) {
+        let n_bytes_in_column: usize = match self.parser.try_parse::<i64>(bytes, self.n_runes) {
             (n, Some(v)) => {
                 self.inner.append_value(v);
                 n
@@ -430,7 +428,7 @@ impl Utf8ColumnBuilder {
 impl ColumnBuilder for Utf8ColumnBuilder {
     ///
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
-        let n_bytes_in_column: usize = match self.parser.try_parse(&bytes, self.n_runes) {
+        let n_bytes_in_column: usize = match self.parser.try_parse(bytes, self.n_runes) {
             (n, Some(v)) => {
                 self.inner.append_value(v);
                 n

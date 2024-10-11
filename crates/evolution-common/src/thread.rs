@@ -47,8 +47,6 @@ pub fn get_available_threads(n_wanted_threads: usize) -> usize {
 
 /// TODO: actually do an estimation based on the available system memory etc.
 /// This is just a heuristic, scale a large capacity with the number of threads linearly.
-pub fn estimate_best_thread_channel_capacity(
-    n_threads: usize,
-) -> usize {
+pub fn estimate_best_thread_channel_capacity(n_threads: usize) -> usize {
     256 / n_threads
 }
