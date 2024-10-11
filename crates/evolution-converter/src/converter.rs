@@ -27,10 +27,11 @@
 
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
 use crossbeam::thread::ScopedJoinHandle;
-use crossbeam::{channel, scope};
+use crossbeam::channel;
+use crossbeam::thread::scope;
 
 use evolution_builder::builder::ParquetBuilder;
-use evolution_common::error::{Result, SetupError};
+use evolution_common::error::{ExecutionError, Result, SetupError};
 use evolution_common::thread::estimate_best_thread_channel_capacity;
 use evolution_common::NUM_BYTES_FOR_NEWLINE;
 use evolution_schema::schema::FixedSchema;
@@ -44,6 +45,7 @@ use parquet::file::properties::WriterProperties as ArrowWriterProperties;
 
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::thread;
 
 ///
 pub trait Converter {}
@@ -51,7 +53,7 @@ pub trait Converter {}
 ///
 pub type ConverterRef = Box<dyn Converter>;
 
-///
+/// Struct for converting any fixed-length file into the parquet file format.
 pub struct ParquetConverter {
     slicer: FileSlicer,
     writer: ParquetWriter,
@@ -71,7 +73,8 @@ impl ParquetConverter {
         }
     }
 
-    ///
+    /// Try and convert the provided fixed-length file to parquet output format. Will propagate any
+    /// errors created in any of the conversion modes (single-threaded or multithreaded).
     pub fn try_convert(&mut self) -> Result<()> {
         if self.n_threads > 1 {
             self.try_convert_multithreaded()?;
@@ -81,13 +84,19 @@ impl ParquetConverter {
         Ok(())
     }
 
-    /// Converts the target file in multithreaded mode.
+    /// Try and convert the target file to parquet format in multithreaded mode.
     ///
-    /// # Panics ?
-    /// ...
+    /// # Panics
+    /// The multithreading is implemented using [`crossbeam`] scoped threads, and we don't currently support returning
+    /// anything from the scope, so any function called inside the scope that returns a [`Result`] has to be unwrapped.
     ///
     /// # Errors
-    /// ...
+    /// This function might return an error for the following reasons:
+    /// * If the [`FileSlicer`] fails to read the expected amount of bytes to the buffer.
+    /// * If the buffer was empty when trying to find line-breaks in it.
+    /// * If the buffer did not contain any line-break characters at all.
+    /// * If any of the threading operations returned an Error during the conversion.
+    /// * If the [`ParquetWriter`] failed flushing all of the RowGroups to file.
     pub fn try_convert_multithreaded(&mut self) -> Result<()> {
         let mut buffer_capacity = self.read_buffer_size;
         let n_worker_threads: usize = self.n_threads - 1;
@@ -99,7 +108,6 @@ impl ParquetConverter {
         );
 
         let mut line_break_indices: Vec<usize> = Vec::with_capacity(buffer_capacity);
-
         let mut thread_workloads: Vec<(usize, usize)> = Vec::with_capacity(n_worker_threads);
 
         loop {
@@ -159,13 +167,14 @@ impl ParquetConverter {
         Ok(())
     }
 
-    /// Converts the target file in single-threaded mode.
-    ///
-    /// # Panics ?
-    /// ...
+    /// Try and convert the target file to parquet format in single-threaded mode.
     ///
     /// # Errors
-    /// ...
+    /// This function might return an error for the following reasons:
+    /// * If the [`FileSlicer`] fails to read the expected amount of bytes to the buffer.
+    /// * If the buffer was empty when trying to find line-breaks in it.
+    /// * If the buffer did not contain any line-break characters at all.
+    /// * If the [`ParquetWriter`] failed flushing all of the RowGroups to file.
     pub fn try_convert_single_threaded(&mut self) -> Result<()> {
         let mut buffer_capacity: usize = self.read_buffer_size;
 
@@ -232,9 +241,8 @@ impl ParquetConverter {
     /// Divide the current buffer into chunks for each worker thread based on the line breaks.
     ///
     /// # Note
-    /// The workload will attempt to be uniform on each worker, however, the worker with the
-    /// last index might get some extra lines to process due to number of rows now being
-    /// divisible by the estimated number of rows per thread.
+    /// The workload will attempt to be uniform on each worker, however, the worker with the last index might get some
+    /// extra lines to process due to number of rows now being divisible by the estimated number of rows per thread.
     fn distribute_worker_thread_workloads(
         &self,
         line_break_indices: &[usize],
@@ -257,9 +265,23 @@ impl ParquetConverter {
         ));
     }
 
-    ///
-    /// line_breaks contains the byte index in the buffer for each line-break
-    /// thread_workloads contains the line break indices for the threads slice
+    /// Spawn the threads which perform the conversion, specifically, n-1 threads will work on converting and 1
+    /// thread will collect and buffer the converted results and write those to parquet file, where n was the
+    /// specified number of threads for the program.
+    /// 
+    /// The threading is implemented using [`crossbeam`] and might perform differently depending on host system.
+    /// 
+    /// # Panics
+    /// This function will panic and terminate execution for the following reasons:
+    /// * If the [`ParquetBuilder`] was unable to parse a column to its expected format.
+    /// * If a thread not being able to communicate through the channel due to it being disconnected.
+    /// * If the [`ParquetWriter`] could not write the parsed columns as a [`RecordBatch`].
+    /// * If any worker thread could not join the main thread from its handle.
+    /// 
+    /// # Errors
+    /// If and only if the thread scope closure returned an error, which will propagate an [`ExecutionError`].
+    /// 
+    /// [`RecordBatch`]: arrow::array::RecordBatch
     fn spawn_converter_threads(
         &mut self,
         buffer: &Vec<u8>,
@@ -268,7 +290,7 @@ impl ParquetConverter {
         let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
         let arc_buffer: Arc<&Vec<u8>> = Arc::new(buffer);
 
-        let _ = scope(|s| {
+        let thread_result: thread::Result<()> = scope(|s| {
             #[cfg(debug_assertions)]
             debug!(
                 "Starting {} worker threads for conversion.",
@@ -281,6 +303,7 @@ impl ParquetConverter {
                 .map(|(t_idx, (from, to))| {
                     let t_sender: channel::Sender<ParquetBuilder> = sender.clone();
                     // Can we do this in another way? So we don't have to allocate a bunch of stuff in our loop...
+                    // TODO: pull this out and create them as part of the ParquetConverter struct?..
                     let mut t_builder: ParquetBuilder = self.schema.clone().into_builder();
 
                     let t_buffer: Arc<&Vec<u8>> = arc_buffer.clone();
@@ -288,13 +311,13 @@ impl ParquetConverter {
 
                     s.spawn(move |_| {
                         #[cfg(debug_assertions)]
-                        debug!("Thread {} working...", t_idx);
+                        debug!("Thread {} working...", t_idx + 1);
 
                         t_builder.try_build_from_slice(t_buffer_slice).unwrap();
                         t_sender.send(t_builder).unwrap();
                         drop(t_sender);
                         #[cfg(debug_assertions)]
-                        debug!("Thread {} done!", t_idx);
+                        debug!("Thread {} done!", t_idx + 1);
                     })
                 })
                 .collect::<Vec<ScopedJoinHandle<()>>>();
@@ -302,10 +325,7 @@ impl ParquetConverter {
             drop(sender);
 
             #[cfg(debug_assertions)]
-            debug!(
-                "Thread {} waiting for batches to write to buffer...",
-                thread_workloads.len() + 1
-            );
+            debug!("Thread 0 waiting for batches to write to buffer...");
             for mut builder in receiver {
                 self.writer.try_write_from_builder(&mut builder).unwrap();
                 drop(builder);
@@ -318,6 +338,12 @@ impl ParquetConverter {
                 handle.join().expect("Could not join worker thread handle!");
             }
         });
+
+        if thread_result.is_err() {
+            return Err(Box::new(ExecutionError::new(
+                format!("One of the scoped threads returned an error: {:?}", thread_result).as_str(),
+            )));
+        }
 
         #[cfg(debug_assertions)]
         debug!("Buffer chunk done!");
