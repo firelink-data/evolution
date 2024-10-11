@@ -47,10 +47,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
 
-///
+/// /// Unified trait for all types of converters.
 pub trait Converter {}
-
-///
 pub type ConverterRef = Box<dyn Converter>;
 
 /// Struct for converting any fixed-length file into the parquet file format.
@@ -59,9 +57,11 @@ pub struct ParquetConverter {
     writer: ParquetWriter,
     builder: ParquetBuilder,
     schema: FixedSchema,
+    // The size of the buffer that reads the input file (in bytes).
     read_buffer_size: usize,
-
+    // The number of threads to use when converting.
     n_threads: usize,
+    // The maximum number of active messages allowed in the thread channels.
     thread_channel_capacity: usize,
 }
 
@@ -242,7 +242,7 @@ impl ParquetConverter {
     ///
     /// # Note
     /// The workload will attempt to be uniform on each worker, however, the worker with the last index might get some
-    /// extra lines to process due to number of rows now being divisible by the estimated number of rows per thread.
+    /// extra lines to process due to number of rows not being divisible by the estimated number of rows per thread.
     fn distribute_worker_thread_workloads(
         &self,
         line_break_indices: &[usize],
