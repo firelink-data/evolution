@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-02-05
-// Last updated: 2024-05-28
+// Last updated: 2024-10-11
 //
 
 use evolution_common::error::{Result, SetupError};
@@ -42,9 +42,10 @@ use crate::mock_column;
 /// specifies the minimum number of rows to be mocked to allow enabling multithreading.
 ///
 /// # Note
-/// This value takes priority over any CLI options regarding number of threads to use.
-pub static MIN_NUM_ROWS_FOR_MULTITHREADING: usize = 100000;
+/// This value takes priority over any CLI options regarding number of threads to use for mocking.
+pub static MIN_NUM_ROWS_FOR_MULTITHREADING: usize = 100_000;
 
+/// Unified trait for all types of file mockers.
 pub trait Mocker {}
 pub type MockerRef = Box<dyn Mocker>;
 
@@ -70,10 +71,18 @@ impl FixedLengthFileMocker {
         }
     }
 
-    /// Generate mocked data based on the provided [`FixedSchema`]. This function will
-    /// either run in single-threaded mode or in multithreaded mode depending on:
-    /// * the number of available threads (logical cores) on the host system,
-    /// * and the number of mocked rows to generate.
+    /// Try and generate mocked data based on the provided [`FixedSchema`].
+    /// 
+    /// This function either runs in single-threaded mode or in multithreaded mode depending on:
+    /// * the number of requested mocked rows to generate,
+    /// * and the number of avilable threads on the host system.
+    /// 
+    /// # Errors
+    /// This function will propagate any errors created in any of the mocking modes, see any
+    /// of the functions [`try_mock_multithreaded`] or [`try_mock_single_threaded`] for specifics.
+    /// 
+    /// [`try_mock_multithreaded`]: FixedLengthFileMocker::try_mock_multithreaded
+    /// [`try_mock_single_threaded`]: FixedLengthFileMocker::try_mock_single_threaded
     pub fn try_mock(&mut self) -> Result<()> {
         if self.n_threads > 1 {
             self.try_mock_multithreaded()?;
@@ -83,12 +92,17 @@ impl FixedLengthFileMocker {
         Ok(())
     }
 
-    ///
+    /// TODO
     fn try_mock_multithreaded(&mut self) -> Result<()> {
         todo!()
     }
 
-    ///
+    /// Try and generate mocked data in single-threaded mode.
+    /// 
+    /// # Errors
+    /// This function might return an error for the following reasons:
+    /// * If the [`FixedLengthFileWriter`] failed to write the generated columns to file.
+    /// * If the [`FixedLengthFileWriter`] failed to flush any remaining bytes and close the buffer.
     fn try_mock_single_threaded(&mut self) -> Result<()> {
         let n_runes_in_row = self.schema.row_length();
         // Here we multiply by 4 because a valid UTF-8 encoded character can at most be
@@ -100,7 +114,7 @@ impl FixedLengthFileMocker {
         let mut buffer: Vec<u8> = Vec::with_capacity(writer_buffer_size);
         let mut rng: ThreadRng = rand::thread_rng();
 
-        info!("Mocking {} rows in single-threaded mode.", self.n_rows);
+        info!("Generating {} mocked rows in single-threaded mode.", self.n_rows);
 
         for ridx in 0..self.n_rows {
             if (ridx % self.write_buffer_size == 0) && (ridx != 0) {
