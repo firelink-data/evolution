@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2023-11-25
-// Last updated: 2024-06-01
+// Last updated: 2024-10-11
 //
 
 use arrow::datatypes::{Field as ArrowField, Schema as ArrowSchema};
@@ -36,7 +36,7 @@ use std::path::PathBuf;
 
 use crate::column::FixedColumn;
 
-/// A blank trait to allow developers to create their own schema implementations.
+/// Unified trait for all types of schemas.
 pub trait Schema {}
 pub type SchemaRef = Box<dyn Schema>;
 

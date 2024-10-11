@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2023-11-25
-// Last updated: 2024-06-01
+// Last updated: 2024-10-11
 //
 
 use arrow::datatypes::DataType as ArrowDataType;
@@ -38,10 +38,8 @@ use log::warn;
 use padder::{Alignment, Symbol};
 use serde::{Deserialize, Serialize};
 
-/// A blank trait to allow developers to create their own column implementations.
+/// Unified trait for all types of schema columns.
 pub trait Column {}
-
-///
 pub type ColumnRef = Box<dyn Column>;
 
 /// Representation of a column in a fixed-length file (.flf), containing the only allowed fields.
