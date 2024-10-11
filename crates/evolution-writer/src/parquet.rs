@@ -49,13 +49,14 @@ impl ParquetWriter {
         }
     }
 
-    /// TODO: NOTE THIS ALLOCATES MEMORY ON THE HEAP!!!
+    /// TODO: NOTE THIS ALLOCATES MEMORY ON THE HEAP!!! BAD!!!
     pub fn try_write_from_builder(&mut self, builder: &mut ParquetBuilder) -> Result<()> {
         let mut buffer: Vec<(&str, ArrayRef)> = Vec::with_capacity(self.n_columns);
         for column_builder in builder.columns().iter_mut() {
             buffer.push(column_builder.finish());
         }
 
+        // BAD PERFORMANCE!!!
         let record_batch: RecordBatch = RecordBatch::try_from_iter(buffer)?;
         self.inner.write(&record_batch)?;
 
