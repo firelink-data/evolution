@@ -72,15 +72,15 @@ impl FixedLengthFileMocker {
     }
 
     /// Try and generate mocked data based on the provided [`FixedSchema`].
-    /// 
+    ///
     /// This function either runs in single-threaded mode or in multithreaded mode depending on:
     /// * the number of requested mocked rows to generate,
     /// * and the number of avilable threads on the host system.
-    /// 
+    ///
     /// # Errors
     /// This function will propagate any errors created in any of the mocking modes, see any
     /// of the functions [`try_mock_multithreaded`] or [`try_mock_single_threaded`] for specifics.
-    /// 
+    ///
     /// [`try_mock_multithreaded`]: FixedLengthFileMocker::try_mock_multithreaded
     /// [`try_mock_single_threaded`]: FixedLengthFileMocker::try_mock_single_threaded
     pub fn try_mock(&mut self) -> Result<()> {
@@ -98,7 +98,7 @@ impl FixedLengthFileMocker {
     }
 
     /// Try and generate mocked data in single-threaded mode.
-    /// 
+    ///
     /// # Errors
     /// This function might return an error for the following reasons:
     /// * If the [`FixedLengthFileWriter`] failed to write the generated columns to file.
@@ -114,8 +114,10 @@ impl FixedLengthFileMocker {
         let mut buffer: Vec<u8> = Vec::with_capacity(writer_buffer_size);
         let mut rng: ThreadRng = rand::thread_rng();
 
-        info!("Generating {} mocked rows in single-threaded mode.", self.n_rows);
-
+        info!(
+            "Generating {} mocked rows in single-threaded mode.",
+            self.n_rows
+        );
         for ridx in 0..self.n_rows {
             if (ridx % self.write_buffer_size == 0) && (ridx != 0) {
                 self.writer.try_write(&buffer)?;

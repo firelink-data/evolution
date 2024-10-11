@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-05-25
-// Last updated: 2024-05-27
+// Last updated: 2024-10-11
 //
 
 use evolution_common::datatype::DataType;
@@ -38,7 +38,7 @@ pub static MOCKED_I16_MAX: i16 = 10_000;
 pub static MOCKED_I32_MAX: i32 = 1_000_000;
 pub static MOCKED_I64_MAX: i64 = 1_000_000_000;
 
-///
+/// Create a string with mocked data based on the [`FixedColumn`] datatype.
 pub fn mock_column(column: &FixedColumn, rng: &mut ThreadRng) -> String {
     match column.dtype() {
         DataType::Boolean => mock_bool(rng),
@@ -53,42 +53,42 @@ pub fn mock_column(column: &FixedColumn, rng: &mut ThreadRng) -> String {
     }
 }
 
-///
+/// Mock a boolean with 50/50 chance of being True/False.
 fn mock_bool(rng: &mut ThreadRng) -> String {
     rng.gen_bool(0.5).to_string()
 }
 
-///
+/// Mock a f16 number in the range [-[`MOCKED_F16_MAX`], [`MOCKED_F16_MAX`]].
 fn mock_f16(rng: &mut ThreadRng) -> String {
     rng.gen_range(-MOCKED_F16_MAX..=MOCKED_F16_MAX).to_string()
 }
 
-///
+/// Mock a f32 number in the range [-[`MOCKED_F32_MAX`], [`MOCKED_F32_MAX`]].
 fn mock_f32(rng: &mut ThreadRng) -> String {
     rng.gen_range(-MOCKED_F32_MAX..=MOCKED_F32_MAX).to_string()
 }
 
-///
+/// Mock a f64 number in the range [-[`MOCKED_F64_MAX`], [`MOCKED_F64_MAX`]].
 fn mock_f64(rng: &mut ThreadRng) -> String {
     rng.gen_range(-MOCKED_F64_MAX..=MOCKED_F64_MAX).to_string()
 }
 
-///
+/// Mock a i16 number in the range [-[`MOCKED_I16_MAX`], [`MOCKED_I16_MAX`]].
 fn mock_i16(rng: &mut ThreadRng) -> String {
     rng.gen_range(-MOCKED_I16_MAX..=MOCKED_I16_MAX).to_string()
 }
 
-///
+/// Mock a i32 number in the range [-[`MOCKED_I32_MAX`], [`MOCKED_I32_MAX`]].
 fn mock_i32(rng: &mut ThreadRng) -> String {
     rng.gen_range(-MOCKED_I32_MAX..=MOCKED_I32_MAX).to_string()
 }
 
-///
+/// Mock a i64 number in the range [-[`MOCKED_I64_MAX`], [`MOCKED_I64_MAX`]].
 fn mock_i64(rng: &mut ThreadRng) -> String {
     rng.gen_range(-MOCKED_I64_MAX..=MOCKED_I64_MAX).to_string()
 }
 
-///
+/// Sample a random name uniformly from the [`FirstName`] distribution.
 fn mock_utf8(rng: &mut ThreadRng) -> String {
     rng.gen::<FirstName>().to_string()
 }
