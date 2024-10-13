@@ -11,9 +11,9 @@ readme = { workspace = true }
 
 [dependencies]
 crossbeam = "0.8.4"
-evolution-common = { path = "../evolution-common", version = "1.0.0"  }
-evolution-schema = { path = "../evolution-schema", version = "1.0.0"  }
-evolution-writer = { path = "../evolution-writer", version = "1.0.0"  }
+evolution-common = { path = "../evolution-common", version = "1.2.0"  }
+evolution-schema = { path = "../evolution-schema", version = "1.2.0"  }
+evolution-writer = { path = "../evolution-writer", version = "1.2.0"  }
 faker_rand = "0.1.1"
 half = "2.4.1"
 log = "0.4.21"
