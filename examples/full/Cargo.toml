@@ -1,8 +1,9 @@
 [package]
-name = "example-full"
+name = "evolution"
 version = "1.0.0"
 edition = "2021"
-publish = false
+publish = true
+readme = { workspace = true }
 
 [dependencies]
 chrono = "0.4.38"
@@ -10,10 +11,10 @@ clap = { version = "4.5.4", features = ["derive", "default"] }
 colored = "2.1.0"
 env_logger = "0.11.3"
 log = "0.4.21"
-evolution-common = { path = "../../crates/evolution-common" }
-evolution-converter = { path = "../../crates/evolution-converter" }
-evolution-mocker = { path = "../../crates/evolution-mocker", optional = true }
-evolution-target = { path = "../../crates/evolution-target" }
+evolution-common = { path = "../../crates/evolution-common", version = "1.0.0" }
+evolution-converter = { path = "../../crates/evolution-converter", version = "1.0.0" }
+evolution-mocker = { path = "../../crates/evolution-mocker", version = "1.0.0", optional = true }
+evolution-target = { path = "../../crates/evolution-target", version = "1.0.0" }
 
 [features]
 default = []
