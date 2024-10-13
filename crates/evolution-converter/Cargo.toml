@@ -18,4 +18,5 @@ evolution-schema = { path = "../evolution-schema" }
 evolution-slicer = { path = "../evolution-slicer" }
 evolution-writer = { path = "../evolution-writer" }
 log = "0.4.21"
+num_cpus = "1.16.0"
 parquet = "51.0.0"

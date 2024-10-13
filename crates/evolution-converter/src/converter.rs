@@ -415,8 +415,20 @@ impl ParquetConverterBuilder {
 
     /// Set the maximum message capacity on the multithreaded converter thread channels.
     /// See https://docs.rs/crossbeam/latest/crossbeam/channel/fn.bounded.html for specifics.
-    pub fn with_thread_channel_capacity(mut self, thread_channel_capacity: Option<usize>) -> Self {
-        self.thread_channel_capacity = thread_channel_capacity;
+    pub fn with_thread_channel_capacity(mut self, capacity: Option<usize>) -> Self {
+        self.thread_channel_capacity = capacity;
+        self
+    }
+
+    /// Set default values for the optional configuration fields.
+    ///
+    /// # Note
+    /// Default conversion mode is always multithreaded utilizing all available threads (logical cores).
+    pub fn with_default_values(mut self) -> Self {
+        let n_threads: usize = num_cpus::get();
+        self.n_threads = Some(n_threads);
+        self.read_buffer_size = Some(500 * 1024 * 1024); // 500 MB
+        self.thread_channel_capacity = Some(n_threads);
         self
     }
 

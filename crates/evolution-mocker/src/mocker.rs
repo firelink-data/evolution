@@ -22,8 +22,10 @@
 // SOFTWARE.
 //
 // File created: 2024-02-05
-// Last updated: 2024-10-11
+// Last updated: 2024-10-13
 //
+
+use crossbeam::channel;
 
 use evolution_common::error::{Result, SetupError};
 use evolution_common::{newline, NUM_BYTES_FOR_NEWLINE};
@@ -34,6 +36,8 @@ use padder::pad_and_push_to_buffer;
 use rand::rngs::ThreadRng;
 
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::thread::{spawn, JoinHandle};
 
 use crate::mock_column;
 
@@ -61,6 +65,8 @@ pub struct FixedLengthFileMocker {
     n_threads: usize,
     /// The size of the writer buffer (in number of rows).
     write_buffer_size: usize,
+    // The maximum number of active messages allowed in the thread channels.
+    thread_channel_capacity: usize,
 }
 
 impl FixedLengthFileMocker {
@@ -92,9 +98,89 @@ impl FixedLengthFileMocker {
         Ok(())
     }
 
-    /// TODO
+    /// Try and generate mocked data in multithreaded mode.
+    ///
+    /// # Errors
+    /// This function might return an error for the following reasons:
+    /// * If the [`FixedLengthFileWriter`] failed to write the generated columns to file.
+    /// * If the [`FixedLengthFileWriter`] failed to flush any remaining bytes and close the buffer.
+    ///
     fn try_mock_multithreaded(&mut self) -> Result<()> {
-        todo!()
+        let thread_workloads: Vec<usize> = self.distribute_worker_thread_workloads();
+        let (sender, receiver) = channel::bounded(self.thread_channel_capacity);
+
+        info!(
+            "Starting {} worker threads to generate {} mocked rows.",
+            self.n_threads - 1,
+            self.n_rows
+        );
+        let arc_schema = Arc::new(self.schema.clone());
+        let t_n_rows_buffer_size: usize = self.write_buffer_size;
+        let t_buffer_size: usize = 2 * self.write_buffer_size * arc_schema.row_length()
+            + NUM_BYTES_FOR_NEWLINE * self.write_buffer_size;
+
+        let threads = thread_workloads
+            .into_iter()
+            .enumerate()
+            .map(|(t_idx, t_workload)| {
+                let t_schema = Arc::clone(&arc_schema);
+                let t_sender = sender.clone();
+                spawn(move || {
+                    let mut rng: ThreadRng = rand::thread_rng();
+                    let mut buffer: Vec<u8> = Vec::with_capacity(t_buffer_size);
+
+                    for row_idx in 0..t_workload {
+                        if (row_idx % t_n_rows_buffer_size == 0) && (row_idx != 0) {
+                            t_sender.send(buffer).unwrap_or_else(|_| {
+                                panic!(
+                                    "Thread {} could not send buffer to master thread!",
+                                    t_idx + 1
+                                )
+                            });
+
+                            // We need to reallocate the buffer since we sent it to the master thread.
+                            buffer = Vec::with_capacity(t_buffer_size);
+                        }
+
+                        for column in t_schema.iter() {
+                            pad_and_push_to_buffer(
+                                mock_column(column, &mut rng).as_bytes(),
+                                column.length(),
+                                column.alignment(),
+                                column.pad_symbol(),
+                                &mut buffer,
+                            );
+                        }
+
+                        buffer.extend_from_slice(newline().as_bytes());
+                    }
+
+                    t_sender.send(buffer).unwrap_or_else(|_| {
+                        panic!(
+                            "Thread {} could not send buffer to master thread!",
+                            t_idx + 1
+                        )
+                    });
+
+                    info!("Thread {} done!", t_idx + 1);
+                    drop(t_sender);
+                })
+            })
+            .collect::<Vec<JoinHandle<()>>>();
+
+        drop(sender);
+        for buffer in receiver {
+            self.writer.try_write(&buffer)?;
+            drop(buffer);
+        }
+
+        for (t_idx, handle) in threads.into_iter().enumerate() {
+            handle
+                .join()
+                .unwrap_or_else(|_| panic!("Thread {} could not join the master thread!", t_idx));
+        }
+
+        Ok(())
     }
 
     /// Try and generate mocked data in single-threaded mode.
@@ -143,6 +229,20 @@ impl FixedLengthFileMocker {
 
         Ok(())
     }
+
+    /// Distribute the workload of mocking rows to the available threads. Attempts to dsitribute
+    /// uniformly, but the last thread will always get any remaining rows which were not split evenly.
+    fn distribute_worker_thread_workloads(&self) -> Vec<usize> {
+        let n_worker_threads: usize = self.n_threads - 1;
+        let n_rows_per_thread: usize = self.n_rows / n_worker_threads;
+        let n_rows_remaining: usize = self.n_rows - (n_rows_per_thread * n_worker_threads);
+        let mut thread_workloads: Vec<usize> = (0..(n_worker_threads - 1))
+            .map(|_| n_rows_per_thread)
+            .collect();
+
+        thread_workloads.push(n_rows_per_thread + n_rows_remaining);
+        thread_workloads
+    }
 }
 
 impl Mocker for FixedLengthFileMocker {}
@@ -155,6 +255,7 @@ pub struct FixedLengthFileMockerBuilder {
     n_rows: Option<usize>,
     n_threads: Option<usize>,
     write_buffer_size: Option<usize>,
+    thread_channel_capacity: Option<usize>,
 
     // File descriptor properties.
     force_create_new: Option<bool>,
@@ -201,6 +302,24 @@ impl FixedLengthFileMockerBuilder {
     /// Set the writer option to truncate the output file if it already exists.
     pub fn with_truncate_existing(mut self, truncate_existing: bool) -> Self {
         self.truncate_existing = Some(truncate_existing);
+        self
+    }
+
+    pub fn with_thread_channel_capacity(mut self, capacity: Option<usize>) -> Self {
+        self.thread_channel_capacity = capacity;
+        self
+    }
+
+    /// Set default values for the optional configuration fields.
+    ///
+    /// # Note
+    /// Default mode is always single-threaded since I/O bottleneck leads to multithreading not being efficient.
+    pub fn with_default_values(mut self) -> Self {
+        self.n_threads = Some(1);
+        self.write_buffer_size = Some(1000);
+        self.force_create_new = Some(true);
+        self.truncate_existing = Some(true);
+        self.thread_channel_capacity = Some(1);
         self
     }
 
@@ -257,6 +376,8 @@ impl FixedLengthFileMockerBuilder {
             ))
         })?;
 
+        let thread_channel_capacity: usize = self.thread_channel_capacity.unwrap_or(n_threads);
+
         let writer_properties: FixedLengthFileWriterProperties =
             FixedLengthFileWriterProperties::builder()
                 .with_force_create_new(force_create_new)
@@ -288,6 +409,7 @@ impl FixedLengthFileMockerBuilder {
             n_rows,
             n_threads,
             write_buffer_size,
+            thread_channel_capacity,
         })
     }
 

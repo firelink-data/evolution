@@ -10,6 +10,7 @@ license = { workspace = true }
 readme = { workspace = true }
 
 [dependencies]
+crossbeam = "0.8.4"
 evolution-common = { path = "../evolution-common" }
 evolution-schema = { path = "../evolution-schema" }
 evolution-writer = { path = "../evolution-writer" }
