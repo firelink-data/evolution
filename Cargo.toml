@@ -17,10 +17,15 @@ authors = [
 license = "MIT"
 version = "1.2.0"
 readme = "README.md"
+categories = [
+    "science",
+    "database",
+    "concurrency",
+    "command-line-interface",
+]
 keywords = [
     "arrow",
     "parquet",
-    ""
 ]
 description = "Efficiently evolve your old fixed-length data files into modern file formats. "
 
