@@ -40,9 +40,9 @@ evolution-schema = "1.2.0"
 
 ## Schema setup
 
-To be able to work with automatic file conversion you need to have a valid **schema** available which specifies the structure of the source file you want to convert. A valid schema, in this context, is a json file which adhers to [this template](https://github.com/firelink-data/evolution/tree/main/resources/template-schema.json). If you are unsure whether or not your own schema file is valid according to the template, you can use [this](https://www.jsonschemavalidator.net/) validator tool.
+To be able to work with automatic file conversion you need to have a valid **schema** available which specifies the structure of the source file you want to convert. A valid schema, in this context, is a json file which adhers to [this template](examples/full/res/template_schema.json). If you are unsure whether or not your own schema file is valid according to the template, you can use [this](https://www.jsonschemavalidator.net/) validator tool.
 
-An example schema can be found [here](https://github.com/firelink-data/evolution/blob/main/examples/full/res/example_schema.json), and if you are unsure about valid values for datatypes, alignment modes, and padding symbols, please refer to the [template](https://github.com/firelink-data/evolution/blob/main/examples/full/res/template_schema.json) which lists all valid values. For specifics on all the currently supported padding modes, characters, and default values, please see the [padder](https://github.com/firelink-data/padder) crate (which we also maintain).
+An example schema can be found [here](examples/full/res/example_schema.json), and if you are unsure about valid values for datatypes, alignment modes, and padding symbols, please refer to the template which lists all valid values. For specifics on all the currently supported padding modes, characters, and default values, please see the [padder](https://github.com/firelink-data/padder) crate (which we also maintain).
 
 
 ## Quick start
