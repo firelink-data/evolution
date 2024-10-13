@@ -1,6 +1,6 @@
 [package]
 name = "evolution-converter"
-description = "Converters for evolution."
+description = "Converter implementations for evolution."
 version = { workspace = true }
 edition = { workspace = true }
 authors = { workspace = true }
@@ -12,11 +12,11 @@ readme = { workspace = true }
 [dependencies]
 arrow = "51.0.0"
 crossbeam = "0.8.4"
-evolution-builder = { path = "../evolution-builder", version = "1.0.0"  }
-evolution-common = { path = "../evolution-common", version = "1.0.0"  }
-evolution-schema = { path = "../evolution-schema", version = "1.0.0"  }
-evolution-slicer = { path = "../evolution-slicer", version = "1.0.0"  }
-evolution-writer = { path = "../evolution-writer", version = "1.0.0"  }
+evolution-builder = { path = "../evolution-builder", version = "1.2.0"  }
+evolution-common = { path = "../evolution-common", version = "1.2.0"  }
+evolution-schema = { path = "../evolution-schema", version = "1.2.0"  }
+evolution-slicer = { path = "../evolution-slicer", version = "1.2.0"  }
+evolution-writer = { path = "../evolution-writer", version = "1.2.0"  }
 log = "0.4.21"
 num_cpus = "1.16.0"
 parquet = "51.0.0"
