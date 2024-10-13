@@ -74,12 +74,12 @@ Options:
           Print version
 ```
 
-To specify the log verbosity, set the `RUST_LOG` environment variable to your wanted value, e.g., `INFO` or `DEBUG`.
+To specify the log verbosity set the `RUST_LOG` environment variable to your wanted value, e.g., `INFO`.
 
 
 ## Threading
 
-To know how many threads (logical cores) you have available on your system you can either of the following commands depending on your host system:
+To know how many threads (logical cores) you have available run either of the following commands depending on your host system:
 
 - Windows:
     - Command: `Get-WmiObject Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors`
