@@ -11,6 +11,6 @@ readme = { workspace = true }
 
 [dependencies]
 atoi_simd = "0.16.0"
-evolution-common = { path = "../evolution-common" }
+evolution-common = { path = "../evolution-common", version = "1.0.0"  }
 log = "0.4.21"
 padder = "1.2.0"

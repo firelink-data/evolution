@@ -10,9 +10,9 @@ license = { workspace = true }
 readme = { workspace = true }
 
 [dependencies]
-evolution-builder = { path = "../evolution-builder" }
-evolution-common = { path = "../evolution-common" }
-evolution-parser = { path = "../evolution-parser" }
+evolution-builder = { path = "../evolution-builder", version = "1.0.0"  }
+evolution-common = { path = "../evolution-common" , version = "1.0.0" }
+evolution-parser = { path = "../evolution-parser", version = "1.0.0" }
 arrow = { version = "51.0.0", default-features = false }
 deltalake = "0.17.3"
 padder = { version = "1.2.0", features = ["serde"] }
