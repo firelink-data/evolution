@@ -9,14 +9,19 @@ repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
 
+[lib]
+name = "evolution_converter"
+path = "src/lib.rs"
+bench = false
+
 [dependencies]
 arrow = "51.0.0"
 crossbeam = "0.8.4"
-evolution-builder = { path = "../evolution-builder", version = "1.2.0"  }
-evolution-common = { path = "../evolution-common", version = "1.2.0"  }
-evolution-schema = { path = "../evolution-schema", version = "1.2.0"  }
-evolution-slicer = { path = "../evolution-slicer", version = "1.2.0"  }
-evolution-writer = { path = "../evolution-writer", version = "1.2.0"  }
+evolution-builder = { workspace = true }
+evolution-common = { workspace = true }
+evolution-schema = { workspace = true }
+evolution-slicer = { workspace = true }
+evolution-writer = { workspace = true }
 log = "0.4.21"
 num_cpus = "1.16.0"
 parquet = "51.0.0"

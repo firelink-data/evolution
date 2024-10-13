@@ -9,6 +9,11 @@ repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
 
+[lib]
+name = "evolution_common"
+path = "src/lib.rs"
+bench = false
+
 [dependencies]
 log = "0.4.21"
 num_cpus = "1.16.0"

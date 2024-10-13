@@ -9,8 +9,13 @@ repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
 
+[lib]
+name = "evolution_writer"
+path = "src/lib.rs"
+bench = false
+
 [dependencies]
 arrow = "51.0.0"
-evolution-builder = { path = "../evolution-builder", version = "1.2.0" }
-evolution-common = { path = "../evolution-common", version = "1.2.0" }
+evolution-builder = { workspace = true }
+evolution-common = { workspace = true }
 parquet = "51.0.0"

@@ -9,9 +9,14 @@ repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
 
+[lib]
+name = "evolution_builder"
+path = "src/lib.rs"
+bench = false
+
 [dependencies]
-evolution-common = { path = "../evolution-common", version = "1.2.0" }
-evolution-parser = { path = "../evolution-parser", version = "1.2.0" }
+evolution-common = { workspace = true }
+evolution-parser = { workspace = true }
 arrow = { version = "51.0.0", default-features = false }
 log = "0.4.21"
 half = "2.4.1"

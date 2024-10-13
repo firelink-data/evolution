@@ -1,6 +1,6 @@
 [package]
 name = "evolution-schema"
-description = "Standard implementation of a schema used with evolution."
+description = "Schema implementations for evolution."
 version = { workspace = true }
 edition = { workspace = true }
 authors = { workspace = true }
@@ -9,10 +9,15 @@ repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
 
+[lib]
+name = "evolution_schema"
+path = "src/lib.rs"
+bench = false
+
 [dependencies]
-evolution-builder = { path = "../evolution-builder", version = "1.2.0"  }
-evolution-common = { path = "../evolution-common" , version = "1.2.0" }
-evolution-parser = { path = "../evolution-parser", version = "1.2.0" }
+evolution-builder = { workspace = true }
+evolution-common = { workspace = true }
+evolution-parser = { workspace = true }
 arrow = { version = "51.0.0", default-features = false }
 deltalake = "0.17.3"
 padder = { version = "1.2.0", features = ["serde"] }

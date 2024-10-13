@@ -9,8 +9,13 @@ repository = { workspace = true }
 license = { workspace = true }
 readme = { workspace = true }
 
+[lib]
+name = "evolution_parser"
+path = "src/lib.rs"
+bench = false
+
 [dependencies]
 atoi_simd = "0.16.0"
-evolution-common = { path = "../evolution-common", version = "1.2.0"  }
+evolution-common = { workspace = true }
 log = "0.4.21"
 padder = "1.2.0"
