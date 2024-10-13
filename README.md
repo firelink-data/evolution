@@ -11,7 +11,7 @@ The project is structured as a monorepo which hosts all of the *evolution* frame
 
 ## Installation
 
-The easiest way to install a complete *evolution* binary on your system is by using the [Cargo](https://crates.io/) package manager (which downloads it from [this](https://crates.io/crates/evolution) link).
+The easiest way to install an *evolution* binary on your system with support for all implemented output targets is by using the [Cargo](https://crates.io/) package manager (which downloads it from [this link](https://crates.io/crates/evolution)). This binary can be found at [examples/full](examples/full) in this repo.
 
 ```
 cargo install evolution
@@ -29,13 +29,12 @@ cd evolution
 cargo build --release
 ```
 
-If you want to integrate any of the evolution crates in your own project, simply add them as dependencies to your projects Cargo.toml file, for example.
+If you want to integrate any of the evolution crates in your own project that you're building, simply add them as dependencies to your projects Cargo.toml file like you would any other third-party dependecy, like below.
 
 ```toml
 [dependencies]
-evolution-common = "1.0.0"
-evolution-schema = "1.0.0"
-...
+evolution-common = "1.2.0"
+evolution-schema = "1.2.0"
 ```
 
 
@@ -48,10 +47,10 @@ An example schema can be found [here](https://github.com/firelink-data/evolution
 
 ## Quick start
 
-If you install the program as explained above then by simply running the binary you will see the following helpful usage print:
+If you install the program as explained above then by simply running the binary you will see the following usage print:
 
 ```
-🦖 Evolve your fixed-length data files into Apache Parquet, fully parallelized!
+Efficiently evolve your old fixed-length data files into modern file formats. 
 
 Usage: evolution.exe [OPTIONS] <COMMAND>
 
@@ -64,7 +63,7 @@ Options:
   -N, --n-threads <N_THREADS>
           Enable multithreading and set the number of threads (logical cores) to use [default: 1]
   -C, --thread-channel-capacity <THREAD_CHANNEL_CAPACITY>
-          The maximum amount of messages that can be accumulated in the thread channels before holding
+          The maximum capacity of the thread channel (in number of messages) [default: 32]
   -R, --read-buffer-size <READ_BUFFER_SIZE>
           The size of the read buffer used when converting (in bytes) [default: 5368709120]
   -W, --write-buffer-size <WRITE_BUFFER_SIZE>
@@ -75,12 +74,12 @@ Options:
           Print version
 ```
 
-To specify the log verbosity of the program, set the `RUST_LOG` environment variable to your wanted value, e.g., `INFO` or `DEBUG`.
+To specify the log verbosity, set the `RUST_LOG` environment variable to your wanted value, e.g., `INFO` or `DEBUG`.
 
 
 ## Threading
 
-To know how many threads (logical cores) you have available on your system you can use any of the following commands depending on your host system:
+To know how many threads (logical cores) you have available on your system you can either of the following commands depending on your host system:
 
 - Windows:
     - Command: `Get-WmiObject Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors`
