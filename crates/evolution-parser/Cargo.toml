@@ -1,6 +1,6 @@
 [package]
 name = "evolution-parser"
-description = "Standard implementation of a schema used with evolution."
+description = "Data parsing functionality for evolution."
 version = { workspace = true }
 edition = { workspace = true }
 authors = { workspace = true }
@@ -11,6 +11,6 @@ readme = { workspace = true }
 
 [dependencies]
 atoi_simd = "0.16.0"
-evolution-common = { path = "../evolution-common", version = "1.0.0"  }
+evolution-common = { path = "../evolution-common", version = "1.2.0"  }
 log = "0.4.21"
 padder = "1.2.0"
