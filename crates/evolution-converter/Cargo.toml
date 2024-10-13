@@ -1,0 +1,27 @@
+[package]
+name = "evolution-converter"
+description = "Converter implementations for evolution."
+version = { workspace = true }
+edition = { workspace = true }
+authors = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "evolution_converter"
+path = "src/lib.rs"
+bench = false
+
+[dependencies]
+arrow = "51.0.0"
+crossbeam = "0.8.4"
+evolution-builder = { workspace = true }
+evolution-common = { workspace = true }
+evolution-schema = { workspace = true }
+evolution-slicer = { workspace = true }
+evolution-writer = { workspace = true }
+log = "0.4.21"
+num_cpus = "1.16.0"
+parquet = "51.0.0"

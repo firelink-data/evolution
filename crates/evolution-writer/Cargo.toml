@@ -1,0 +1,21 @@
+[package]
+name = "evolution-writer"
+description = "Output target writers for evolution."
+version = { workspace = true }
+edition = { workspace = true }
+authors = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "evolution_writer"
+path = "src/lib.rs"
+bench = false
+
+[dependencies]
+arrow = "51.0.0"
+evolution-builder = { workspace = true }
+evolution-common = { workspace = true }
+parquet = "51.0.0"

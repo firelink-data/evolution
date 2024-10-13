@@ -1,0 +1,26 @@
+[package]
+name = "evolution-mocker"
+description = "Mocking components of evolution."
+version = { workspace = true }
+edition = { workspace = true }
+authors = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "evolution_mocker"
+path = "src/lib.rs"
+bench = false
+
+[dependencies]
+crossbeam = "0.8.4"
+evolution-common = { workspace = true }
+evolution-schema = { workspace = true }
+evolution-writer = { workspace = true }
+faker_rand = "0.1.1"
+half = "2.4.1"
+log = "0.4.21"
+padder = { version = "1.2.0", features = ["serde"] }
+rand = "0.8.5"

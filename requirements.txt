@@ -1,2 +1,2 @@
-parquet-tools
-pyarrow
+pandas==2.2.2
+pyarrow==16.1.0

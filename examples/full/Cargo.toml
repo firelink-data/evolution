@@ -1,0 +1,34 @@
+[package]
+name = "evolution"
+description = { workspace = true }
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+authors = { workspace = true }
+repository = { workspace = true }
+homepage = { workspace = true }
+categories = { workspace = true }
+keywords = { workspace = true }
+publish = true
+
+[[bin]]
+name = "evolution"
+path = "src/main.rs"
+bench = false
+
+[dependencies]
+chrono = "0.4.38"
+clap = { version = "4.5.4", features = ["derive", "default"] }
+colored = "2.1.0"
+env_logger = "0.11.3"
+log = "0.4.21"
+evolution-common = { workspace = true }
+evolution-converter = { workspace = true }
+evolution-mocker = { workspace = true, optional = true}
+evolution-target = { workspace = true }
+
+[features]
+default = []
+nightly = []
+mock = [ "dep:evolution-mocker" ]

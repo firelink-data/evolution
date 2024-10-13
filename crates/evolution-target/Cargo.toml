@@ -1,0 +1,18 @@
+[package]
+name = "evolution-target"
+description = "Output targets for evolution."
+version = { workspace = true }
+edition = { workspace = true }
+authors = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "evolution_target"
+path = "src/lib.rs"
+bench = false
+
+[dependencies]
+clap = { version = "4.5.4", features = ["derive"] }

@@ -1,0 +1,42 @@
+{
+    "name": "EvolutionExampleSchema",
+    "version": 1337,
+    "columns": [
+        {
+            "name": "cool",
+            "offset": 0,
+            "length": 9,
+            "dtype": "Int32",
+            "alignment": "Right",
+            "pad_symbol": "Underscore",
+            "is_nullable": false
+        },
+        {
+           "name": "salary",
+            "offset": 9,
+            "length": 20,
+            "dtype": "Float16",
+            "alignment": "Left",
+            "pad_symbol": "Asterisk",
+            "is_nullable": false
+        },
+        {
+           "name": "name",
+            "offset": 29,
+            "length": 30,
+            "dtype": "Utf8",
+            "alignment": "Center",
+            "pad_symbol": "Semicolon",
+            "is_nullable": true 
+        },
+        {
+            "name": "employed",
+            "offset": 59,
+            "length": 8,
+            "dtype": "Boolean",
+            "alignment": "Center",
+            "pad_symbol": "Zero",
+            "is_nullable": true
+        }
+    ]
+}

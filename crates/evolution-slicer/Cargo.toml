@@ -1,0 +1,19 @@
+[package]
+name = "evolution-slicer"
+description = "Data slicing components for evolution."
+version = { workspace = true }
+edition = { workspace = true }
+authors = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+readme = { workspace = true }
+
+[lib]
+name = "evolution_slicer"
+path = "src/lib.rs"
+bench = false
+
+[dependencies]
+evolution-common = { workspace = true }
+log = "0.4.21"
