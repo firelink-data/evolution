@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-02-05
-// Last updated: 2024-06-01
+// Last updated: 2024-10-13
 //
 
 use clap::{value_parser, ArgAction, Parser, Subcommand};
@@ -58,11 +58,12 @@ pub(crate) struct Cli {
     )]
     n_threads: usize,
 
-    /// The maximum amount of messages that can be accumulated in the thread channels before holding.
+    /// The maximum capacity of the thread channel (in number of messages).
     #[arg(
         short = 'C',
         long = "thread-channel-capacity",
         action = ArgAction::Set,
+        default_value = "32",
         value_parser = value_parser!(usize),
         required = false,
     )]
