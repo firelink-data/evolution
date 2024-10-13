@@ -122,14 +122,14 @@ impl Cli {
                 schema,
                 out_file,
             } => ParquetConverter::builder()
-                    .with_in_file(in_file.to_path_buf())
-                    .with_schema(schema.to_path_buf())
-                    .with_out_file(out_file.to_path_buf())
-                    .with_num_threads(n_threads)
-                    .with_read_buffer_size(read_buffer_size)
-                    .with_thread_channel_capacity(self.thread_channel_capacity)
-                    .try_build()?
-                    .try_convert()?,
+                .with_in_file(in_file.to_path_buf())
+                .with_schema(schema.to_path_buf())
+                .with_out_file(out_file.to_path_buf())
+                .with_num_threads(n_threads)
+                .with_read_buffer_size(read_buffer_size)
+                .with_thread_channel_capacity(self.thread_channel_capacity)
+                .try_build()?
+                .try_convert()?,
         };
 
         Ok(())
