@@ -1,14 +1,7 @@
 [workspace]
 members = [
-    "examples/full",
-    "crates/evolution-builder",
-    "crates/evolution-common",
-    "crates/evolution-converter",
-    "crates/evolution-mocker",
-    "crates/evolution-schema",
-    "crates/evolution-slicer",
-    "crates/evolution-target",
-    "crates/evolution-writer",
+    "examples/*",
+    "crates/*",
 ]
 resolver = "2"
 
