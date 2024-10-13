@@ -1,9 +1,13 @@
 [package]
 name = "evolution"
-version = "1.0.0"
+version = "1.2.0"
 edition = "2021"
+description = "🦖 Evolve your fixed-length data files into Apache Parquet, fully parallelized!"
 publish = true
 readme = { workspace = true }
+authors = { workspace = true }
+repository = { workspace = true }
+homepage = { workspace = true }
 
 [dependencies]
 chrono = "0.4.38"

@@ -1,7 +1,7 @@
 [package]
 name = "evolution-builder"
-version = "1.0.0"
 description = "Builder implementations for evolution."
+version = { workspace = true }
 edition = { workspace = true }
 authors = { workspace = true }
 homepage = { workspace = true }
