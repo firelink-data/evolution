@@ -1,6 +1,6 @@
 [package]
 name = "evolution-slicer"
-description = "Data slicer implemented for evolution."
+description = "Data slicing components for evolution."
 version = { workspace = true }
 edition = { workspace = true }
 authors = { workspace = true }
