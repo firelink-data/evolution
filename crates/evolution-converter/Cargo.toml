@@ -25,4 +25,4 @@ evolution-slicer = { workspace = true }
 evolution-writer = { workspace = true }
 log = "0.4.21"
 num_cpus = "1.16.0"
-parquet = "51.0.0"
+parquet = "53.1.0"
