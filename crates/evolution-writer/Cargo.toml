@@ -18,4 +18,4 @@ bench = false
 arrow = "51.0.0"
 evolution-builder = { workspace = true }
 evolution-common = { workspace = true }
-parquet = "51.0.0"
+parquet = "53.1.0"
