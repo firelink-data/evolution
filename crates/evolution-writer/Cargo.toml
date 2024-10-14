@@ -15,7 +15,7 @@ path = "src/lib.rs"
 bench = false
 
 [dependencies]
-arrow = "51.0.0"
+arrow = "53.1.0"
 evolution-builder = { workspace = true }
 evolution-common = { workspace = true }
 parquet = "51.0.0"
