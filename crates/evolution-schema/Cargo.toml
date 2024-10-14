@@ -19,7 +19,7 @@ evolution-builder = { workspace = true }
 evolution-common = { workspace = true }
 evolution-parser = { workspace = true }
 arrow = { version = "51.0.0", default-features = false }
-deltalake = "0.17.3"
+deltalake = "0.20.1"
 padder = { version = "1.2.0", features = ["serde"] }
 serde = { version = "1.0.202", features = ["derive"] }
 serde_json = "1.0.117"
