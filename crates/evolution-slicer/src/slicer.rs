@@ -145,13 +145,13 @@ impl FileSlicer {
 
     /// Try and evenly distribute the buffer into uniformly sized chunks for each worker thread.
     /// This function expects a [`Vec`] of usize tuples, representing the start and end byte
-    /// indices for each worke threads chunk. 
-    /// 
+    /// indices for each worker threads chunk.
+    ///
     /// # Note
     /// This function is optimized to spend as little time as possible looking for valid chunks, i.e.,
-    /// where there are line breaks, and will not look through the entire buffer. This can have an 
+    /// where there are line breaks, and will not look through the entire buffer. This can have an
     /// effect on the CPU cache hit-rate, however, this depends on the size of the buffer.
-    /// 
+    ///
     /// # Errors
     /// This function might return an error for the following reasons:
     /// * If the buffer was empty.
