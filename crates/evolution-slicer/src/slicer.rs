@@ -22,10 +22,11 @@
 // SOFTWARE.
 //
 // File created: 2023-12-11
-// Last updated: 2024-05-31
+// Last updated: 2024-10-13
 //
 
 use evolution_common::error::{ExecutionError, Result};
+use evolution_common::NUM_BYTES_FOR_NEWLINE;
 use log::warn;
 
 use std::fs::{File, OpenOptions};
@@ -140,6 +141,57 @@ impl FileSlicer {
                 _ => Err(Box::new(e)),
             },
         }
+    }
+
+    /// Try and evenly distribute the buffer into uniformly sized chunks for each worker thread.
+    /// This function expects a [`Vec`] of usize tuples, representing the start and end byte
+    /// indices for each worker threads chunk.
+    ///
+    /// # Note
+    /// This function is optimized to spend as little time as possible looking for valid chunks, i.e.,
+    /// where there are line breaks, and will not look through the entire buffer. This can have an
+    /// effect on the CPU cache hit-rate, however, this depends on the size of the buffer.
+    ///
+    /// # Errors
+    /// This function might return an error for the following reasons:
+    /// * If the buffer was empty.
+    /// * If there were no line breaks in the buffer.
+    pub fn try_distribute_buffer_chunks_on_workers(
+        &self,
+        buffer: &[u8],
+        thread_workloads: &mut Vec<(usize, usize)>,
+    ) -> Result<()> {
+        let n_bytes_total: usize = buffer.len();
+        let n_worker_threads: usize = thread_workloads.capacity();
+
+        let n_bytes_per_thread: usize = n_bytes_total / n_worker_threads;
+        let n_bytes_remaining: usize = n_bytes_total - n_bytes_per_thread * n_worker_threads;
+
+        let mut prev_byte_idx: usize = 0;
+        for _ in 0..(n_worker_threads - 1) {
+            let next_byte_idx: usize = n_bytes_per_thread + prev_byte_idx;
+            thread_workloads.push((prev_byte_idx, next_byte_idx));
+            prev_byte_idx = next_byte_idx;
+        }
+
+        thread_workloads.push((
+            prev_byte_idx,
+            prev_byte_idx + n_bytes_per_thread + n_bytes_remaining,
+        ));
+
+        let mut n_bytes_to_offset_start: usize = 0;
+        for t_idx in 0..n_worker_threads {
+            let (mut start_byte_idx, mut end_byte_idx) = thread_workloads[t_idx];
+            start_byte_idx -= n_bytes_to_offset_start;
+            let n_bytes_to_offset_end: usize = (end_byte_idx - start_byte_idx)
+                - self.try_find_last_line_break(&buffer[start_byte_idx..end_byte_idx])?;
+            end_byte_idx -= n_bytes_to_offset_end;
+            thread_workloads[t_idx].0 = start_byte_idx;
+            thread_workloads[t_idx].1 = end_byte_idx;
+            n_bytes_to_offset_start = n_bytes_to_offset_end - NUM_BYTES_FOR_NEWLINE;
+        }
+
+        Ok(())
     }
 
     /// Read from the buffered reader into the provided buffer. This function reads
