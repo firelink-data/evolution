@@ -15,7 +15,7 @@ authors = [
     "Wilhelm Ågren <wilhelmagren98@gmail.com>",
 ]
 license = "MIT"
-version = "1.2.0"
+version = "1.3.0"
 readme = "README.md"
 categories = [
     "science",
@@ -26,16 +26,19 @@ categories = [
 keywords = [
     "arrow",
     "parquet",
+    "concurrency",
+    "data-engineering",
+    "ETL",
 ]
-description = "Efficiently evolve your old fixed-length data files into modern file formats. "
+description = "Efficiently evolve your old fixed-length data files into modern file formats."
 
 [workspace.dependencies]
-evolution-builder = { path = "crates/evolution-builder", version = "1.2.0" }
-evolution-common = { path = "crates/evolution-common", version = "1.2.0" }
-evolution-converter = { path = "crates/evolution-converter", version = "1.2.0" }
-evolution-mocker = { path = "crates/evolution-mocker", version = "1.2.0" }
-evolution-parser = { path = "crates/evolution-parser", version = "1.2.0" }
-evolution-schema = { path = "crates/evolution-schema", version = "1.2.0" }
-evolution-slicer = { path = "crates/evolution-slicer", version = "1.2.0" }
-evolution-target = { path = "crates/evolution-target", version = "1.2.0" }
-evolution-writer = { path = "crates/evolution-writer", version = "1.2.0" }
+evolution-builder = { path = "crates/evolution-builder", version = "1.3.0" }
+evolution-common = { path = "crates/evolution-common", version = "1.3.0" }
+evolution-converter = { path = "crates/evolution-converter", version = "1.3.0" }
+evolution-mocker = { path = "crates/evolution-mocker", version = "1.3.0" }
+evolution-parser = { path = "crates/evolution-parser", version = "1.3.0" }
+evolution-schema = { path = "crates/evolution-schema", version = "1.3.0" }
+evolution-slicer = { path = "crates/evolution-slicer", version = "1.3.0" }
+evolution-target = { path = "crates/evolution-target", version = "1.3.0" }
+evolution-writer = { path = "crates/evolution-writer", version = "1.3.0" }
