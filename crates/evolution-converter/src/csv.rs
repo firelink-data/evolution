@@ -21,10 +21,19 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-// File created: 2024-05-05
+// File created: 2024-10-18
 // Last updated: 2024-10-18
 //
 
-pub mod parquet;
-pub mod csv;
-pub mod writer;
+use evolution_slicer::slicer::FileSlicer;
+use evolution_schema::schema::FixedSchema;
+use evolution_writer::csv::CsvWriter;
+
+pub struct CsvConverter {
+    slicer: FileSlicer,
+    writer: CsvWriter,
+    schema: FixedSchema,
+    read_buffer_size: usize,
+    n_threads: usize,
+    thread_channel_capacity: usize,
+}

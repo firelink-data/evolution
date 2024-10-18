@@ -21,10 +21,63 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-// File created: 2024-05-05
+// File created: 2024-10-18
 // Last updated: 2024-10-18
 //
 
-pub mod parquet;
-pub mod csv;
-pub mod writer;
+use std::fs::File;
+use std::path::PathBuf;
+
+pub struct CsvWriter {
+    inner: File,
+    n_columns: usize,
+}
+
+impl CsvWriter {
+    pub fn builder() -> CsvWriterBuilder {
+        CsvWriterBuilder {
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct CsvWriterBuilder {
+    out_path: Option<PathBuf>,
+    properties: CsvWriterProperties,
+}
+
+pub struct CsvWriterProperties {
+    delimiter: char,
+    quote: char,
+    escape: char,
+}
+
+///
+impl CsvWriterProperties {
+    /// 
+    pub fn with_delimiter(mut self, delimiter: char) -> Self {
+        self.delimiter = delimiter;
+        self
+    }
+
+    pub fn with_quote(mut self, quote: char) -> Self {
+        self.quote = quote;
+        self
+    }
+
+    pub fn with_escape(mut self, escape: char) -> Self {
+        self.escape = escape;
+        self
+    }
+}
+
+impl Default for CsvWriterProperties {
+    fn default() -> Self {
+        CsvWriterProperties {
+            delimiter: ',',
+            quote: '"',
+            escape: '\\',
+        }
+    }
+}
