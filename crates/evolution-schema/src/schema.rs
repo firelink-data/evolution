@@ -26,7 +26,7 @@
 //
 
 use arrow::datatypes::{Field as ArrowField, Schema as ArrowSchema};
-use evolution_builder::builder::{Builder, ColumnBuilderRef};
+use evolution_builder::parquet::ParquetColumnBuilderRef;
 use evolution_common::datatype::DataType;
 use evolution_common::error::Result;
 use serde::{Deserialize, Serialize};
@@ -190,13 +190,13 @@ impl FixedSchema {
     /// Consume the [`FixedSchema`] and produce an instance of a [`Builder`] from it.
     pub fn into_builder<T>(self) -> T
     where
-        T: Builder,
+        T: From<Vec<ParquetColumnBuilderRef>>,
     {
         let column_builders = self
             .columns
             .iter()
             .map(|c| c.as_column_builder())
-            .collect::<Vec<ColumnBuilderRef>>();
+            .collect::<Vec<ParquetColumnBuilderRef>>();
 
         T::from(column_builders)
     }

@@ -42,7 +42,7 @@ pub trait Writer<'a> {
 }
 
 /// A short-hand notation for a generic writer implementation.
-pub type WriterRef<'a, T> = dyn Writer<'a, Buffer = T>;
+pub type WriterRef<'a, T> = Box<dyn Writer<'a, Buffer = T>>;
 
 /// The writer struct for fixed-length files (.flf).
 pub struct FixedLengthFileWriter {

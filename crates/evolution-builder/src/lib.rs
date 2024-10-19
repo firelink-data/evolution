@@ -22,8 +22,9 @@
 // SOFTWARE.
 //
 // File created: 2024-05-07
-// Last updated: 2024-05-29
+// Last updated: 2024-10-19
 //
 
 pub mod builder;
 pub mod datatype;
+pub mod parquet;

@@ -32,7 +32,8 @@ use crossbeam::thread::scope;
 use crossbeam::thread::ScopedJoinHandle;
 use parquet::file::properties::WriterProperties as ArrowWriterProperties;
 
-use evolution_builder::builder::ParquetBuilder;
+use evolution_builder::builder::Builder;
+use evolution_builder::parquet::ParquetBuilder;
 use evolution_common::error::{ExecutionError, Result, SetupError};
 use evolution_common::thread::estimate_best_thread_channel_capacity;
 use evolution_common::NUM_BYTES_FOR_NEWLINE;
@@ -217,7 +218,7 @@ impl ParquetConverter {
             let n_bytes_left_after_last_line_break: usize =
                 buffer_capacity - byte_idx_last_line_break - NUM_BYTES_FOR_NEWLINE;
 
-            self.builder.try_build_from_slice(&buffer)?;
+            self.builder.try_build_from(&buffer)?;
             self.writer.try_write_from_builder(&mut self.builder)?;
 
             self.slicer
@@ -284,7 +285,7 @@ impl ParquetConverter {
                     let t_buffer_slice: &[u8] = &t_buffer[*from..*to];
 
                     s.spawn(move |_| {
-                        t_builder.try_build_from_slice(t_buffer_slice).unwrap();
+                        t_builder.try_build_from(t_buffer_slice).unwrap();
                         t_sender.send(t_builder).unwrap();
                         drop(t_sender);
                     })

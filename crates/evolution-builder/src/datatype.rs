@@ -62,6 +62,8 @@ impl BooleanColumnBuilder {
 }
 
 impl ColumnBuilder for BooleanColumnBuilder {
+    type Output = (String, ArrayRef);
+
     ///
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
         let n_bytes_in_column: usize = match self.parser.try_parse(bytes, self.n_runes) {
@@ -86,8 +88,8 @@ impl ColumnBuilder for BooleanColumnBuilder {
     }
 
     ///
-    fn finish(&mut self) -> (&str, ArrayRef) {
-        (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
+    fn finish(&mut self) -> Self::Output {
+        (self.name.to_string(), Arc::new(self.inner.finish()) as ArrayRef)
     }
 }
 
@@ -114,6 +116,8 @@ impl Float16ColumnBuilder {
 }
 
 impl ColumnBuilder for Float16ColumnBuilder {
+    type Output = (String, ArrayRef);
+
     ///
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
         let n_bytes_in_column: usize = match self.parser.try_parse::<f16>(bytes, self.n_runes) {
@@ -138,8 +142,8 @@ impl ColumnBuilder for Float16ColumnBuilder {
     }
 
     ///
-    fn finish(&mut self) -> (&str, ArrayRef) {
-        (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
+    fn finish(&mut self) -> Self::Output {
+        (self.name.to_string(), Arc::new(self.inner.finish()) as ArrayRef)
     }
 }
 
@@ -166,6 +170,8 @@ impl Float32ColumnBuilder {
 }
 
 impl ColumnBuilder for Float32ColumnBuilder {
+    type Output = (String, ArrayRef);
+
     ///
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
         let n_bytes_in_column: usize = match self.parser.try_parse::<f32>(bytes, self.n_runes) {
@@ -190,8 +196,8 @@ impl ColumnBuilder for Float32ColumnBuilder {
     }
 
     ///
-    fn finish(&mut self) -> (&str, ArrayRef) {
-        (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
+    fn finish(&mut self) -> Self::Output {
+        (self.name.to_string(), Arc::new(self.inner.finish()) as ArrayRef)
     }
 }
 
@@ -218,6 +224,8 @@ impl Float64ColumnBuilder {
 }
 
 impl ColumnBuilder for Float64ColumnBuilder {
+    type Output = (String, ArrayRef);
+
     ///
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
         let n_bytes_in_column: usize = match self.parser.try_parse::<f64>(bytes, self.n_runes) {
@@ -242,8 +250,8 @@ impl ColumnBuilder for Float64ColumnBuilder {
     }
 
     ///
-    fn finish(&mut self) -> (&str, ArrayRef) {
-        (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
+    fn finish(&mut self) -> Self::Output {
+        (self.name.to_string(), Arc::new(self.inner.finish()) as ArrayRef)
     }
 }
 
@@ -270,6 +278,8 @@ impl Int16ColumnBuilder {
 }
 
 impl ColumnBuilder for Int16ColumnBuilder {
+    type Output = (String, ArrayRef);
+
     ///
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
         let n_bytes_in_column: usize = match self.parser.try_parse::<i16>(bytes, self.n_runes) {
@@ -294,8 +304,8 @@ impl ColumnBuilder for Int16ColumnBuilder {
     }
 
     ///
-    fn finish(&mut self) -> (&str, ArrayRef) {
-        (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
+    fn finish(&mut self) -> Self::Output {
+        (self.name.to_string(), Arc::new(self.inner.finish()) as ArrayRef)
     }
 }
 
@@ -322,6 +332,8 @@ impl Int32ColumnBuilder {
 }
 
 impl ColumnBuilder for Int32ColumnBuilder {
+    type Output = (String, ArrayRef);
+
     ///
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
         let n_bytes_in_column: usize = match self.parser.try_parse::<i32>(bytes, self.n_runes) {
@@ -346,8 +358,8 @@ impl ColumnBuilder for Int32ColumnBuilder {
     }
 
     ///
-    fn finish(&mut self) -> (&str, ArrayRef) {
-        (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
+    fn finish(&mut self) -> Self::Output {
+        (self.name.to_string(), Arc::new(self.inner.finish()) as ArrayRef)
     }
 }
 
@@ -374,6 +386,8 @@ impl Int64ColumnBuilder {
 }
 
 impl ColumnBuilder for Int64ColumnBuilder {
+    type Output = (String, ArrayRef);
+
     ///
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
         let n_bytes_in_column: usize = match self.parser.try_parse::<i64>(bytes, self.n_runes) {
@@ -398,8 +412,8 @@ impl ColumnBuilder for Int64ColumnBuilder {
     }
 
     ///
-    fn finish(&mut self) -> (&str, ArrayRef) {
-        (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
+    fn finish(&mut self) -> Self::Output {
+        (self.name.to_string(), Arc::new(self.inner.finish()) as ArrayRef)
     }
 }
 
@@ -426,6 +440,8 @@ impl Utf8ColumnBuilder {
 }
 
 impl ColumnBuilder for Utf8ColumnBuilder {
+    type Output = (String, ArrayRef);
+
     ///
     fn try_build_column(&mut self, bytes: &[u8]) -> Result<usize> {
         let n_bytes_in_column: usize = match self.parser.try_parse(bytes, self.n_runes) {
@@ -450,7 +466,7 @@ impl ColumnBuilder for Utf8ColumnBuilder {
     }
 
     ///
-    fn finish(&mut self) -> (&str, ArrayRef) {
-        (&self.name, Arc::new(self.inner.finish()) as ArrayRef)
+    fn finish(&mut self) -> Self::Output {
+        (self.name.to_string(), Arc::new(self.inner.finish()) as ArrayRef)
     }
 }

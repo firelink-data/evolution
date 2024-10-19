@@ -27,7 +27,7 @@
 
 use arrow::array::{ArrayRef, RecordBatch};
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
-use evolution_builder::builder::ParquetBuilder;
+use evolution_builder::parquet::ParquetBuilder;
 use evolution_common::error::{Result, SetupError};
 use parquet::arrow::ArrowWriter;
 use parquet::file::properties::WriterProperties as ArrowWriterProperties;
@@ -51,7 +51,7 @@ impl ParquetWriter {
 
     /// TODO: NOTE THIS ALLOCATES MEMORY ON THE HEAP!!! BAD!!!
     pub fn try_write_from_builder(&mut self, builder: &mut ParquetBuilder) -> Result<()> {
-        let mut buffer: Vec<(&str, ArrayRef)> = Vec::with_capacity(self.n_columns);
+        let mut buffer: Vec<(String, ArrayRef)> = Vec::with_capacity(self.n_columns);
         for column_builder in builder.columns().iter_mut() {
             buffer.push(column_builder.finish());
         }

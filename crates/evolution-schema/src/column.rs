@@ -22,12 +22,12 @@
 // SOFTWARE.
 //
 // File created: 2023-11-25
-// Last updated: 2024-10-11
+// Last updated: 2024-10-19
 //
 
 use arrow::datatypes::DataType as ArrowDataType;
 use deltalake::kernel::DataType as DeltaDataType;
-use evolution_builder::builder::ColumnBuilderRef;
+use evolution_builder::parquet::ParquetColumnBuilderRef;
 use evolution_builder::datatype::{
     BooleanColumnBuilder, Float16ColumnBuilder, Float32ColumnBuilder, Float64ColumnBuilder,
     Int16ColumnBuilder, Int32ColumnBuilder, Int64ColumnBuilder, Utf8ColumnBuilder,
@@ -173,7 +173,7 @@ impl FixedColumn {
     /// This method will clone the String which contains the name of the column.
     /// You should only use this during setup of the program, and not during any
     /// performance critical parts of the program.
-    pub fn as_column_builder(&self) -> ColumnBuilderRef {
+    pub fn as_column_builder(&self) -> ParquetColumnBuilderRef {
         match self.dtype {
             DataType::Boolean => Box::new(BooleanColumnBuilder::new(
                 self.name.clone(),
