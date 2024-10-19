@@ -22,7 +22,8 @@
 // SOFTWARE.
 //
 // File created: 2023-12-11
-// Last updated: 2024-05-28
+// Last updated: 2024-10-19
 //
 
+pub mod fixed_width;
 pub mod slicer;
