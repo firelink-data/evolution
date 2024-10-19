@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-02-25
-// Last updated: 2024-05-25
+// Last updated: 2024-10-19
 //
 
 use clap::ValueEnum;
@@ -34,4 +34,5 @@ pub enum Target {
     Iceberg,
     Ipc,
     Parquet,
+    Csv,
 }

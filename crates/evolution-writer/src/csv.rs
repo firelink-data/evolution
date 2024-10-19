@@ -25,12 +25,16 @@
 // Last updated: 2024-10-18
 //
 
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::path::PathBuf;
+
+use evolution_builder::csv::CsvBuilder;
+use evolution_common::error::{Result, SetupError};
 
 pub struct CsvWriter {
     inner: File,
     n_columns: usize,
+    properties: CsvWriterProperties,
 }
 
 impl CsvWriter {
@@ -39,12 +43,73 @@ impl CsvWriter {
             ..Default::default()
         }
     }
+
+    pub fn try_write_from_builder(&mut self, builder: &mut CsvBuilder) -> Result<()> {
+        let mut buffer: Vec<u8> = Vec::with_capacity(self.n_columns);
+        for (col_idx, column) in builder.columns().iter_mut().enumerate() {
+            buffer.extend(column.finish());
+            if col_idx != self.n_columns - 1 {
+                buffer.push(self.properties.delimiter() as u8);
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Default)]
 pub struct CsvWriterBuilder {
     out_path: Option<PathBuf>,
-    properties: CsvWriterProperties,
+    n_columns: Option<usize>,
+    properties: Option<CsvWriterProperties>,
+}
+
+impl CsvWriterBuilder {
+    pub fn with_out_path(mut self, out_path: PathBuf) -> Self {
+        self.out_path = Some(out_path);
+        self
+    }
+
+    pub fn with_n_columns(mut self, n_columns: usize) -> Self {
+        self.n_columns = Some(n_columns);
+        self
+    }
+
+    pub fn with_properties(mut self, properties: CsvWriterProperties) -> Self {
+        self.properties = Some(properties);
+        self
+    }
+
+    pub fn try_build(self) -> Result<CsvWriter> {
+        let out_file: File = match self.out_path {
+            Some(p) => OpenOptions::new().create(true).append(true).open(p)?,
+            None => {
+                return Err(Box::new(SetupError::new(
+                    "Output path not set for CSV writer.",
+                )))
+            }
+        };
+
+        let n_columns: usize = match self.n_columns {
+            Some(n) => n,
+            None => {
+                return Err(Box::new(SetupError::new(
+                    "Number of columns not set for CSV writer.",
+                )))
+            }
+        };
+
+        let properties: CsvWriterProperties = match self.properties {
+            Some(p) => p,
+            None => CsvWriterProperties::default(),
+        };
+
+        Ok(CsvWriter {
+            inner: out_file,
+            n_columns,
+            properties,
+        })
+    }
 }
 
 pub struct CsvWriterProperties {
@@ -69,6 +134,18 @@ impl CsvWriterProperties {
     pub fn with_escape(mut self, escape: char) -> Self {
         self.escape = escape;
         self
+    }
+
+    pub fn delimiter(&self) -> char {
+        self.delimiter
+    }
+
+    pub fn quote(&self) -> char {
+        self.quote
+    }
+
+    pub fn escape(&self) -> char {
+        self.escape
     }
 }
 

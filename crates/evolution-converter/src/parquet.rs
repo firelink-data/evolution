@@ -387,7 +387,7 @@ impl ParquetConverterBuilder {
         self
     }
 
-    /// Try creating a new [`ParquetConverterProperties`] from the previously set values.
+    /// Try creating a new [`ParquetConverter`] from the previously set values.
     ///
     /// # Errors
     /// This function might return an error for the following reasons:

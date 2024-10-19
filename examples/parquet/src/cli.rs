@@ -22,13 +22,13 @@
 // SOFTWARE.
 //
 // File created: 2024-10-13
-// Last updated: 2024-10-13
+// Last updated: 2024-10-19
 //
 
 use clap::{value_parser, ArgAction, Parser, Subcommand};
 use evolution_common::error::Result;
 use evolution_common::thread::get_available_threads;
-use evolution_converter::converter::ParquetConverter;
+use evolution_converter::parquet::ParquetConverter;
 
 use std::path::PathBuf;
 
