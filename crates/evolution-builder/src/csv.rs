@@ -21,19 +21,43 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-// File created: 2024-10-18
+// File created: 2024-10-19
 // Last updated: 2024-10-19
 //
 
-use evolution_slicer::slicer::FileSlicer;
-use evolution_schema::schema::FixedSchema;
-use evolution_writer::csv::CsvWriter;
+use evolution_common::error::Result;
+use evolution_common::NUM_BYTES_FOR_NEWLINE;
 
-pub struct CsvConverter {
-    slicer: FileSlicer,
-    writer: CsvWriter,
-    schema: FixedSchema,
-    read_buffer_size: usize,
-    n_threads: usize,
-    thread_channel_capacity: usize,
+use crate::builder::{Builder, ColumnBuilderRef};
+
+pub struct CsvBuilder {
+    columns: Vec<ColumnBuilderRef>,
 }
+
+impl CsvBuilder {
+    ///
+    pub fn try_build_from_slice(&mut self, buffer: &[u8]) -> Result<()> {
+        let mut idx: usize = 0;
+        while idx < buffer.len() {
+            for column in self.columns.iter_mut() {
+                idx += column.try_build_column(&buffer[idx..])?;
+            }
+            idx += NUM_BYTES_FOR_NEWLINE;
+        }
+
+        Ok(())
+    }
+
+    ///
+    pub fn columns(&mut self) -> &mut Vec<ColumnBuilderRef> {
+        &mut self.columns
+    }
+}
+
+impl From<Vec<ColumnBuilderRef>> for CsvBuilder {
+    fn from(columns: Vec<ColumnBuilderRef>) -> Self {
+        Self { columns }
+    }
+}
+
+impl Builder for CsvBuilder {}

@@ -22,8 +22,9 @@
 // SOFTWARE.
 //
 // File created: 2024-05-28
-// Last updated: 2024-10-18
+// Last updated: 2024-10-19
 //
 
 pub mod converter;
+pub mod parquet;
 pub mod csv;

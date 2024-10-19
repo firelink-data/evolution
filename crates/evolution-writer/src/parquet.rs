@@ -27,7 +27,7 @@
 
 use arrow::array::{ArrayRef, RecordBatch};
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
-use evolution_builder::builder::ParquetBuilder;
+use evolution_builder::parquet::ParquetBuilder;
 use evolution_common::error::{Result, SetupError};
 use parquet::arrow::ArrowWriter;
 use parquet::file::properties::WriterProperties as ArrowWriterProperties;
