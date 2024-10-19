@@ -42,7 +42,7 @@ pub type SchemaRef = Box<dyn Schema>;
 
 /// Representation of the schema for a fixed-length file (.flf), containing the only allowed fields.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct FixedSchema {
+pub struct FixedWidthSchema {
     /// The symbolic name of the schema.
     name: String,
     /// The version of the schema.
@@ -51,8 +51,8 @@ pub struct FixedSchema {
     columns: Vec<FixedColumn>,
 }
 
-impl FixedSchema {
-    /// Create a new [`FixedSchema`] from the provided field values.
+impl FixedWidthSchema {
+    /// Create a new [`FixedWidthSchema`] from the provided field values.
     pub fn new(name: String, version: usize, columns: Vec<FixedColumn>) -> Self {
         Self {
             name,
@@ -61,7 +61,7 @@ impl FixedSchema {
         }
     }
 
-    /// Create a new [`FixedSchema`] by reading a .json file at the provided path.
+    /// Create a new [`FixedWidthSchema`] by reading a .json file at the provided path.
     ///
     /// # Errors
     /// This function will return an error under a number of different circumstances. These error conditions
@@ -77,11 +77,11 @@ impl FixedSchema {
     /// # Examples
     ///
     /// ```no_run
-    /// use evolution_schema::schema::FixedSchema;
+    /// use evolution_schema::schema::FixedWidthSchema;
     /// use std::path::PathBuf;
     ///
     /// let path: PathBuf = PathBuf::from(r"/path/to/my/schema.json");
-    /// let schema: FixedSchema = FixedSchema::from_path(path).unwrap();
+    /// let schema: FixedWidthSchema = FixedWidthSchema::from_path(path).unwrap();
     ///
     /// println!("This is my cool schema: {:?}", schema);
     /// ```
@@ -169,14 +169,14 @@ impl FixedSchema {
     }
 
     /// Borrow the vector of [`FixedColumn`]s and create a new iterator with it.
-    pub fn iter(&self) -> FixedSchemaIterator {
-        FixedSchemaIterator {
+    pub fn iter(&self) -> FixedWidthSchemaIterator {
+        FixedWidthSchemaIterator {
             columns: &self.columns,
             index: 0,
         }
     }
 
-    /// Consume the [`FixedSchema`] and produce an [`ArrowSchema`] from it.
+    /// Consume the [`FixedWidthSchema`] and produce an [`ArrowSchema`] from it.
     pub fn into_arrow_schema(self) -> ArrowSchema {
         let fields = self
             .columns
@@ -187,7 +187,7 @@ impl FixedSchema {
         ArrowSchema::new(fields)
     }
 
-    /// Consume the [`FixedSchema`] and produce an instance of a [`Builder`] from it.
+    /// Consume the [`FixedWidthSchema`] and produce an instance of a [`Builder`] from it.
     pub fn into_builder<T>(self) -> T
     where
         T: From<Vec<ParquetColumnBuilderRef>>,
@@ -202,16 +202,16 @@ impl FixedSchema {
     }
 }
 
-impl Schema for FixedSchema {}
+impl Schema for FixedWidthSchema {}
 
-/// Intermediary struct representing an iterable [`FixedSchema`]. It contains a reference
+/// Intermediary struct representing an iterable [`FixedWidthSchema`]. It contains a reference
 /// to the schema's vector of [`FixedColumn`]s and the current iteration index.
-pub struct FixedSchemaIterator<'a> {
+pub struct FixedWidthSchemaIterator<'a> {
     columns: &'a Vec<FixedColumn>,
     index: usize,
 }
 
-impl<'a> Iterator for FixedSchemaIterator<'a> {
+impl<'a> Iterator for FixedWidthSchemaIterator<'a> {
     type Item = &'a FixedColumn;
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.columns.len() {
@@ -258,8 +258,8 @@ mod tests_schema {
             ),
         ];
 
-        let a: FixedSchema = FixedSchema::from_path(path).unwrap();
-        let b: FixedSchema = FixedSchema::new(String::from("ValidTestSchema"), 8914781578, columns);
+        let a: FixedWidthSchema = FixedWidthSchema::from_path(path).unwrap();
+        let b: FixedWidthSchema = FixedWidthSchema::new(String::from("ValidTestSchema"), 8914781578, columns);
 
         assert_eq!(a.name(), b.name());
         assert_ne!(a.version(), b.version());
@@ -299,7 +299,7 @@ mod tests_schema {
         let mut path: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("res/test_invalid_schema.json");
 
-        let _: FixedSchema = FixedSchema::from_path(path).unwrap();
+        let _: FixedWidthSchema = FixedWidthSchema::from_path(path).unwrap();
     }
 
     #[test]
@@ -324,9 +324,9 @@ mod tests_schema {
                 false,
             ),
         ];
-        let a: FixedSchema = FixedSchema::new(String::from("ValidTestSchema"), 8914781578, columns);
+        let a: FixedWidthSchema = FixedWidthSchema::new(String::from("ValidTestSchema"), 8914781578, columns);
 
-        let mut iterator: FixedSchemaIterator = a.iter();
+        let mut iterator: FixedWidthSchemaIterator = a.iter();
 
         let c1: &FixedColumn = iterator.next().unwrap();
         assert_eq!("id", c1.name());

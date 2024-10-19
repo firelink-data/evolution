@@ -26,4 +26,5 @@
 //
 
 pub mod converter;
+pub mod fixed_width;
 pub mod parquet;

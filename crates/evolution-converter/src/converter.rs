@@ -1,7 +1,7 @@
 //
 // MIT License
 //
-// Copyright (c) 2023-2024 Firelink Data
+// Copyright (c) 2024 Firelink Data
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -34,3 +34,72 @@ pub trait Converter {
 }
 /// A short-hand notation for a generic [`Converter`] reference.
 pub type ConverterRef = Box<dyn Converter>;
+
+/// Properties for conversion.
+pub struct ConverterProperties {
+    read_buffer_size: usize,
+    thread_channel_capacity: usize,
+    multithreaded: bool,
+    n_worker_threads: usize,
+}
+
+impl ConverterProperties {
+    pub fn new() -> Self {
+        Self {
+            ..Default::default()
+        }
+    }
+
+    /// Set the buffer size for reading the input (in bytes).
+    pub fn with_read_buffer_size(mut self, read_buffer_size: usize) -> Self {
+        self.read_buffer_size = read_buffer_size;
+        self
+    }
+
+    /// Set the maxmimum message capacity on the multithreaded converter channels.
+    pub fn with_thread_channel_capacity(mut self, thread_channel_capacity: usize) -> Self {
+        self.thread_channel_capacity = thread_channel_capacity;
+        self
+    }
+
+    /// Set the number of worker threads (logical cores) to use.
+    pub fn with_n_worker_threads(mut self, n_worker_threads: usize) -> Self {
+        self.n_worker_threads = n_worker_threads;
+        if n_worker_threads > 1 {
+            self.multithreaded = true;
+        }
+        self
+    }
+
+    /// Get the buffer size for reading the input (in bytes).
+    pub fn read_buffer_size(&self) -> usize {
+        self.read_buffer_size
+    }
+
+    /// Get the maxmimum message capacity on the multithreaded converter channels.
+    pub fn thread_channel_capacity(&self) -> usize {
+        self.thread_channel_capacity
+    }
+
+    /// Get whether the converter is multithreaded.
+    pub fn multithreaded(&self) -> bool {
+        self.multithreaded
+    }
+
+    /// Get the number of worker threads (logical cores) to use.
+    pub fn n_worker_threads(&self) -> usize {
+        self.n_worker_threads
+    }
+}
+
+impl Default for ConverterProperties {
+    fn default() -> Self {
+        let n_worker_threads: usize = num_cpus::get() - 1;
+        Self {
+            read_buffer_size: 1 * 1024 * 1024 * 1024, // 1 GB
+            thread_channel_capacity: n_worker_threads,
+            multithreaded: true,
+            n_worker_threads,
+        }
+    }
+}
