@@ -22,14 +22,18 @@
 // SOFTWARE.
 //
 // File created: 2024-02-17
-// Last updated: 2024-10-19
+// Last updated: 2024-10-20
 //
 
+use bytesize::ByteSize;
 use evolution_builder::builder::BuilderRef;
+use evolution_common::NUM_BYTES_FOR_NEWLINE;
 use evolution_common::error::{Result, SetupError};
 use evolution_schema::schema::FixedWidthSchema;
 use evolution_slicer::fixed_width::FixedWidthSlicer;
+use evolution_slicer::slicer::Slicer;
 use evolution_writer::writer::WriterRef;
+use log::info;
 
 use std::path::PathBuf;
 
@@ -38,7 +42,7 @@ use crate::converter::{Converter, ConverterProperties};
 /// Struct for converting any fixed-width file to a 
 pub struct FixedWidthConverter<'a> {
     slicer: FixedWidthSlicer,
-    writer: WriterRef<'a, &'a [u8]>,
+    writer: WriterRef<'a, BuilderRef<'a, &'a [u8]>>,
     builder: BuilderRef<'a, &'a [u8]>,
     schema: FixedWidthSchema,
     properties: ConverterProperties,
@@ -74,7 +78,47 @@ impl<'a> FixedWidthConverter<'a> {
     }
 
     pub fn try_convert_single_threaded(&mut self) -> Result<()> {
-        todo!()
+        let mut buffer_capacity: usize = self.properties.read_buffer_size();
+
+        info!("Converting fixed-width file to {} in single-threaded mode.", self.writer.target());
+        info!("The file to convert is ~{} in total.", ByteSize::gb((self.slicer.bytes_to_read() / 1_000_000_000) as u64));
+
+        loop {
+            if self.slicer.is_done() {
+                break;
+            }
+
+            let mut remaining_bytes: usize = self.slicer.remaining_bytes();
+            let mut bytes_processed: usize = self.slicer.bytes_processed();
+            let mut bytes_overlapped: usize = self.slicer.bytes_overlapped();
+
+            if remaining_bytes < buffer_capacity {
+                buffer_capacity = remaining_bytes;
+            }
+
+            let mut buffer: Vec<u8> = vec![0u8; buffer_capacity];
+            self.slicer.try_read_to_buffer(&mut buffer)?;
+
+            let byte_idx_last_line_break: usize = self.slicer.try_find_last_line_break(&buffer)?;
+            let n_bytes_left_after_last_line_break: usize =
+                buffer_capacity - byte_idx_last_line_break - NUM_BYTES_FOR_NEWLINE;
+            
+            self.slicer
+                .try_seek_relative(-(n_bytes_left_after_last_line_break as i64))?;
+
+            self.builder.try_build_from(&buffer)?;
+            self.writer.try_write(self.builder)?;
+
+            bytes_processed += buffer_capacity - n_bytes_left_after_last_line_break;
+            bytes_overlapped += n_bytes_left_after_last_line_break;
+            remaining_bytes -= buffer_capacity - n_bytes_left_after_last_line_break;
+
+            self.slicer.set_remaining_bytes(remaining_bytes);
+            self.slicer.set_bytes_processed(bytes_processed);
+            self.slicer.set_bytes_overlapped(bytes_overlapped);
+        }
+
+        Ok(())
     }
 }
 
@@ -83,7 +127,7 @@ impl<'a> FixedWidthConverter<'a> {
 pub struct FixedWidthConverterBuilder<'a> {
     in_path: Option<PathBuf>,
     schema_path: Option<PathBuf>,
-    writer: Option<WriterRef<'a, &'a [u8]>>,
+    writer: Option<WriterRef<'a, BuilderRef<'a, &'a [u8]>>>,
     builder: Option<BuilderRef<'a, &'a [u8]>>,
     properties: Option<ConverterProperties>,
 }
@@ -102,7 +146,7 @@ impl<'a> FixedWidthConverterBuilder<'a> {
     }
 
     /// Set the [`WriterRef`] that will be used to write the converted data to the target format.
-    pub fn with_writer(mut self, writer: WriterRef<'a, &'a [u8]>) -> Self {
+    pub fn with_writer(mut self, writer: WriterRef<'a, BuilderRef<'a, &'a [u8]>>) -> Self {
         self.writer = Some(writer);
         self
     }
@@ -140,7 +184,7 @@ impl<'a> FixedWidthConverterBuilder<'a> {
             ))
         })?;
 
-        let writer: WriterRef<'a, &'a [u8]> = self.writer.ok_or_else(|| {
+        let writer: WriterRef<'a, BuilderRef<'a, &'a [u8]>> = self.writer.ok_or_else(|| {
             Box::new(SetupError::new(
                 "Required field 'writer' was not provided, exiting...",
             ))

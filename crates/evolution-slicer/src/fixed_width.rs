@@ -210,49 +210,39 @@ impl FixedWidthSlicer {
 
         Ok(())
     }
-}
-
-impl<'a> Slicer<'a> for FixedWidthSlicer {
-    type Buffer = &'a mut [u8];
-    type Workloads = &'a mut Vec<(usize, usize)>;
-
-    /// Get whether or not this [`Slicer`] is done reading the input file.
-    fn is_done(&self) -> bool {
-        self.bytes_processed >= self.bytes_to_read
-    }
 
     /// Get the total number of bytes to read.
-    fn bytes_to_read(&self) -> usize {
+    pub fn bytes_to_read(&self) -> usize {
         self.bytes_to_read
     }
 
     /// Get the number of remaining bytes to read.
-    fn remaining_bytes(&self) -> usize {
+    pub fn remaining_bytes(&self) -> usize {
         self.remaining_bytes
     }
 
     /// Set the number of remaining bytes to read.
-    fn set_remaining_bytes(&mut self, remaining_bytes: usize) {
+    pub fn set_remaining_bytes(&mut self, remaining_bytes: usize) {
         self.remaining_bytes = remaining_bytes;
     }
 
     /// Get the total number of processed bytes.
-    fn bytes_processed(&self) -> usize {
+    pub fn bytes_processed(&self) -> usize {
         self.bytes_processed
     }
 
     /// Set the total number of processed bytes.
-    fn set_bytes_processed(&mut self, bytes_processed: usize) {
+    pub fn set_bytes_processed(&mut self, bytes_processed: usize) {
         self.bytes_processed = bytes_processed;
     }
 
     /// Get the total number of overlapped bytes (due to sliding window).
-    fn bytes_overlapped(&self) -> usize {
+    pub fn bytes_overlapped(&self) -> usize {
         self.bytes_overlapped
     }
 
     /// Set the total number of overlapped bytes.
-    fn set_bytes_overlapped(&mut self, bytes_overlapped: usize) {
+    pub fn set_bytes_overlapped(&mut self, bytes_overlapped: usize) {
         self.bytes_overlapped = bytes_overlapped;
     }
 
@@ -269,30 +259,12 @@ impl<'a> Slicer<'a> for FixedWidthSlicer {
     /// This function might panics on an error for the following reasons:
     /// * If the buffer was empty.
     /// * If there were no line breaks in the buffer.
-    fn distribute_workloads(
+    pub fn distribute_workloads(
         &self,
-        buffer: Self::Buffer,
-        workloads: Self::Workloads,
+        buffer: &[u8],
+        workloads: &mut Vec<(usize, usize)>,
     ) {
         self.try_distribute_workloads(buffer, workloads).unwrap();
-    }
-
-    /// Read from the buffered reader into the provided buffer. This function reads
-    /// enough bytes to fill the buffer, hence, it is up to the caller to ensure that
-    /// that buffer has the correct and/or wanted capacity.
-    ///
-    /// # Panics
-    /// If the buffered reader encounters an EOF before completely filling the buffer.
-    fn read_to_buffer(&mut self, buffer: Self::Buffer) {
-        self.inner.read_exact(buffer).unwrap();
-    }
-
-    /// Seek relative to the current position in the buffered reader.
-    ///
-    /// # Panics
-    /// Seeking to a negative offset will cause the program to panic.
-    fn seek_relative(&mut self, bytes_to_seek: i64) {
-        self.try_seek_relative(bytes_to_seek).unwrap()
     }
 
     /// Try and evenly distribute the buffer into uniformly sized chunks for each worker thread.
@@ -308,10 +280,10 @@ impl<'a> Slicer<'a> for FixedWidthSlicer {
     /// This function might return an error for the following reasons:
     /// * If the buffer was empty.
     /// * If there were no line breaks in the buffer.
-    fn try_distribute_workloads(
+    pub fn try_distribute_workloads(
         &self,
-        buffer: Self::Buffer,
-        thread_workloads: Self::Workloads,
+        buffer: &[u8],
+        thread_workloads: &mut Vec<(usize, usize)>,
     ) -> Result<()> {
         let n_bytes_total: usize = buffer.len();
         let n_worker_threads: usize = thread_workloads.capacity();
@@ -344,6 +316,33 @@ impl<'a> Slicer<'a> for FixedWidthSlicer {
         }
 
         Ok(())
+    }
+}
+
+impl<'a> Slicer<'a> for FixedWidthSlicer {
+    type Buffer = &'a mut [u8];
+
+    /// Get whether or not this [`Slicer`] is done reading the input file.
+    fn is_done(&self) -> bool {
+        self.bytes_processed >= self.bytes_to_read
+    }
+
+    /// Read from the buffered reader into the provided buffer. This function reads
+    /// enough bytes to fill the buffer, hence, it is up to the caller to ensure that
+    /// that buffer has the correct and/or wanted capacity.
+    ///
+    /// # Panics
+    /// If the buffered reader encounters an EOF before completely filling the buffer.
+    fn read_to_buffer(&mut self, buffer: Self::Buffer) {
+        self.inner.read_exact(buffer).unwrap();
+    }
+
+    /// Seek relative to the current position in the buffered reader.
+    ///
+    /// # Panics
+    /// Seeking to a negative offset will cause the program to panic.
+    fn seek_relative(&mut self, bytes_to_seek: i64) {
+        self.try_seek_relative(bytes_to_seek).unwrap()
     }
 
     /// Try and read from the buffered reader into the provided buffer. This function

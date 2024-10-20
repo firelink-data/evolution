@@ -22,8 +22,9 @@
 // SOFTWARE.
 //
 // File created: 2024-05-05
-// Last updated: 2024-05-28
+// Last updated: 2024-10-20
 //
 
+pub mod fixed_width;
 pub mod parquet;
 pub mod writer;
