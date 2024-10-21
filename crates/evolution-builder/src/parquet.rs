@@ -22,10 +22,11 @@
 // SOFTWARE.
 //
 // File created: 2024-10-19
-// Last updated: 2024-10-19
+// Last updated: 2024-10-21
 //
 
 use arrow::array::ArrayRef;
+use arrow::record_batch::RecordBatch;
 
 use evolution_common::NUM_BYTES_FOR_NEWLINE;
 use evolution_common::error::Result;
@@ -54,8 +55,9 @@ impl From<Vec<ParquetColumnBuilderRef>> for ParquetBuilder {
     }
 }
 
-impl<'a> Builder<'a> for ParquetBuilder {
-    type Buffer = &'a [u8];
+impl Builder for ParquetBuilder {
+    type Buffer = Vec<u8>;
+    type Output = RecordBatch;
 
     /// Build the parquet columns from the buffer.
     /// 
@@ -65,7 +67,7 @@ impl<'a> Builder<'a> for ParquetBuilder {
         self.try_build_from(buffer).unwrap();
     }
 
-    /// Try and build the parquet columns from the buffer.
+    /// Try to build the parquet columns from the buffer.
     /// 
     /// # Errors
     /// If any of the [`ColumnBuilder`]s fail to build from the buffer.
@@ -79,5 +81,20 @@ impl<'a> Builder<'a> for ParquetBuilder {
         }
 
         Ok(())
+    }
+
+    /// Try to finalize the accumulated columns into a [`RecordBatch`].
+    /// 
+    /// # Errors
+    /// This function might return an error for the following reasons:
+    /// * The vec of columns was empty.
+    /// * Any column array had a different length.
+    fn try_finish(&mut self) -> Result<Self::Output> {
+        let mut columns: Vec<(String, ArrayRef)> = Vec::with_capacity(self.columns.len());
+        for column in self.columns.iter_mut() {
+            columns.push(column.finish());
+        }
+        let record_batch: RecordBatch = RecordBatch::try_from_iter(columns)?;
+        Ok(record_batch)
     }
 }

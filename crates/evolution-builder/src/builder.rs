@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-05-07
-// Last updated: 2024-10-19
+// Last updated: 2024-10-21
 //
 
 use evolution_common::error::Result;
@@ -38,11 +38,13 @@ pub trait ColumnBuilder: Send + Sync {
 pub type ColumnBuilderRef<T> = Box<dyn ColumnBuilder<Output = T>>;
 
 /// A trait providing functions to build structured data from a buffer.
-pub trait Builder<'a>: Send + Sync {
-    type Buffer: 'a;
+pub trait Builder: Send + Sync {
+    type Buffer;
+    type Output;
 
     fn build_from(&mut self, buffer: Self::Buffer);
     fn try_build_from(&mut self, buffer: Self::Buffer) -> Result<()>;
+    fn try_finish(&mut self) -> Result<Self::Output>;
 }
 /// A short-hand notation for a generic [`Builder`] reference.
-pub type BuilderRef<'a, T> = Box<dyn Builder<'a, Buffer = T>>;
+pub type BuilderRef<T, V> = Box<dyn Builder<Buffer = T, Output = V>>;

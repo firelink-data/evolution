@@ -22,12 +22,12 @@
 // SOFTWARE.
 //
 // File created: 2024-05-05
-// Last updated: 2024-10-20
+// Last updated: 2024-10-21
 //
 
 use evolution_common::error::{Result, SetupError};
 
-use arrow::array::{ArrayRef, RecordBatch};
+use arrow::array::RecordBatch;
 use arrow::datatypes::SchemaRef as ArrowSchemaRef;
 use log::warn;
 use parquet::arrow::ArrowWriter;
@@ -53,6 +53,47 @@ impl ParquetWriter {
     /// Get the properties for the writer.
     pub fn properties(&self) -> &WriterProperties {
         &self.properties
+    }
+}
+
+impl<'a> Writer<'a> for ParquetWriter {
+    type Buffer = RecordBatch;
+
+    /// Close and finalize the underlying [`ArrowWriter`].
+    /// 
+    /// # Errors
+    /// This function will return an error if an attempt to write was made after calling [`finish`].
+    /// 
+    /// [`finish`]: ArrowWriter::finish
+    fn finish(&mut self) {
+        self.try_finish().unwrap();
+    }
+
+    /// Get the target path for the output file.
+    fn target(&self) -> &str {
+        "parquet"
+    }
+
+    /// Write the record batch to the output file.
+    fn write_from(&mut self, buffer: &mut Self::Buffer) {
+        self.try_write_from(buffer).unwrap();
+    }
+
+    /// Try and close and finalize the underlying [`ArrowWriter`].
+    /// 
+    /// # Errors
+    /// This function will return an error if an attempt to write was made after calling [`finish`].
+    /// 
+    /// [`finish`]: ArrowWriter::finish
+    fn try_finish(&mut self) -> Result<()> {
+        self.inner.finish()?;
+        Ok(())
+    }
+
+    /// Try and write the record batch to the output file.
+    fn try_write_from(&mut self, buffer: &mut Self::Buffer) -> Result<()> {
+        self.inner.write(&buffer)?;
+        Ok(())
     }
 }
 

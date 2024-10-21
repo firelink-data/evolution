@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-02-17
-// Last updated: 2024-10-20
+// Last updated: 2024-10-21
 //
 
 use bytesize::ByteSize;
@@ -42,8 +42,8 @@ use crate::converter::{Converter, ConverterProperties};
 /// Struct for converting any fixed-width file to a 
 pub struct FixedWidthConverter<'a> {
     slicer: FixedWidthSlicer,
-    writer: WriterRef<'a, BuilderRef<'a, &'a [u8]>>,
-    builder: BuilderRef<'a, &'a [u8]>,
+    writer: WriterRef<'a, BuilderRef<Vec<u8>>>,
+    builder: BuilderRef<Vec<u8>>,
     schema: FixedWidthSchema,
     properties: ConverterProperties,
 }
@@ -106,8 +106,8 @@ impl<'a> FixedWidthConverter<'a> {
             self.slicer
                 .try_seek_relative(-(n_bytes_left_after_last_line_break as i64))?;
 
-            self.builder.try_build_from(&buffer)?;
-            self.writer.try_write(self.builder)?;
+            self.builder.try_build_from(buffer)?;
+            self.writer.try_write_from(self.builder.try_finish()?)?;
 
             bytes_processed += buffer_capacity - n_bytes_left_after_last_line_break;
             bytes_overlapped += n_bytes_left_after_last_line_break;
@@ -127,8 +127,8 @@ impl<'a> FixedWidthConverter<'a> {
 pub struct FixedWidthConverterBuilder<'a> {
     in_path: Option<PathBuf>,
     schema_path: Option<PathBuf>,
-    writer: Option<WriterRef<'a, BuilderRef<'a, &'a [u8]>>>,
-    builder: Option<BuilderRef<'a, &'a [u8]>>,
+    writer: Option<WriterRef<'a, BuilderRef<Vec<u8>>>>,
+    builder: Option<BuilderRef<Vec<u8>>>,
     properties: Option<ConverterProperties>,
 }
 
@@ -146,13 +146,13 @@ impl<'a> FixedWidthConverterBuilder<'a> {
     }
 
     /// Set the [`WriterRef`] that will be used to write the converted data to the target format.
-    pub fn with_writer(mut self, writer: WriterRef<'a, BuilderRef<'a, &'a [u8]>>) -> Self {
+    pub fn with_writer(mut self, writer: WriterRef<'a, BuilderRef<Vec<u8>>>) -> Self {
         self.writer = Some(writer);
         self
     }
 
     /// Set the [`BuilderRef`] that will be used to build converted data to the target format.
-    pub fn with_builder(mut self, builder: BuilderRef<'a, &'a [u8]>) -> Self {
+    pub fn with_builder(mut self, builder: BuilderRef<Vec<u8>>) -> Self {
         self.builder = Some(builder);
         self
     }
@@ -184,13 +184,13 @@ impl<'a> FixedWidthConverterBuilder<'a> {
             ))
         })?;
 
-        let writer: WriterRef<'a, BuilderRef<'a, &'a [u8]>> = self.writer.ok_or_else(|| {
+        let writer: WriterRef<'a, BuilderRef<Vec<u8>>> = self.writer.ok_or_else(|| {
             Box::new(SetupError::new(
                 "Required field 'writer' was not provided, exiting...",
             ))
         })?;
 
-        let builder: BuilderRef<'a, &'a [u8]> = self.builder.ok_or_else(|| {
+        let builder: BuilderRef<Vec<u8>> = self.builder.ok_or_else(|| {
             Box::new(SetupError::new(
                 "Required field 'builder' was not provided, exiting...",
             ))

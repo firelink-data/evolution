@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-05-05
-// Last updated: 2024-10-20
+// Last updated: 2024-10-21
 //
 
 use evolution_common::error::Result;
@@ -34,12 +34,11 @@ pub trait Writer<'a> {
 
     fn finish(&mut self);
     fn target(&self) -> &str;
-    fn write_from(&mut self, buffer: Self::Buffer);
+    fn write_from(&mut self, buffer: &mut Self::Buffer);
     
     fn try_finish(&mut self) -> Result<()>;
-    fn try_write_from(&mut self, buffer: Self::Buffer) -> Result<()>;
+    fn try_write_from(&mut self, buffer: &mut Self::Buffer) -> Result<()>;
 }
-
 /// A short-hand notation for a generic writer implementation.
 pub type WriterRef<'a, T> = Box<dyn Writer<'a, Buffer = T>>;
 
@@ -99,8 +98,6 @@ impl Default for WriterProperties {
 /// the [`ArrowWriterProperties`] we need to implement this trait accordingly.
 impl From<WriterProperties> for ArrowWriterProperties {
     fn from(_properties: WriterProperties) -> Self {
-        Self {
-            ..Default::default()
-        }
+        Self::new()
     }
 }

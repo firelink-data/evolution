@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-10-20
-// Last updated: 2024-10-20
+// Last updated: 2024-10-21
 //
 
 use evolution_common::error::{Result, SetupError};
@@ -74,11 +74,11 @@ impl<'a> Writer<'a> for FixedWidthFileWriter {
     /// 
     /// # Panics
     /// If and only if any I/O error occured during writing.
-    fn write_from(&mut self, buffer: Self::Buffer) {
+    fn write_from(&mut self, buffer: &mut Self::Buffer) {
         self.try_write_from(buffer).unwrap();
     }
 
-    /// Try and flush any remaining bytes in the output stream, ensuring that all bytes are written to disk.
+    /// Try to flush any remaining bytes in the output stream, ensuring that all bytes are written to disk.
     /// 
     /// # Errors
     /// If not all bytes could be written due to any I/O error or by reacing EOF.
@@ -87,12 +87,12 @@ impl<'a> Writer<'a> for FixedWidthFileWriter {
         Ok(())
     }
 
-    /// Try and write the entire buffer to the file by continuously calling [`write`].
+    /// Try to write the entire buffer to the file by continuously calling [`write`].
     /// 
     /// # Errors
     /// If and only if any I/O error occured during writing. Each call to [`write`] might generate
     /// an I/O error, however, no bytes will be written to disk if that actually happens.
-    fn try_write_from(&mut self, buffer: Self::Buffer) -> Result<()> {
+    fn try_write_from(&mut self, buffer: &mut Self::Buffer) -> Result<()> {
         self.inner.write_all(buffer)?;
         Ok(())
     }
@@ -128,7 +128,7 @@ impl FixedWidthFileWriterBuilder {
         self.try_build().unwrap()
     }
 
-    /// Try and create a new instance of a [`FixedWidthFileWriter`] from the set values.
+    /// Try to create a new instance of a [`FixedWidthFileWriter`] from the set values.
     /// 
     /// # Errors
     /// This function might return an error for the following reasons:
