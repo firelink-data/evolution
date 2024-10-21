@@ -37,8 +37,7 @@ use evolution_builder::parquet::ParquetBuilder;
 use evolution_common::error::{ExecutionError, Result, SetupError};
 use evolution_common::thread::estimate_best_thread_channel_capacity;
 use evolution_common::NUM_BYTES_FOR_NEWLINE;
-use evolution_schema::schema::FixedSchema;
-use evolution_slicer::slicer::SlicerRef;
+use evolution_schema::schema::FixedWidthSchema;
 use evolution_slicer::fixed_width::FixedWidthSlicer;
 use evolution_writer::parquet::ParquetWriter;
 
@@ -53,11 +52,11 @@ use std::thread;
 use crate::converter::Converter;
 
 /// Struct for converting any fixed-length file into the parquet file format.
-pub struct ParquetConverter<'a, B, W> {
-    slicer: SlicerRef<'a, B, W>,
+pub struct FixedWidthToParquetConverter {
+    slicer: FixedWidthSlicer,
     writer: ParquetWriter,
     builder: ParquetBuilder,
-    schema: FixedSchema,
+    schema: FixedWidthSchema,
     // The size of the buffer that reads the input file (in bytes).
     read_buffer_size: usize,
     // The number of threads to use when converting.
@@ -66,7 +65,7 @@ pub struct ParquetConverter<'a, B, W> {
     thread_channel_capacity: usize,
 }
 
-impl<'a, B, W> ParquetConverter<'a, B, W> {
+impl FixedWidthToParquetConverter {
     /// Create a new instance of a [`ParquetConverterBuilder`] with default values.
     pub fn builder() -> ParquetConverterBuilder {
         ParquetConverterBuilder {

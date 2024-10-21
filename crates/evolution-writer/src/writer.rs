@@ -29,8 +29,8 @@ use evolution_common::error::Result;
 use parquet::file::properties::WriterProperties as ArrowWriterProperties;
 
 /// A trait providing functions to write buffered data to some target.
-pub trait Writer<'a> {
-    type Buffer: 'a;
+pub trait Writer {
+    type Buffer;
 
     fn finish(&mut self);
     fn target(&self) -> &str;
@@ -40,7 +40,7 @@ pub trait Writer<'a> {
     fn try_write_from(&mut self, buffer: &mut Self::Buffer) -> Result<()>;
 }
 /// A short-hand notation for a generic writer implementation.
-pub type WriterRef<'a, T> = Box<dyn Writer<'a, Buffer = T>>;
+pub type WriterRef<T> = Box<dyn Writer<Buffer = T>>;
 
 /// Properties for writing converted data to some target.
 #[derive(Clone, Debug)]

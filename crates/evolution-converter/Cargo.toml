@@ -22,6 +22,7 @@ evolution-builder = { workspace = true }
 evolution-common = { workspace = true }
 evolution-schema = { workspace = true }
 evolution-slicer = { workspace = true }
+evolution-target = { workspace = true }
 evolution-writer = { workspace = true }
 log = "0.4.21"
 num_cpus = "1.16.0"

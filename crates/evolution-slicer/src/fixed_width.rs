@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 // File created: 2024-10-19
-// Last updated: 2024-10-19
+// Last updated: 2024-10-21
 //
 
 use evolution_common::error::{ExecutionError, Result};
@@ -35,7 +35,7 @@ use std::path::PathBuf;
 
 use crate::slicer::Slicer;
 
-///
+/// Struct for reading and slicing a fixed-width file.
 pub struct FixedWidthSlicer {
     inner: BufReader<File>,
     bytes_to_read: usize,
@@ -319,8 +319,8 @@ impl FixedWidthSlicer {
     }
 }
 
-impl<'a> Slicer<'a> for FixedWidthSlicer {
-    type Buffer = &'a mut [u8];
+impl Slicer for FixedWidthSlicer {
+    type Buffer = Vec<u8>;
 
     /// Get whether or not this [`Slicer`] is done reading the input file.
     fn is_done(&self) -> bool {
@@ -333,7 +333,7 @@ impl<'a> Slicer<'a> for FixedWidthSlicer {
     ///
     /// # Panics
     /// If the buffered reader encounters an EOF before completely filling the buffer.
-    fn read_to_buffer(&mut self, buffer: Self::Buffer) {
+    fn read_to_buffer(&mut self, buffer: &mut Self::Buffer) {
         self.inner.read_exact(buffer).unwrap();
     }
 
@@ -351,7 +351,7 @@ impl<'a> Slicer<'a> for FixedWidthSlicer {
     ///
     /// # Errors
     /// If the buffered reader encounters an EOF before completely filling the buffer.
-    fn try_read_to_buffer(&mut self, buffer: Self::Buffer) -> Result<()> {
+    fn try_read_to_buffer(&mut self, buffer: &mut Self::Buffer) -> Result<()> {
         match self.inner.read_exact(buffer) {
             Ok(()) => Ok(()),
             Err(e) => match e.kind() {

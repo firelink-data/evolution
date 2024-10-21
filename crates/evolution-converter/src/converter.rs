@@ -25,7 +25,12 @@
 // Last updated: 2024-10-19
 //
 
+use evolution_builder::builder::Builder;
 use evolution_common::error::Result;
+use evolution_schema::schema::Schema;
+use evolution_slicer::slicer::Slicer;
+use evolution_target::target::Target;
+use evolution_writer::writer::Writer;
 
 /// A trait providing functions to convert source data to target.
 pub trait Converter {
@@ -34,6 +39,35 @@ pub trait Converter {
 }
 /// A short-hand notation for a generic [`Converter`] reference.
 pub type ConverterRef = Box<dyn Converter>;
+
+pub struct FileConverter<S, B, W, C>
+where
+    S: Slicer,
+    B: Builder,
+    W: Writer,
+{
+    parser: S,
+    builder: B,
+    writer: W,
+    schema: C,
+    properties: ConverterProperties,
+}
+
+impl FileConverter<_> {
+    pub fn new(target: Target) -> Self {
+        match target {
+            Target::Parquet => {
+                FileConverter {
+                    slicer: FixedWidthSlicer::new(),
+                    builder: ParquetBuilder,
+                    writer: ParquetWriter,
+                }
+            },
+            Target::Iceberg => todo!(),
+            _ => todo!(),
+        }
+    }
+}
 
 /// Properties for conversion.
 pub struct ConverterProperties {

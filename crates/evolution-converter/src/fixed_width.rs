@@ -31,7 +31,8 @@ use evolution_common::NUM_BYTES_FOR_NEWLINE;
 use evolution_common::error::{Result, SetupError};
 use evolution_schema::schema::FixedWidthSchema;
 use evolution_slicer::fixed_width::FixedWidthSlicer;
-use evolution_slicer::slicer::Slicer;
+use evolution_slicer::slicer::SlicerRef;
+use evolution_writer::fixed_width::FixedWidthFileWriter;
 use evolution_writer::writer::WriterRef;
 use log::info;
 
@@ -39,16 +40,16 @@ use std::path::PathBuf;
 
 use crate::converter::{Converter, ConverterProperties};
 
-/// Struct for converting any fixed-width file to a 
-pub struct FixedWidthConverter<'a> {
-    slicer: FixedWidthSlicer,
-    writer: WriterRef<'a, BuilderRef<Vec<u8>>>,
-    builder: BuilderRef<Vec<u8>>,
+/// Struct for converting an arbitrary data source to fixed-width file format.
+pub struct FixedWidthFileConverter<'a> {
+    slicer: SlicerRef<BuilderRef::Buffer>,
+    builder: BuilderRef<...>,
+    writer: FixedWidthFileWriter,
     schema: FixedWidthSchema,
     properties: ConverterProperties,
 }
 
-impl Converter for FixedWidthConverter<'_> {
+impl Converter for FixedWidthFileConverter<'_> {
     ///
     fn convert(&mut self) {
         self.try_convert().unwrap();
@@ -65,10 +66,10 @@ impl Converter for FixedWidthConverter<'_> {
     }
 }
 
-impl<'a> FixedWidthConverter<'a> {
+impl<'a> FixedWidthFileConverter<'a> {
     /// Create a new instance of a [`FixedWidthConverterBuilder`].
-    pub fn builder() -> FixedWidthConverterBuilder<'a> {
-        FixedWidthConverterBuilder {
+    pub fn builder() -> FixedWidthFileConverterBuilder<'a> {
+        FixedWidthFileConverterBuilder {
             ..Default::default()
         }
     }
@@ -124,7 +125,7 @@ impl<'a> FixedWidthConverter<'a> {
 
 #[derive(Default)]
 /// Helper struct for building an instance of a [`FixedWidthConverter`].
-pub struct FixedWidthConverterBuilder<'a> {
+pub struct FixedWidthFileConverterBuilder<'a> {
     in_path: Option<PathBuf>,
     schema_path: Option<PathBuf>,
     writer: Option<WriterRef<'a, BuilderRef<Vec<u8>>>>,
@@ -132,7 +133,7 @@ pub struct FixedWidthConverterBuilder<'a> {
     properties: Option<ConverterProperties>,
 }
 
-impl<'a> FixedWidthConverterBuilder<'a> {
+impl<'a> FixedWidthFileConverterBuilder<'a> {
     /// Set the relative or absolute path to the fixed-width file that is to be converted.
     pub fn with_in_path(mut self, in_path: PathBuf) -> Self {
         self.in_path = Some(in_path);
@@ -171,7 +172,7 @@ impl<'a> FixedWidthConverterBuilder<'a> {
     /// * If the schema deserialization failed.
     /// * If any I/O error occured when trying to open the input and output files.
     /// * If a 
-    pub fn try_build(self) -> Result<FixedWidthConverter<'a>> {
+    pub fn try_build(self) -> Result<FixedWidthFileConverter<'a>> {
         let in_path: PathBuf = self.in_path.ok_or_else(|| {
             Box::new(SetupError::new(
                 "Required field 'in_path' was not provided, exiting...",
@@ -205,10 +206,10 @@ impl<'a> FixedWidthConverterBuilder<'a> {
         let slicer: FixedWidthSlicer = FixedWidthSlicer::try_from_path(in_path)?;
         let schema: FixedWidthSchema = FixedWidthSchema::from_path(schema_path)?;
 
-        Ok(FixedWidthConverter {
+        Ok(FixedWidthFileConverter {
             slicer,
-            writer,
             builder,
+            writer,
             schema,
             properties,
         })

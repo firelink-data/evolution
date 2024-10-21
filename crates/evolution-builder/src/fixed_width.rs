@@ -21,24 +21,35 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-// File created: 2023-12-11
-// Last updated: 2024-10-20
+// File created: 2024-10-21
+// Last updated: 2024-10-21
 //
 
 use evolution_common::error::Result;
 
-use std::sync::Arc;
+use crate::builder::{Builder, ColumnBuilder};
 
-/// A trait providing functions to read and slice buffered data.
-pub trait Slicer {
-    type Buffer;
+/// A short-hand notation for a fixed-width file specific [`ColumnBuilder`] reference.
+pub type FixedWidthFileColumnBuilderRef = Box<dyn ColumnBuilder<Output = Vec<u8>>>;
 
-    fn is_done(&self) -> bool;
-    fn read_to_buffer(&mut self, buffer: &mut Self::Buffer);
-    fn seek_relative(&mut self, offset: i64);
-
-    fn try_read_to_buffer(&mut self, buffer: &mut Self::Buffer) -> Result<()>;
-    fn try_seek_relative(&mut self, offset: i64) -> Result<()>;
+/// Struct for building fixed-width files.
+pub struct FixedWidthFileBuilder {
+    columns: Vec<FixedWidthFileColumnBuilderRef>,
 }
-///
-pub type SlicerRef<T> = Arc<dyn Slicer<Buffer = T>>;
+
+impl Builder for FixedWidthFileBuilder {
+    type Buffer = Vec<u8>;
+    type Output = Vec<u8>;
+
+    fn build_from(&mut self, buffer: Self::Buffer) {
+        self.try_build_from(buffer).unwrap();
+    }
+
+    fn try_build_from(&mut self, buffer: Self::Buffer) -> Result<()> {
+        unimplemented!()
+    }
+
+    fn try_finish(&mut self) -> Result<Self::Output> {
+        unimplemented!()
+    }
+}
