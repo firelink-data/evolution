@@ -92,6 +92,7 @@ impl<'a> Writer<'a> for ParquetWriter {
 
     /// Try and write the record batch to the output file.
     fn try_write_from(&mut self, buffer: &mut Self::Buffer) -> Result<()> {
+        
         self.inner.write(&buffer)?;
         Ok(())
     }

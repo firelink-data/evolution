@@ -43,7 +43,7 @@ use crate::converter::{Converter, ConverterProperties};
 /// Struct for converting an arbitrary data source to fixed-width file format.
 pub struct FixedWidthFileConverter<'a> {
     slicer: SlicerRef<BuilderRef::Buffer>,
-    builder: BuilderRef<...>,
+    builder: BuilderRef<>,
     writer: FixedWidthFileWriter,
     schema: FixedWidthSchema,
     properties: ConverterProperties,
